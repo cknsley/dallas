@@ -31,6 +31,7 @@ export const DEFAULT_SETTINGS: Settings = {
     Autre: 0,
   },
   trackingUrls: { ...DEFAULT_TRACKING_URLS },
+  nonSuppliers: [],
 };
 
 export const EMPTY_STATE: AppState = {

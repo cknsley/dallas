@@ -47,6 +47,9 @@ export default function OrderModal({
   const [carrier, setCarrier] = useState("");
   const [tracking, setTracking] = useState("");
   const [shipping, setShipping] = useState("");
+  const [customs, setCustoms] = useState("");
+  const [handling, setHandling] = useState("");
+  const [lotName, setLotName] = useState("");
   const [notes, setNotes] = useState(fromRequest?.notes ?? "");
   const [purchasePaid, setPurchasePaid] = useState(true);
   const [lines, setLines] = useState<Line[]>(
@@ -81,11 +84,16 @@ export default function OrderModal({
   const filled = lines.filter((l) => l.name.trim() || num(l.cost) > 0);
   const qtyOfLine = (l: Line) => Math.max(1, Math.round(num(l.quantity)) || 1);
   const goods = filled.reduce((a, l) => a + num(l.cost) * qtyOfLine(l), 0);
-  const shippingTotal = num(shipping);
-  const total = goods + shippingTotal;
-  // Le port se répartit au prorata du prix : une pièce chère en porte la plus grosse part.
+  // Port, douane et frais de livraison forment ensemble les frais d'approche.
+  const landedTotal = num(shipping) + num(customs) + num(handling);
+  const total = goods + landedTotal;
+  // Ils se répartissent au prorata du prix : un article cher en porte la plus grosse part.
   const shareOf = (l: Line) =>
-    shippingTotal === 0 ? 0 : goods > 0 ? ((num(l.cost) * qtyOfLine(l)) / goods) * shippingTotal : shippingTotal / filled.length;
+    landedTotal === 0
+      ? 0
+      : goods > 0
+        ? ((num(l.cost) * qtyOfLine(l)) / goods) * landedTotal
+        : landedTotal / Math.max(1, filled.length);
 
   const submit = () => {
     if (filled.length === 0) {
@@ -98,6 +106,8 @@ export default function OrderModal({
     }
     const orderId = uid();
     const now = Date.now();
+    // À défaut de nom saisi, le lot porte celui de sa source et de sa date.
+    const tag = lotName.trim() || [source.trim(), buyDate].filter(Boolean).join(" · ") || "Lot";
     filled.forEach((l, ix) => {
       const item: Item = {
         id: uid(),
@@ -120,6 +130,7 @@ export default function OrderModal({
         carrier: carrier.trim(), tracking: tracking.trim(), expectedDate, shipDate: "",
         orderId,
         purchasePaid,
+        lotTag: tag,
       };
       dispatch({ type: "upsertItem", item });
     });
@@ -176,8 +187,22 @@ export default function OrderModal({
         <Field label="N° de suivi">
           <input type="text" value={tracking} placeholder="Numéro de colis" onChange={(e) => setTracking(e.target.value)} />
         </Field>
-        <Field label={eurLabel("Frais de port de la commande")}>
+        <Field label={eurLabel("Frais de port")}>
           <input type="number" step="0.01" value={shipping} placeholder="0,00" onChange={(e) => setShipping(e.target.value)} />
+        </Field>
+        <Field label={eurLabel("Douane")}>
+          <input type="number" step="0.01" value={customs} placeholder="0,00" onChange={(e) => setCustoms(e.target.value)} />
+        </Field>
+        <Field label={eurLabel("Autres frais de livraison")}>
+          <input type="number" step="0.01" value={handling} placeholder="Manutention, assurance…" onChange={(e) => setHandling(e.target.value)} />
+        </Field>
+        <Field label="Nom du lot">
+          <input
+            type="text"
+            value={lotName}
+            placeholder={source.trim() ? `${source.trim()} ${buyDate}` : "Ex. Lot Milan septembre"}
+            onChange={(e) => setLotName(e.target.value)}
+          />
         </Field>
         <Field label="Règlement fournisseur">
           <select value={purchasePaid ? "paye" : "du"} onChange={(e) => setPurchasePaid(e.target.value === "paye")}>
@@ -211,9 +236,9 @@ export default function OrderModal({
               <label><span>{LABEL.cost}</span><input type="number" step="0.01" value={l.cost} placeholder="0,00" onChange={(e) => patch(l.key, { cost: e.target.value })} /></label>
               <label><span>{LABEL.estimate}</span><input type="number" step="0.01" value={l.estimate} placeholder={HINT.estimate} onChange={(e) => patch(l.key, { estimate: e.target.value })} /></label>
             </div>
-            {shippingTotal > 0 && num(l.cost) > 0 && (
+            {landedTotal > 0 && num(l.cost) > 0 && (
               <div className="hint num" style={{ textAlign: "right" }}>
-                {LABEL.fees.toLowerCase()} réparti : {eur2(shareOf(l))} · {LABEL.totalCost.toLowerCase()} {eur2(num(l.cost) + shareOf(l))}
+                {LABEL.fees.toLowerCase()} réparti : {eur2(shareOf(l))} · {LABEL.totalCost.toLowerCase()} {eur2(num(l.cost) * qtyOfLine(l) + shareOf(l))}
               </div>
             )}
           </div>
@@ -232,7 +257,7 @@ export default function OrderModal({
           <span>{filled.reduce((a, l) => a + qtyOfLine(l), 0)} article{filled.reduce((a, l) => a + qtyOfLine(l), 0) > 1 ? "s" : ""} sur {filled.length} ligne{filled.length > 1 ? "s" : ""}</span>
           <b className="num">{eur2(goods)}</b>
         </div>
-        <div className="totrow"><span>Frais de port</span><b className="num">+{eur2(shippingTotal)}</b></div>
+        <div className="totrow"><span>Frais d'approche (port, douane, livraison)</span><b className="num">+{eur2(landedTotal)}</b></div>
         <div className="totrow big"><span>Total de la commande</span><b className="num">{eur2(total)}</b></div>
       </div>
     </Modal>

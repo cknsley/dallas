@@ -62,6 +62,15 @@ const daysBetween = (a: string, b: string) =>
 
 export const supplierKey = (name: string) => name.trim().toLowerCase();
 
+/** Mots qui trahissent un achat au détail plutôt qu'un vrai fournisseur. */
+const RETAIL_HINTS = ["outlet", "magasin", "boutique", "store", "vinted", "leboncoin", "vestiaire", "ebay", "depop"];
+
+/** Vrai si cette source ressemble à un achat au détail, à proposer d'écarter. */
+export const looksLikeRetail = (name: string) => {
+  const n = name.trim().toLowerCase();
+  return RETAIL_HINTS.some((h) => n.includes(h));
+};
+
 export function buildSuppliers(items: Item[], records: SupplierRecord[] = []): Supplier[] {
   const byKey = new Map<string, Supplier>();
   const recordByKey = new Map(records.map((r) => [supplierKey(r.name), r]));

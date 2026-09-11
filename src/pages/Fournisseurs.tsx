@@ -5,7 +5,7 @@ import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
 import { useQueryState } from "../lib/useQueryState";
-import { buildSuppliers, scoreOf, type Supplier } from "../lib/suppliers";
+import { buildSuppliers, looksLikeRetail, scoreOf, type Supplier } from "../lib/suppliers";
 import { costOf, periodRange, qtyOf, revenueOf } from "../lib/calc";
 import { dshort, eur, eur2, pct } from "../lib/format";
 import { STATUS_LABEL } from "../lib/constants";
@@ -37,7 +37,31 @@ export default function Fournisseurs() {
   const [ordering, setOrdering] = useState<string | null>(null);
 
   const range = useMemo(() => periodRange(period), [period]);
-  const suppliers = useMemo(() => buildSuppliers(state.items, state.suppliers), [state.items, state.suppliers]);
+  const excluded = state.settings.nonSuppliers;
+  const allSources = useMemo(() => buildSuppliers(state.items, state.suppliers), [state.items, state.suppliers]);
+
+  // Un achat au détail n'est pas un approvisionnement : on l'écarte de cette page.
+  const suppliers = useMemo(
+    () => allSources.filter((s) => s.name !== "Source non renseignée" && !excluded.includes(s.key)),
+    [allSources, excluded],
+  );
+  const hiddenSources = useMemo(
+    () => allSources.filter((s) => excluded.includes(s.key)),
+    [allSources, excluded],
+  );
+  // Sources encore listées mais qui ressemblent à du détail : on propose de les sortir.
+  const retailCandidates = useMemo(
+    () => suppliers.filter((s) => looksLikeRetail(s.name) && !s.record),
+    [suppliers],
+  );
+
+  const setExcluded = (keys: string[]) =>
+    dispatch({ type: "settings", patch: { nonSuppliers: keys } });
+  const exclude = (s: Supplier) => {
+    setExcluded([...excluded, s.key]);
+    toast(`« ${s.name} » retiré des fournisseurs`);
+  };
+  const restore = (key: string) => setExcluded(excluded.filter((k) => k !== key));
 
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -162,10 +186,41 @@ export default function Fournisseurs() {
         </div>
       </div>
 
+      {retailCandidates.length > 0 && (
+        <div className="note warn" style={{ marginBottom: 16 }}>
+          <span className="glyph">⌂</span>
+          <div>
+            <b>Achats au détail dans la liste</b>
+            <br />
+            {retailCandidates.map((s) => s.name).join(", ")} ressemble{retailCandidates.length > 1 ? "nt" : ""} à
+            des achats en magasin plutôt qu'à des fournisseurs.
+            <div className="retail-actions">
+              {retailCandidates.map((s) => (
+                <button key={s.key} className="btn sm" onClick={() => exclude(s)}>
+                  Retirer « {s.name} »
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {hiddenSources.length > 0 && (
+        <div className="hint hidden-sources">
+          Sources écartées :
+          {hiddenSources.map((s) => (
+            <button key={s.key} className="btn ghost sm" onClick={() => restore(s.key)}>
+              {s.name} ↺
+            </button>
+          ))}
+        </div>
+      )}
+
       {suppliers.length === 0 ? (
         <div className="card">
           <Empty glyph="⌂" title="Aucun fournisseur">
-            Le champ « Source » d’un article ou d’une commande alimente cette liste.
+            Le champ « Source » d’un article ou d’une commande alimente cette liste — les achats au détail
+            en sont écartés.
           </Empty>
         </div>
       ) : (
@@ -245,6 +300,13 @@ export default function Fournisseurs() {
                       onClick={() => setRecordFor({ name: s.name, record: s.record })}
                     >
                       {s.record ? "Fiche" : "Créer la fiche"}
+                    </button>
+                    <button
+                      className="btn sm ghost"
+                      title="Retirer cette source des fournisseurs"
+                      onClick={() => exclude(s)}
+                    >
+                      Pas un fournisseur
                     </button>
                   </div>
 

@@ -43,6 +43,8 @@ export interface Item {
   orderId: string;
   /** Faux tant que le fournisseur n'a pas été réglé : c'est une dette. */
   purchasePaid: boolean;
+  /** Étiquette du lot d'origine, conservée après éclatement à l'unité. */
+  lotTag: string;
 }
 
 /** Une tâche automatique est déduite de l'état des pièces ou des documents :
@@ -171,6 +173,8 @@ export interface Settings {
   platformFees: Record<string, number>;
   /** Adresse de suivi par transporteur, « {code} » remplacé par le numéro. */
   trackingUrls: Record<string, string>;
+  /** Sources écartées de l'onglet Fournisseurs : outlet, magasin, achat en direct. */
+  nonSuppliers: string[];
 }
 
 export interface AppState {

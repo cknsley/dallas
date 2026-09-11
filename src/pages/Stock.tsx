@@ -246,6 +246,7 @@ export default function Stock() {
                         <button className="linkish ellipsis" title={i.name} onClick={() => setEditing({ item: i })}>
                           {i.name || "Sans nom"}
                         </button>
+                        {i.lotTag && <span className="lot-tag" title="Lot d'origine">{i.lotTag}</span>}
                         {i.notes && <div className="hint ellipsis">{i.notes}</div>}
                       </td>
                       <td className="r num shrink">{qtyOf(i)}</td>

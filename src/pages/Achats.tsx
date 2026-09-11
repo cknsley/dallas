@@ -1,16 +1,17 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
-import { Empty, Kpi, Photo, Segmented } from "../components/ui";
+import { Empty, Photo, Segmented } from "../components/ui";
 import InlineField from "../components/InlineField";
 import TrackingLink from "../components/TrackingLink";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
-import { costOf, periodRange, qtyOf } from "../lib/calc";
+import { costOf, qtyOf } from "../lib/calc";
 import { dshort, eur, eur2, num, today } from "../lib/format";
 import { REQUEST_LABEL } from "../lib/constants";
 import { useQueryState } from "../lib/useQueryState";
 import { links } from "../lib/links";
+import { uid } from "../lib/id";
 import OrderModal from "../modals/OrderModal";
 import MenuButton from "../components/MenuButton";
 import RequestModal from "../modals/RequestModal";
@@ -35,7 +36,6 @@ export default function Achats() {
   const [showArchive, setShowArchive] = useState(false);
 
   const now = today();
-  const month = useMemo(() => periodRange("month"), []);
 
   const incoming = useMemo(
     () =>
@@ -65,10 +65,6 @@ export default function Achats() {
 
   const late = incoming.filter((i) => i.expectedDate && i.expectedDate < now);
   const inTransit = incoming.reduce((a, i) => a + costOf(i), 0);
-  const monthPurchases = state.items
-    .filter((i) => i.buyDate >= month.from && i.buyDate <= month.to)
-    .reduce((a, i) => a + costOf(i), 0);
-  const debt = state.items.filter((i) => !i.purchasePaid).reduce((a, i) => a + costOf(i), 0);
 
   const patch = (id: string, p: Partial<Item>) => dispatch({ type: "patchItem", id, patch: p });
 
@@ -88,13 +84,80 @@ export default function Achats() {
     toast(`Demande ${REQUEST_LABEL[status].toLowerCase()}`);
   };
 
-  const receive = (i: Item) => {
-    patch(i.id, { status: "stock", receiveDate: today() });
-    toast(`« ${i.name || "Sans nom"} » est en stock`, {
-      label: "Voir le stock",
-      onClick: () => navigate(links.stock({ status: "stock" })),
-    });
+  /**
+   * À la réception, une ligne de plusieurs exemplaires éclate en articles
+   * individuels : chacun se vend, se photographie et se price séparément.
+   * Le tag du lot est conservé pour garder le lien avec la commande.
+   */
+  const receiveItem = (i: Item) => {
+    const qty = qtyOf(i);
+    const tag = i.lotTag || i.source || "";
+    if (qty <= 1) {
+      patch(i.id, { status: "stock", receiveDate: today(), lotTag: tag });
+      return 1;
+    }
+    dispatch({ type: "removeItem", id: i.id });
+    for (let n = 0; n < qty; n++) {
+      dispatch({
+        type: "upsertItem",
+        item: {
+          ...i,
+          id: uid(),
+          quantity: 1,
+          status: "stock",
+          receiveDate: today(),
+          lotTag: tag,
+          createdAt: Date.now() + n,
+        },
+      });
+    }
+    return qty;
   };
+
+  const receive = (i: Item) => {
+    const units = receiveItem(i);
+    toast(
+      units > 1
+        ? `${units} exemplaires de « ${i.name || "Sans nom"} » entrés à l'unité`
+        : `« ${i.name || "Sans nom"} » est en stock`,
+      { label: "Voir le stock", onClick: () => navigate(links.stock({ status: "stock" })) },
+    );
+  };
+
+  /**
+   * Les commandes encore en route, dans l'ordre où elles doivent arriver.
+   * Les frais d'approche ont été répartis sur chaque article à la commande :
+   * on les recompose ici pour montrer ce que chaque lot a coûté à faire venir.
+   */
+  const incomingOrders = useMemo(() => {
+    const map = new Map<string, {
+      id: string; tag: string; source: string; expectedDate: string; buyDate: string;
+      carrier: string; tracking: string; pieces: number; goods: number; landed: number; paid: boolean;
+    }>();
+    for (const i of incoming) {
+      const id = i.orderId || `solo:${i.id}`;
+      const o = map.get(id) ?? {
+        id,
+        tag: i.lotTag || i.source || "Achat isolé",
+        source: i.source,
+        expectedDate: i.expectedDate,
+        buyDate: i.buyDate,
+        carrier: i.carrier,
+        tracking: i.tracking,
+        pieces: 0, goods: 0, landed: 0, paid: true,
+      };
+      o.pieces += qtyOf(i);
+      o.goods += num(i.cost) * qtyOf(i);
+      o.landed += num(i.fees) * qtyOf(i);
+      if (!i.purchasePaid) o.paid = false;
+      if (i.expectedDate && (!o.expectedDate || i.expectedDate < o.expectedDate)) o.expectedDate = i.expectedDate;
+      if (!o.carrier && i.carrier) o.carrier = i.carrier;
+      if (!o.tracking && i.tracking) o.tracking = i.tracking;
+      map.set(id, o);
+    }
+    // Sans date annoncée, la commande passe en fin de file.
+    return [...map.values()].sort((a, b) => (a.expectedDate || "9999").localeCompare(b.expectedDate || "9999"));
+  }, [incoming]);
 
   /** Les commandes groupées encore complètes en arrivage. */
   const orderGroups = Array.from(
@@ -106,9 +169,9 @@ export default function Achats() {
   ).filter(([, n]) => n > 1);
 
   const receiveOrder = (orderId: string) => {
-    const pieces = incoming.filter((i) => i.orderId === orderId);
-    pieces.forEach((i) => patch(i.id, { status: "stock", receiveDate: today() }));
-    toast(`${pieces.length} article${pieces.length > 1 ? "s" : ""} passée${pieces.length > 1 ? "s" : ""} en stock`, {
+    const lines = incoming.filter((i) => i.orderId === orderId);
+    const units = lines.reduce((a, i) => a + receiveItem(i), 0);
+    toast(`${units} article${units > 1 ? "s" : ""} entré${units > 1 ? "s" : ""} en stock à l'unité`, {
       label: "Voir le stock",
       onClick: () => navigate(links.stock({ status: "stock" })),
     });
@@ -187,28 +250,78 @@ export default function Achats() {
         />
       </HeaderActions>
 
-      <div className="kpi-grid">
-        <Kpi
-          label="Colis en route"
-          value={String(incoming.length)}
-          meta={incoming.length ? `${eur(inTransit)} en transit` : "Rien en chemin"}
-          tone={incoming.length ? "info" : "ok"}
-        />
-        <Kpi
-          label="En retard"
-          value={String(late.length)}
-          meta={late.length ? "Arrivée prévue dépassée" : "Aucun retard"}
-          tone={late.length ? "warn" : "ok"}
-        />
-        <Kpi label={`Achats — ${month.label}`} value={eur(monthPurchases)} meta="Entrées de stock du mois" />
-        <Kpi
-          label="Dettes fournisseurs"
-          value={eur(debt)}
-          meta={debt > 0 ? "Achats non encore réglés" : "Tout est réglé"}
-          tone={debt > 0 ? "warn" : "ok"}
-          to={links.fournisseurs()}
-          hint="Fournisseurs"
-        />
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-h">
+          <h3>Prochaines arrivées</h3>
+          <div className="spacer" />
+          <span className="hint">
+            {incoming.length
+              ? `${incomingOrders.length} commande${incomingOrders.length > 1 ? "s" : ""} en route · ${eur(inTransit)} engagés${late.length ? ` · ${late.length} en retard` : ""}`
+              : "Rien en chemin"}
+          </span>
+        </div>
+        {incomingOrders.length === 0 ? (
+          <Empty glyph="⇩" title="Aucune commande en route">
+            Enregistrez une commande : elle prendra sa place dans la file d'arrivée, avec ses frais.
+          </Empty>
+        ) : (
+          <div className="arrival-queue">
+            {incomingOrders.map((o, ix) => {
+              const isLate = !!o.expectedDate && o.expectedDate < now;
+              const days = o.expectedDate
+                ? Math.round((new Date(o.expectedDate + "T12:00:00").getTime() - Date.now()) / 864e5)
+                : null;
+              return (
+                <article className={`arrival-row${isLate ? " late" : ""}`} key={o.id}>
+                  <div className="arrival-rank">{ix + 1}</div>
+                  <div className="arrival-id">
+                    <b>{o.tag}</b>
+                    <span className="hint">
+                      {o.pieces} article{o.pieces > 1 ? "s" : ""}
+                      {o.carrier ? ` · ${o.carrier}` : ""}
+                    </span>
+                  </div>
+                  <div className="arrival-when">
+                    {o.expectedDate ? (
+                      <>
+                        <b className="num">{dshort(o.expectedDate)}</b>
+                        <span className={`hint${isLate ? " neg" : ""}`}>
+                          {isLate
+                            ? `${Math.abs(days ?? 0)} j de retard`
+                            : days === 0
+                              ? "aujourd'hui"
+                              : `dans ${days} j`}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="hint">Date inconnue</span>
+                    )}
+                  </div>
+                  <div className="arrival-costs">
+                    <span><small>Marchandise</small><b className="num">{eur2(o.goods)}</b></span>
+                    <span>
+                      <small>Frais d'approche</small>
+                      <b className="num">{o.landed > 0 ? `+${eur2(o.landed)}` : "—"}</b>
+                    </span>
+                    <span><small>Total</small><b className="num">{eur2(o.goods + o.landed)}</b></span>
+                  </div>
+                  <div className="arrival-actions">
+                    <span className={`pill ${o.paid ? "good" : "bad"}`}>{o.paid ? "Réglé" : "À régler"}</span>
+                    {o.tracking && <TrackingLink carrier={o.carrier} code={o.tracking} />}
+                    <button
+                      className="btn sm"
+                      onClick={() => (o.id.startsWith("solo:")
+                        ? receive(incoming.find((i) => `solo:${i.id}` === o.id)!)
+                        : receiveOrder(o.id))}
+                    >
+                      ⇩ Réceptionner
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ---------- demandes produit ---------- */}
