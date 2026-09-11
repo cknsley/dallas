@@ -34,6 +34,7 @@ export default function Achats() {
   const [requestFilter, setRequestFilter] = useQueryState("demandes", "ouvertes");
   const [editing, setEditing] = useState<Item | null>(null);
   const [showArchive, setShowArchive] = useState(false);
+  const [openOrder, setOpenOrder] = useState("");
 
   const now = today();
 
@@ -159,15 +160,6 @@ export default function Achats() {
     return [...map.values()].sort((a, b) => (a.expectedDate || "9999").localeCompare(b.expectedDate || "9999"));
   }, [incoming]);
 
-  /** Les commandes groupées encore complètes en arrivage. */
-  const orderGroups = Array.from(
-    incoming.reduce((m, i) => {
-      if (!i.orderId) return m;
-      m.set(i.orderId, (m.get(i.orderId) ?? 0) + 1);
-      return m;
-    }, new Map<string, number>()),
-  ).filter(([, n]) => n > 1);
-
   const receiveOrder = (orderId: string) => {
     const lines = incoming.filter((i) => i.orderId === orderId);
     const units = lines.reduce((a, i) => a + receiveItem(i), 0);
@@ -256,7 +248,7 @@ export default function Achats() {
           <div className="spacer" />
           <span className="hint">
             {incoming.length
-              ? `${incomingOrders.length} commande${incomingOrders.length > 1 ? "s" : ""} en route · ${eur(inTransit)} engagés${late.length ? ` · ${late.length} en retard` : ""}`
+              ? `${incomingOrders.length} commande${incomingOrders.length > 1 ? "s" : ""} en route · ${eur(inTransit)} engagés${late.length ? ` · ${late.length} en retard` : ""} — dépliez pour renseigner le suivi`
               : "Rien en chemin"}
           </span>
         </div>
@@ -316,7 +308,55 @@ export default function Achats() {
                     >
                       ⇩ Réceptionner
                     </button>
+                    <button
+                      className="iconbtn"
+                      title={openOrder === o.id ? "Replier" : "Voir les articles"}
+                      onClick={() => setOpenOrder(openOrder === o.id ? "" : o.id)}
+                    >
+                      {openOrder === o.id ? "▲" : "▼"}
+                    </button>
                   </div>
+
+                  {openOrder === o.id && (
+                    <div className="arrival-detail">
+                      {incoming
+                        .filter((i) => (i.orderId || `solo:${i.id}`) === o.id)
+                        .map((i) => (
+                          <div className="arrival-item" key={i.id}>
+                            <Photo id={i.photoId} />
+                            <button className="linkish ellipsis" onClick={() => setEditing(i)}>
+                              {i.name || "Sans nom"}
+                            </button>
+                            <span className="hint nowrap">
+                              {i.brand || "—"}
+                              {qtyOf(i) > 1 && <span className="qty-badge">×{qtyOf(i)}</span>}
+                            </span>
+                            <span className="spacer" />
+                            <InlineField
+                              value={i.carrier}
+                              placeholder="Transporteur"
+                              onCommit={(v) => patch(i.id, { carrier: v })}
+                              width={120}
+                            />
+                            <InlineField
+                              value={i.tracking}
+                              placeholder="Code de suivi"
+                              onCommit={(v) => patch(i.id, { tracking: v })}
+                              width={130}
+                            />
+                            <InlineField
+                              value={i.expectedDate}
+                              type="date"
+                              placeholder=""
+                              onCommit={(v) => patch(i.id, { expectedDate: v })}
+                              width={128}
+                            />
+                            <b className="num nowrap">{eur2(costOf(i))}</b>
+                            <button className="btn sm" onClick={() => receive(i)}>⇩</button>
+                          </div>
+                        ))}
+                    </div>
+                  )}
                 </article>
               );
             })}
@@ -388,51 +428,6 @@ export default function Achats() {
                 </div>
               </article>
             ))}
-          </div>
-        )}
-      </div>
-
-      {/* ---------- en arrivage ---------- */}
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-h">
-          <h3>En arrivage</h3>
-          <div className="spacer" />
-          <span className="hint">Renseignez le suivi, réceptionnez pour passer en stock</span>
-        </div>
-        {orderGroups.length > 0 && (
-          <div className="card-b" style={{ display: "flex", flexWrap: "wrap", gap: 8, paddingBottom: 0 }}>
-            {orderGroups.map(([orderId, n]) => {
-              const first = incoming.find((i) => i.orderId === orderId);
-              return (
-                <button key={orderId} className="btn sm" onClick={() => receiveOrder(orderId)}>
-                  ⇩ Réceptionner la commande {first?.source ? `« ${first.source} »` : ""} ({n})
-                </button>
-              );
-            })}
-          </div>
-        )}
-        {incoming.length === 0 ? (
-          <Empty glyph="⇩" title="Aucun colis en route">
-            Enregistrez une commande : ses articles arrivent ici avec leur suivi, puis rejoignent le stock.
-          </Empty>
-        ) : (
-          <div className="twrap">
-            <table className="table-compact">
-              <thead>
-                <tr>
-                  <th className="shrink" />
-                  <th>Article</th>
-                  <th>Fournisseur</th>
-                  <th className="r">Coût</th>
-                  <th className="shrink">Règlement</th>
-                  <th>Transporteur</th>
-                  <th>Code de suivi</th>
-                  <th>Arrivée prévue</th>
-                  <th className="r shrink" />
-                </tr>
-              </thead>
-              <tbody>{incoming.map((i) => row(i, "arrivage"))}</tbody>
-            </table>
           </div>
         )}
       </div>

@@ -533,6 +533,14 @@ a.kpi:hover .go, button.kpi:hover .go { opacity: 1; transform: none; }
 }
 .arrival-costs b { font-size: 13px; }
 .arrival-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+.arrival-row { position: relative; }
+.arrival-detail {
+  flex-basis: 100%; display: flex; flex-direction: column; gap: 6px;
+  margin-top: 10px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--surface-2);
+}
+.arrival-item { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.arrival-item .thumb { width: 26px; height: 32px; }
+.arrival-item .linkish { max-width: 160px; }
 
 /* Bouton à choix : une action, plusieurs manières. */
 .menu-button { position: relative; display: inline-block; }
