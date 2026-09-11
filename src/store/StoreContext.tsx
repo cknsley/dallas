@@ -2,7 +2,7 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState,
   type ReactNode,
 } from "react";
-import type { AppState, DocKind, Expense, Item, SalesDoc, Settings, Todo } from "../types";
+import type { AppState, DocKind, Expense, Item, SalesDoc, Settings, SupplierRecord, Todo } from "../types";
 import { EMPTY_STATE, DEFAULT_SETTINGS } from "./defaults";
 import { getSyncInfo, initSync, push, subscribeSyncInfo, type SyncInfo } from "./sync";
 import { deletePhoto } from "./photos";
@@ -27,6 +27,8 @@ type Action =
   | { type: "addExpense"; expense: Expense }
   | { type: "patchExpense"; id: string; patch: Partial<Expense> }
   | { type: "removeExpense"; id: string }
+  | { type: "upsertSupplier"; supplier: SupplierRecord }
+  | { type: "removeSupplier"; id: string }
   | { type: "settings"; patch: Partial<Settings> };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -86,6 +88,17 @@ function reducer(state: AppState, action: Action): AppState {
       });
     case "removeExpense":
       return stamp({ ...state, expenses: state.expenses.filter((e) => e.id !== action.id) });
+    case "upsertSupplier": {
+      const exists = state.suppliers.some((s) => s.id === action.supplier.id);
+      return stamp({
+        ...state,
+        suppliers: exists
+          ? state.suppliers.map((s) => (s.id === action.supplier.id ? action.supplier : s))
+          : [...state.suppliers, action.supplier],
+      });
+    }
+    case "removeSupplier":
+      return stamp({ ...state, suppliers: state.suppliers.filter((s) => s.id !== action.id) });
     case "settings":
       return stamp({ ...state, settings: { ...state.settings, ...action.patch } });
     default:
@@ -131,6 +144,7 @@ function loadLocal(): AppState {
       todos: parsed.todos ?? [],
       docs: parsed.docs ?? [],
       expenses: parsed.expenses ?? [],
+      suppliers: parsed.suppliers ?? [],
       seq: parsed.seq ?? {},
     };
   } catch {
@@ -176,6 +190,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             },
             items: (remote.items ?? []).map(withLogistics),
             expenses: remote.expenses ?? [],
+            suppliers: remote.suppliers ?? [],
           },
         });
       },

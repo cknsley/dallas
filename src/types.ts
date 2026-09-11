@@ -105,6 +105,25 @@ export interface Expense {
   createdAt: number;
 }
 
+/** Fiche fournisseur : les informations que le stock ne peut pas déduire.
+ *  Elle s'attache à un nom de source, ce qui évite toute migration. */
+export interface SupplierRecord {
+  id: string;
+  /** Nom tel qu'il est saisi dans le champ « Source » d'un article. */
+  name: string;
+  contact: string;
+  email: string;
+  phone: string;
+  url: string;
+  address: string;
+  /** Délai de paiement accordé, en jours. */
+  terms: number;
+  /** Appréciation de 1 à 5, 0 si non notée. */
+  rating: number;
+  notes: string;
+  createdAt: number;
+}
+
 export interface Settings {
   business: string;
   /** Mode TVA : tant qu'il est éteint, aucune TVA n'est calculée nulle part. */
@@ -130,6 +149,7 @@ export interface AppState {
   todos: Todo[];
   docs: SalesDoc[];
   expenses: Expense[];
+  suppliers: SupplierRecord[];
   settings: Settings;
   seq: Record<string, number>;
   updatedAt: number;
