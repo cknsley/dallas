@@ -226,7 +226,13 @@ export default function Bilan() {
         <Kpi
           label="Marge nette finale"
           value={eur(net)}
-          meta={regime.subject ? `TVA −${eur(tva)} · charges −${eur(charges)}` : `Charges −${eur(charges)}`}
+          meta={
+            stats.ca === 0 && charges > 0
+              ? `Charges générales de ${range.label.toLowerCase()}, avant la première vente`
+              : regime.subject
+                ? `TVA −${eur(tva)} · charges générales −${eur(charges)}`
+                : `Charges générales −${eur(charges)}`
+          }
           tone={net >= 0 ? "ok" : "warn"}
         />
       </div>
@@ -260,7 +266,7 @@ export default function Bilan() {
               <div className="totrow"><span>TVA {regime.scheme === "marge" ? "sur la marge" : "sur le prix"} ({regime.rate} %)</span><b className="num">{deducted(tva)}</b></div>
             )}
             <div className="totrow">
-              <span>Charges de la période</span>
+              <span>Charges générales</span>
               <b className="num">{deducted(detail.charges)}</b>
             </div>
             <div className="totrow big">
