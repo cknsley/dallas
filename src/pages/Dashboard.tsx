@@ -5,6 +5,7 @@ import {
 } from "recharts";
 import { Link, useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
+import CashFlowCard from "../components/CashFlowCard";
 import { BarList, Empty, Kpi, Segmented } from "../components/ui";
 import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
@@ -108,6 +109,8 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      <CashFlowCard state={state} range={range} />
 
       <div className="kpi-grid">
         <Kpi

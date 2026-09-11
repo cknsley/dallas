@@ -6,6 +6,7 @@ import Ventes from "./pages/Ventes";
 import Livraison from "./pages/Livraison";
 import Bilan from "./pages/Bilan";
 import Deal from "./pages/Deal";
+import Clients from "./pages/Clients";
 import Charges from "./pages/Charges";
 import Todo from "./pages/Todo";
 import Facturation from "./pages/Facturation";
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="colis" element={<Navigate to="/livraison" replace />} />
         <Route path="bilan" element={<Bilan />} />
         <Route path="deal" element={<Deal />} />
+        <Route path="clients" element={<Clients />} />
         <Route path="marge" element={<Navigate to="/bilan" replace />} />
         <Route path="charges" element={<Charges />} />
         <Route path="todo" element={<Todo />} />

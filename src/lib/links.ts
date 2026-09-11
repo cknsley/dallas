@@ -12,6 +12,7 @@ export const links = {
   doc: (docId: string) => `/facturation?doc=${docId}`,
   bilan: () => "/bilan",
   deal: () => "/deal",
+  clients: (f: { q?: string; client?: string } = {}) => withQuery("/clients", f),
   charges: () => "/charges",
   todo: () => "/todo",
 };

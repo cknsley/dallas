@@ -7,7 +7,7 @@ import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
 import { useClearQuery, useQueryState } from "../lib/useQueryState";
 import { links } from "../lib/links";
-import { costOf, marginOf, roiOf } from "../lib/calc";
+import { costOf, marginOf, qtyOf, roiOf } from "../lib/calc";
 import { dshort, eur, eur2, today } from "../lib/format";
 import { STATUS_LABEL, STATUS_ORDER } from "../lib/constants";
 import { downloadText, itemsToCSV, stockFilename } from "../lib/csv";
@@ -18,11 +18,12 @@ import type { Item, ItemStatus } from "../types";
 
 type SortKey =
   | "name" | "brand" | "type" | "size" | "source" | "status"
-  | "cost" | "price" | "margin" | "roi" | "buyDate" | "saleDate";
+  | "cost" | "price" | "margin" | "roi" | "buyDate" | "saleDate" | "quantity";
 
 const COLUMNS: { key: SortKey | "photo" | "sell" | "actions"; label: string; sortable: boolean; right?: boolean }[] = [
   { key: "photo", label: "", sortable: false },
   { key: "name", label: "Pièce", sortable: true },
+  { key: "quantity", label: "Qté", sortable: true, right: true },
   { key: "brand", label: "Marque", sortable: true },
   { key: "type", label: "Type", sortable: true },
   { key: "size", label: "Taille", sortable: true },
@@ -41,6 +42,7 @@ const sortValue = (i: Item, k: SortKey): string | number => {
     case "name": case "brand": case "type": case "size": case "source":
       return i[k].toLowerCase();
     case "status": return STATUS_ORDER.indexOf(i.status);
+    case "quantity": return qtyOf(i);
     case "cost": return costOf(i);
     case "price": return i.price;
     case "margin": return marginOf(i);
@@ -203,7 +205,9 @@ export default function Stock() {
         )}
       </div>
       <div className="hint num" style={{ margin: "-6px 0 16px" }}>
-        {list.length} pièce{list.length > 1 ? "s" : ""} · {eur(heldCost)} immobilisés
+        {list.reduce((a, i) => a + qtyOf(i), 0)} article
+        {list.reduce((a, i) => a + qtyOf(i), 0) > 1 ? "s" : ""} sur {list.length} ligne{list.length > 1 ? "s" : ""} ·{" "}
+        {eur(heldCost)} immobilisés
       </div>
 
       {list.length === 0 ? (
@@ -247,6 +251,7 @@ export default function Stock() {
                         </button>
                         {i.notes && <div className="hint ellipsis">{i.notes}</div>}
                       </td>
+                      <td className="r num shrink">{qtyOf(i)}</td>
                       <td>{i.brand || "—"}</td>
                       <td>{i.type || "—"}</td>
                       <td>{i.size || "—"}</td>
@@ -280,7 +285,10 @@ export default function Stock() {
                   <button className="linkish" onClick={() => setEditing({ item: i })}>
                     {i.name || "Sans nom"}
                   </button>
-                  <div className="meta">{i.type || "—"}{i.size ? ` · ${i.size}` : ""}</div>
+                  <div className="meta">
+                    {i.type || "—"}{i.size ? ` · ${i.size}` : ""}
+                    {qtyOf(i) > 1 && <span className="qty-badge">×{qtyOf(i)}</span>}
+                  </div>
                   <div className="meta num">
                     Coût {eur2(costOf(i))}
                     {i.price ? (

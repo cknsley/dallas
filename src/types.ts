@@ -13,12 +13,15 @@ export interface Item {
   type: string;
   size: string;
   source: string;
-  cost: number;          // coût d'entrée
+  /** Nombre d'exemplaires identiques sur cette ligne. */
+  quantity: number;
+  cost: number;          // coût d'entrée, par exemplaire
   fees: number;          // frais d'achat (port entrant, nettoyage, retouche…)
   price: number;         // prix de vente (0 tant que non fixé)
   /* côté vente */
   platform: string;      // plateforme ou canal de vente
   buyer: string;         // acheteur
+  buyerUrl: string;      // lien vers son profil sur la plateforme
   saleFees: number;      // commission de la plateforme
   shippingCost: number;  // port payé par le vendeur
   shippingPaid: number;  // port refacturé à l'acheteur

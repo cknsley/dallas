@@ -14,6 +14,7 @@ interface SaleDraft {
   saleDate: string;
   platform: string;
   buyer: string;
+  buyerUrl: string;
   saleFees: string;
   shippingPaid: string;
   shippingCost: string;
@@ -41,6 +42,7 @@ export default function SellModal({
     saleDate: item.saleDate || today(),
     platform: item.platform,
     buyer: item.buyer,
+    buyerUrl: item.buyerUrl,
     saleFees: item.saleFees ? String(item.saleFees) : "",
     shippingPaid: item.shippingPaid ? String(item.shippingPaid) : "",
     shippingCost: item.shippingCost ? String(item.shippingCost) : "",
@@ -51,6 +53,30 @@ export default function SellModal({
     notes: item.notes,
   });
   const set = <K extends keyof SaleDraft>(k: K, v: SaleDraft[K]) => setD((x) => ({ ...x, [k]: v }));
+
+  /** Dernier envoi enregistré pour une plateforme : sert de modèle par défaut. */
+  const shippingTemplate = useMemo(() => {
+    const map = new Map<string, { carrier: string; shippingCost: number; shippingPaid: number; saleFees: number }>();
+    for (const i of [...state.items].sort((a, b) => a.saleDate.localeCompare(b.saleDate))) {
+      if (i.status !== "vendu" || !i.platform.trim()) continue;
+      map.set(i.platform.trim().toLowerCase(), {
+        carrier: i.carrier,
+        shippingCost: i.shippingCost,
+        shippingPaid: i.shippingPaid,
+        saleFees: i.saleFees,
+      });
+    }
+    return map;
+  }, [state.items]);
+
+  /** Retrouve le profil déjà enregistré pour un acheteur connu. */
+  const knownBuyers = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const i of state.items) {
+      if (i.buyer.trim() && i.buyerUrl.trim()) map.set(i.buyer.trim().toLowerCase(), i.buyerUrl.trim());
+    }
+    return map;
+  }, [state.items]);
 
   const platforms = useMemo(
     () => [...new Set([...PLATFORMS, ...state.items.map((i) => i.platform).filter(Boolean)])],
@@ -82,6 +108,7 @@ export default function SellModal({
       saleDate: d.saleDate || today(),
       platform: d.platform.trim(),
       buyer: d.buyer.trim(),
+      buyerUrl: d.buyerUrl.trim(),
       saleFees,
       shippingPaid,
       shippingCost,
@@ -134,13 +161,47 @@ export default function SellModal({
               <input type="date" value={d.saleDate} onChange={(e) => set("saleDate", e.target.value)} />
             </Field>
             <Field label="Plateforme / canal">
-              <input type="text" list="dl-platform" value={d.platform} placeholder="Vinted, main propre…" onChange={(e) => set("platform", e.target.value)} />
+              <input
+                type="text"
+                list="dl-platform"
+                value={d.platform}
+                placeholder="Vinted, main propre…"
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const tpl = shippingTemplate.get(value.trim().toLowerCase());
+                  setD((x) => ({
+                    ...x,
+                    platform: value,
+                    // On ne remplit que ce qui est encore vide : jamais d'écrasement d'une saisie.
+                    carrier: x.carrier || (tpl?.carrier ?? ""),
+                    shippingCost: x.shippingCost || (tpl?.shippingCost ? String(tpl.shippingCost) : ""),
+                    shippingPaid: x.shippingPaid || (tpl?.shippingPaid ? String(tpl.shippingPaid) : ""),
+                    saleFees: x.saleFees || (tpl?.saleFees ? String(tpl.saleFees) : ""),
+                  }));
+                }}
+              />
             </Field>
             <Field label="Acheteur">
-              <input type="text" value={d.buyer} placeholder="Pseudo ou nom" onChange={(e) => set("buyer", e.target.value)} />
+              <input
+                type="text"
+                list="dl-buyer"
+                value={d.buyer}
+                placeholder="Pseudo ou nom"
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const url = knownBuyers.get(value.trim().toLowerCase());
+                  setD((x) => ({ ...x, buyer: value, buyerUrl: x.buyerUrl || (url ?? "") }));
+                }}
+              />
+            </Field>
+            <Field label="Lien du profil">
+              <input type="url" value={d.buyerUrl} placeholder="https://vinted.fr/member/…" onChange={(e) => set("buyerUrl", e.target.value)} />
             </Field>
           </div>
           <datalist id="dl-platform">{platforms.map((v) => <option key={v} value={v} />)}</datalist>
+          <datalist id="dl-buyer">
+            {[...new Set(state.items.map((i) => i.buyer).filter(Boolean))].map((v) => <option key={v} value={v} />)}
+          </datalist>
           <datalist id="dl-carrier">{carriers.map((v) => <option key={v} value={v} />)}</datalist>
 
           <hr className="sep" />

@@ -12,8 +12,8 @@ import type { Item, ItemStatus } from "../types";
 export const blankItem = (): Item => ({
   id: uid(),
   name: "", brand: "", type: "", size: "", source: "",
-  cost: 0, fees: 0, price: 0,
-  platform: "", buyer: "", saleFees: 0, shippingCost: 0, shippingPaid: 0,
+  quantity: 1, cost: 0, fees: 0, price: 0,
+  platform: "", buyer: "", buyerUrl: "", saleFees: 0, shippingCost: 0, shippingPaid: 0,
   status: "arrivage",
   buyDate: today(), receiveDate: "", saleDate: "",
   delivery: "commandee", shipping: "en_preparation", orderId: "",
@@ -24,10 +24,11 @@ export const blankItem = (): Item => ({
 
 /** Les montants restent des chaînes le temps de la saisie. */
 type MoneyKey = "cost" | "fees" | "price" | "saleFees" | "shippingPaid" | "shippingCost";
-type Draft = Omit<Item, MoneyKey> & Record<MoneyKey, string>;
+type Draft = Omit<Item, MoneyKey | "quantity"> & Record<MoneyKey, string> & { quantity: string };
 
 const toDraft = (i: Item): Draft => ({
   ...i,
+  quantity: String(Math.max(1, i.quantity || 1)),
   cost: i.cost ? String(i.cost) : "",
   fees: i.fees ? String(i.fees) : "",
   price: i.price ? String(i.price) : "",
@@ -72,6 +73,7 @@ export default function ItemModal({
   /** Version « Item » du brouillon, pour la passer au formulaire de vente. */
   const draftToItem = (): Item => ({
     ...draft,
+    quantity: Math.max(1, Math.round(num(draft.quantity)) || 1),
     cost: num(draft.cost),
     fees: num(draft.fees),
     price: num(draft.price),
@@ -80,10 +82,11 @@ export default function ItemModal({
     shippingCost: num(draft.shippingCost),
   });
 
-  const totalCost = num(draft.cost) + num(draft.fees);
+  const qty = Math.max(1, Math.round(num(draft.quantity)) || 1);
+  const totalCost = (num(draft.cost) + num(draft.fees)) * qty;
   const price = num(draft.price);
   const saleCosts = isSold ? num(draft.saleFees) + num(draft.shippingCost) : 0;
-  const cashIn = isSold ? price + num(draft.shippingPaid) : price;
+  const cashIn = (isSold ? price + num(draft.shippingPaid) / qty : price) * qty;
   const outflow = totalCost + saleCosts;
   const marge = cashIn - outflow;
 
@@ -124,6 +127,7 @@ export default function ItemModal({
       size: draft.size.trim(),
       source: draft.source.trim(),
       notes: draft.notes.trim(),
+      quantity: qty,
       cost: num(draft.cost),
       fees: num(draft.fees),
       price: num(draft.price),
@@ -188,6 +192,15 @@ export default function ItemModal({
         </Field>
         <Field label="Type d'article">
           <input type="text" list="dl-type" value={draft.type} placeholder="Ex. Veste" onChange={(e) => set("type", e.target.value)} />
+        </Field>
+        <Field label="Quantité">
+          <input
+            type="number"
+            step="1"
+            min="1"
+            value={draft.quantity}
+            onChange={(e) => set("quantity", e.target.value)}
+          />
         </Field>
         <Field label="Taille">
           <input type="text" list="dl-size" value={draft.size} placeholder="Ex. M · 42 · 10,5" onChange={(e) => set("size", e.target.value)} />
@@ -309,7 +322,7 @@ export default function ItemModal({
           ) : (
             <>
               Marge estimée <b className="num">{eur2(marge)}</b> · ROI <b className="num">{pct(totalCost ? (marge / totalCost) * 100 : 0)}</b> ·
-              revente à {eur2(price)} pour un {LABEL.totalCost.toLowerCase()} de {eur2(totalCost)}
+              {qty > 1 ? ` ${qty} × ${eur2(price)}` : ` revente à ${eur2(price)}`} pour un {LABEL.totalCost.toLowerCase()} de {eur2(totalCost)}
             </>
           )}
         </div>

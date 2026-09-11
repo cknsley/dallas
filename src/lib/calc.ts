@@ -1,14 +1,17 @@
 import type { AppState, Expense, Item, Period } from "../types";
 import { num } from "./format";
 
-/** Coût d'acquisition : prix payé + frais d'achat (port entrant, nettoyage, retouche). */
-export const costOf = (i: Item): number => num(i.cost) + num(i.fees);
+/** Nombre d'exemplaires sur la ligne, au minimum un. */
+export const qtyOf = (i: Item): number => Math.max(1, num(i.quantity) || 1);
 
-/** Frais supportés lors de la vente : commission de la plateforme + port à la charge du vendeur. */
+/** Coût d'acquisition de la ligne : (prix payé + frais d'achat) × quantité. */
+export const costOf = (i: Item): number => (num(i.cost) + num(i.fees)) * qtyOf(i);
+
+/** Frais supportés lors de la vente : commission et port valent pour l'envoi entier. */
 export const saleCostsOf = (i: Item): number => num(i.saleFees) + num(i.shippingCost);
 
-/** Encaissé pour la pièce : prix de vente + port refacturé à l'acheteur. */
-export const revenueOf = (i: Item): number => num(i.price) + num(i.shippingPaid);
+/** Encaissé pour la ligne : prix de vente × quantité, plus le port refacturé. */
+export const revenueOf = (i: Item): number => num(i.price) * qtyOf(i) + num(i.shippingPaid);
 
 /** Marge nette : tout ce qui rentre moins tout ce qui sort, port compris. */
 export const marginOf = (i: Item): number => revenueOf(i) - costOf(i) - saleCostsOf(i);
@@ -78,7 +81,7 @@ export interface Stats {
 
 export function computeStats(state: AppState, r: Range): Stats {
   const sold = soldItems(state.items, r);
-  const ca = sold.reduce((a, i) => a + num(i.price), 0);
+  const ca = sold.reduce((a, i) => a + num(i.price) * qtyOf(i), 0);
   const shippingIn = sold.reduce((a, i) => a + num(i.shippingPaid), 0);
   const saleCosts = sold.reduce((a, i) => a + saleCostsOf(i), 0);
   const cost = sold.reduce((a, i) => a + costOf(i), 0);
@@ -86,7 +89,7 @@ export function computeStats(state: AppState, r: Range): Stats {
   const inStock = state.items.filter((i) => i.status !== "vendu");
   const stockValue = inStock.reduce((a, i) => a + costOf(i), 0);
   // Une pièce sans estimation est comptée à son coût : jamais de valeur inventée.
-  const stockEstimate = inStock.reduce((a, i) => a + (num(i.price) || costOf(i)), 0);
+  const stockEstimate = inStock.reduce((a, i) => a + (num(i.price) ? num(i.price) * qtyOf(i) : costOf(i)), 0);
   const count = sold.length;
   return {
     ca,
@@ -99,7 +102,7 @@ export function computeStats(state: AppState, r: Range): Stats {
     stockValue,
     stockEstimate,
     stockPotential: stockEstimate - stockValue,
-    stockCount: inStock.length,
+    stockCount: inStock.reduce((a, i) => a + qtyOf(i), 0),
     arrivage: state.items.filter((i) => i.status === "arrivage").length,
     enStock: state.items.filter((i) => i.status === "stock").length,
     engaged: stockValue,
@@ -125,8 +128,8 @@ export function groupBy(items: Item[], dim: Dimension): DimRow[] {
   for (const i of items) {
     const k = keyOf(i);
     const row = map.get(k) ?? { key: k, qty: 0, ca: 0, marge: 0 };
-    row.qty += 1;
-    row.ca += num(i.price);
+    row.qty += qtyOf(i);
+    row.ca += num(i.price) * qtyOf(i);
     row.marge += marginOf(i);
     map.set(k, row);
   }
@@ -136,7 +139,7 @@ export function groupBy(items: Item[], dim: Dimension): DimRow[] {
 export function caOfYear(items: Item[], year: number): number {
   return items
     .filter((i) => i.status === "vendu" && i.saleDate.slice(0, 4) === String(year))
-    .reduce((a, i) => a + num(i.price), 0);
+    .reduce((a, i) => a + num(i.price) * qtyOf(i), 0);
 }
 
 export function monthlySeries(items: Item[], months = 12) {
@@ -156,7 +159,7 @@ export function monthlySeries(items: Item[], months = 12) {
   for (const i of soldItems(items)) {
     const bucket = index.get(i.saleDate.slice(0, 7));
     if (bucket) {
-      bucket.ca += num(i.price);
+      bucket.ca += num(i.price) * qtyOf(i);
       bucket.marge += marginOf(i);
     }
   }
@@ -256,4 +259,42 @@ export function remainingToAmortize(expenses: Expense[]): number {
     const future = expenseMonths(e).filter((m) => m > nowMonth).length;
     return sum + future * expenseMonthlyShare(e);
   }, 0);
+}
+
+export interface CashFlow {
+  in: number;
+  out: number;
+  net: number;
+  purchases: number;
+  saleFees: number;
+  charges: number;
+  pending: number;
+}
+
+/**
+ * Trésorerie de la période : ce qui est réellement rentré et sorti.
+ * Une vente non payée ne compte pas comme une entrée ; un achat compte
+ * dès sa date d'achat, même si la pièce n'est pas encore vendue.
+ */
+export function cashFlow(state: AppState, r: Range): CashFlow {
+  const cashedIn = state.items
+    .filter((i) => i.status === "vendu" && i.delivery !== "non_payee" && inRange(i.saleDate, r))
+    .reduce((a, i) => a + revenueOf(i), 0);
+
+  const pending = state.items
+    .filter((i) => i.status === "vendu" && i.delivery === "non_payee" && inRange(i.saleDate, r))
+    .reduce((a, i) => a + revenueOf(i), 0);
+
+  const purchases = state.items
+    .filter((i) => inRange(i.buyDate, r))
+    .reduce((a, i) => a + costOf(i), 0);
+
+  const saleFees = state.items
+    .filter((i) => i.status === "vendu" && i.delivery !== "non_payee" && inRange(i.saleDate, r))
+    .reduce((a, i) => a + saleCostsOf(i), 0);
+
+  const charges = chargesInRange(state.expenses, r);
+  const out = purchases + saleFees + charges;
+
+  return { in: cashedIn, out, net: cashedIn - out, purchases, saleFees, charges, pending };
 }

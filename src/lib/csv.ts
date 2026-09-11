@@ -1,5 +1,5 @@
 import type { Item } from "../types";
-import { costOf, marginOf, revenueOf, roiOf, saleCostsOf } from "./calc";
+import { costOf, marginOf, qtyOf, revenueOf, roiOf, saleCostsOf } from "./calc";
 import { today } from "./format";
 import { STATUS_LABEL, DELIVERY_LABEL } from "./constants";
 
@@ -7,7 +7,7 @@ const cell = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
 export function itemsToCSV(items: Item[]): string {
   const header = [
-    "Nom", "Marque", "Type", "Taille", "Source", "Statut",
+    "Nom", "Quantite", "Marque", "Type", "Taille", "Source", "Statut",
     "Cout achat", "Frais achat", "Cout total",
     "Prix vente", "Port encaisse", "Total encaisse",
     "Commission", "Port a ma charge", "Total frais vente",
@@ -17,7 +17,7 @@ export function itemsToCSV(items: Item[]): string {
     "Livraison", "Transporteur", "Suivi", "Arrivee prevue", "Notes",
   ];
   const rows = items.map((i) => [
-    i.name, i.brand, i.type, i.size, i.source, STATUS_LABEL[i.status],
+    i.name, String(qtyOf(i)), i.brand, i.type, i.size, i.source, STATUS_LABEL[i.status],
     i.cost.toFixed(2), i.fees.toFixed(2), costOf(i).toFixed(2),
     i.price ? i.price.toFixed(2) : "",
     i.shippingPaid ? i.shippingPaid.toFixed(2) : "",

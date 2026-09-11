@@ -11,6 +11,7 @@ import type { Item } from "../types";
 interface Line {
   key: string;
   name: string;
+  quantity: string;
   brand: string;
   type: string;
   size: string;
@@ -18,7 +19,7 @@ interface Line {
   estimate: string;
 }
 
-const newLine = (): Line => ({ key: uid(), name: "", brand: "", type: "", size: "", cost: "", estimate: "" });
+const newLine = (): Line => ({ key: uid(), name: "", quantity: "1", brand: "", type: "", size: "", cost: "", estimate: "" });
 
 /**
  * Une commande fournisseur : plusieurs pièces achetées d'un coup, avec des frais
@@ -53,12 +54,13 @@ export default function OrderModal({ onClose, onCreated }: { onClose: () => void
   }, [state.items]);
 
   const filled = lines.filter((l) => l.name.trim() || num(l.cost) > 0);
-  const goods = filled.reduce((a, l) => a + num(l.cost), 0);
+  const qtyOfLine = (l: Line) => Math.max(1, Math.round(num(l.quantity)) || 1);
+  const goods = filled.reduce((a, l) => a + num(l.cost) * qtyOfLine(l), 0);
   const shippingTotal = num(shipping);
   const total = goods + shippingTotal;
   // Le port se répartit au prorata du prix : une pièce chère en porte la plus grosse part.
   const shareOf = (l: Line) =>
-    shippingTotal === 0 ? 0 : goods > 0 ? (num(l.cost) / goods) * shippingTotal : shippingTotal / filled.length;
+    shippingTotal === 0 ? 0 : goods > 0 ? ((num(l.cost) * qtyOfLine(l)) / goods) * shippingTotal : shippingTotal / filled.length;
 
   const submit = () => {
     if (filled.length === 0) {
@@ -75,10 +77,11 @@ export default function OrderModal({ onClose, onCreated }: { onClose: () => void
         type: l.type.trim(),
         size: l.size.trim(),
         source: source.trim(),
+        quantity: qtyOfLine(l),
         cost: num(l.cost),
-        fees: Math.round(shareOf(l) * 100) / 100,
+        fees: Math.round((shareOf(l) / qtyOfLine(l)) * 100) / 100,
         price: num(l.estimate),
-        platform: "", buyer: "", saleFees: 0, shippingCost: 0, shippingPaid: 0,
+        platform: "", buyer: "", buyerUrl: "", saleFees: 0, shippingCost: 0, shippingPaid: 0,
         status: "arrivage",
         buyDate, receiveDate: "", saleDate: "",
         delivery: "commandee", shipping: "en_preparation",
@@ -155,6 +158,7 @@ export default function OrderModal({ onClose, onCreated }: { onClose: () => void
               )}
             </div>
             <div className="calc-line-grid">
+              <label><span>Quantité</span><input type="number" step="1" min="1" value={l.quantity} onChange={(e) => patch(l.key, { quantity: e.target.value })} /></label>
               <label><span>Marque</span><input type="text" list="dl-order-brand" value={l.brand} onChange={(e) => patch(l.key, { brand: e.target.value })} /></label>
               <label><span>Type</span><input type="text" list="dl-order-type" value={l.type} onChange={(e) => patch(l.key, { type: e.target.value })} /></label>
               <label><span>Taille</span><input type="text" list="dl-order-size" value={l.size} onChange={(e) => patch(l.key, { size: e.target.value })} /></label>
@@ -178,7 +182,10 @@ export default function OrderModal({ onClose, onCreated }: { onClose: () => void
       </Field>
 
       <div>
-        <div className="totrow"><span>{filled.length} pièce{filled.length > 1 ? "s" : ""}</span><b className="num">{eur2(goods)}</b></div>
+        <div className="totrow">
+          <span>{filled.reduce((a, l) => a + qtyOfLine(l), 0)} article{filled.reduce((a, l) => a + qtyOfLine(l), 0) > 1 ? "s" : ""} sur {filled.length} ligne{filled.length > 1 ? "s" : ""}</span>
+          <b className="num">{eur2(goods)}</b>
+        </div>
         <div className="totrow"><span>Frais de port</span><b className="num">+{eur2(shippingTotal)}</b></div>
         <div className="totrow big"><span>Total de la commande</span><b className="num">{eur2(total)}</b></div>
       </div>

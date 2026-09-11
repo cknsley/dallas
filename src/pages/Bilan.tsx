@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
+import CashFlowCard from "../components/CashFlowCard";
 import { BarList, Empty, Kpi, Segmented } from "../components/ui";
 import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
@@ -34,7 +35,6 @@ export default function Bilan() {
   const charges = useMemo(() => chargesInRange(state.expenses, range), [state.expenses, range]);
   const sleeping = useMemo(() => pendingDeliveryValue(state.items), [state.items]);
   const immo = useMemo(() => remainingToAmortize(state.expenses), [state.expenses]);
-  const unpaid = state.docs.filter((d) => !d.paid).reduce((a, d) => a + d.total, 0);
   const sleepingCount = state.items.filter((i) => i.status === "vendu" && i.delivery === "commandee").length;
   const net = stats.marge - tva - charges;
 
@@ -62,6 +62,8 @@ export default function Bilan() {
         />
       </HeaderActions>
 
+      <CashFlowCard state={state} range={range} />
+
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-h">
           <h3>Ce que vous possédez</h3>
@@ -78,16 +80,12 @@ export default function Bilan() {
             <b className="num">{eur(sleeping)}</b>
           </Link>
           <Link className="balance-row" to={links.charges()}>
-            <span className="bl-label">Immobilisations<small>Charges restant à étaler sur leur durée d'usage</small></span>
+            <span className="bl-label">Matériel non encore absorbé<small>Ce qu'il reste à étaler de vos achats pour l'activité</small></span>
             <b className="num">{eur(immo)}</b>
-          </Link>
-          <Link className="balance-row" to={links.facturation({ state: "unpaid" })}>
-            <span className="bl-label">Créances<small>Documents émis et pas encore payés</small></span>
-            <b className="num">{eur(unpaid)}</b>
           </Link>
           <div className="balance-row total">
             <span className="bl-label">Total immobilisé</span>
-            <b className="num">{eur(stats.engaged + sleeping + immo + unpaid)}</b>
+            <b className="num">{eur(stats.engaged + sleeping + immo)}</b>
           </div>
         </div>
       </div>
@@ -156,7 +154,7 @@ export default function Bilan() {
               <div className="totrow"><span>TVA {regime.scheme === "marge" ? "sur la marge" : "sur le prix"} ({regime.rate} %)</span><b className="num">{deducted(tva)}</b></div>
             )}
             <div className="totrow">
-              <span>Charges générales amorties</span>
+              <span>Charges de la période</span>
               <b className="num">{deducted(detail.charges)}</b>
             </div>
             <div className="totrow big">

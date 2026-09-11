@@ -8,7 +8,7 @@ import { usePref } from "../lib/usePref";
 import { useClearQuery, useQueryState } from "../lib/useQueryState";
 import { links } from "../lib/links";
 import { LABEL } from "../lib/lexicon";
-import { costOf, marginOf, periodRange, revenueOf, saleCostsOf, soldItems } from "../lib/calc";
+import { costOf, marginOf, periodRange, qtyOf, revenueOf, saleCostsOf, soldItems } from "../lib/calc";
 import { dshort, eur, eur2, pct, today } from "../lib/format";
 import { DELIVERY_LABEL, DELIVERY_ORDER } from "../lib/constants";
 import { downloadText, itemsToCSV } from "../lib/csv";
@@ -169,6 +169,7 @@ export default function Ventes() {
                         </button>
                         <div className="hint nowrap">
                           {i.brand || "—"}{i.size ? ` · ${i.size}` : ""}
+                          {qtyOf(i) > 1 && <span className="qty-badge">×{qtyOf(i)}</span>}
                         </div>
                       </td>
                       <td>
@@ -180,7 +181,10 @@ export default function Ventes() {
                         {i.buyer && <div className="hint nowrap">{i.buyer}</div>}
                       </td>
                       <td className="num nowrap" style={{ fontSize: 12 }}>{dshort(i.saleDate)}</td>
-                      <td className="r num">{eur2(i.price)}</td>
+                      <td className="r num">
+                        {eur2(i.price * qtyOf(i))}
+                        {qtyOf(i) > 1 && <div className="hint num">{qtyOf(i)} × {eur2(i.price)}</div>}
+                      </td>
                       <td className={`r num ${portNet > 0 ? "pos" : portNet < 0 ? "neg" : ""}`}>
                         {portNet === 0 ? "—" : `${portNet > 0 ? "+" : "−"}${eur2(Math.abs(portNet))}`}
                       </td>

@@ -304,7 +304,7 @@ export default function Deal() {
   const stockCost = inStock.reduce((a, i) => a + costOf(i), 0);
   const stockValue = inStock.reduce((a, i) => a + revenueOf(i), 0);
   const potential = stockValue - stockCost;
-  const maxDiscount = stockValue > 0 ? (potential / stockValue) * 100 : 0;
+  const roi = stockCost > 0 ? (potential / stockCost) * 100 : 0;
 
   return (
     <>
@@ -324,10 +324,10 @@ export default function Deal() {
         <Kpi label="Valeur estimée" value={eur(stockValue)} meta="Aux prix de revente espérés" />
         <Kpi label="Marge potentielle" value={eur(potential)} meta="Si tout part au prix estimé" tone={potential >= 0 ? "ok" : "warn"} />
         <Kpi
-          label="Remise maximale"
-          value={pct(maxDiscount)}
-          meta="Sur l'ensemble du stock, avant de vendre à perte"
-          tone="warn"
+          label="ROI potentiel"
+          value={pct(roi)}
+          meta="Ce que le stock rendrait sur ce qu'il a coûté"
+          tone={roi >= 0 ? "ok" : "warn"}
         />
       </div>
 
