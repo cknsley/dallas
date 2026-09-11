@@ -504,6 +504,37 @@ a.kpi:hover .go, button.kpi:hover .go { opacity: 1; transform: none; }
 }
 .profile-link:hover { text-decoration: underline; }
 
+/* Demandes produit : grille de quatre cartes par rangée. */
+.request-grid {
+  display: grid; gap: 12px; padding: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+@media (min-width: 1240px) { .request-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.request-card {
+  display: flex; flex-direction: column; gap: 9px; padding: 13px 14px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r);
+  border-left-width: 3px;
+}
+.request-card.st-brouillon { border-left-color: var(--ink-3); }
+.request-card.st-envoyee { border-left-color: var(--warn); }
+.request-card.st-acceptee { border-left-color: var(--ok); }
+.request-card.st-refusee { border-left-color: var(--bad); }
+.request-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.request-supplier { font-size: 14.5px; font-weight: 700; }
+.request-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.request-lines li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px; }
+.request-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding-top: 8px; border-top: 1px solid var(--line);
+}
+.request-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pill.req-brouillon { background: var(--bg-2); color: var(--ink-3); }
+.pill.req-envoyee { background: var(--warn-soft); color: var(--warn); }
+.pill.req-acceptee { background: var(--ok-soft); color: var(--ok); }
+.pill.req-refusee { background: var(--bad-soft); color: var(--bad); }
+.btn.sm.ghost { background: transparent; border-color: var(--line-2); color: var(--ink-3); }
+.btn.sm.ghost:hover { color: var(--ink); border-color: var(--accent); }
+
 /* Fournisseurs : une carte par source, dépliable sur son historique. */
 .supplier-grid { display: grid; gap: 12px; padding: 16px; }
 @media (min-width: 1100px) { .supplier-grid { grid-template-columns: 1fr 1fr; } }

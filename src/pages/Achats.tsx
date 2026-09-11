@@ -1,17 +1,20 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
-import { Empty, Kpi, Photo } from "../components/ui";
+import { Empty, Kpi, Photo, Segmented } from "../components/ui";
 import InlineField from "../components/InlineField";
 import TrackingLink from "../components/TrackingLink";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { costOf, periodRange, qtyOf } from "../lib/calc";
-import { dshort, eur, eur2, today } from "../lib/format";
+import { dshort, eur, eur2, num, today } from "../lib/format";
+import { REQUEST_LABEL } from "../lib/constants";
+import { useQueryState } from "../lib/useQueryState";
 import { links } from "../lib/links";
 import OrderModal from "../modals/OrderModal";
+import RequestModal from "../modals/RequestModal";
 import ItemModal from "../modals/ItemModal";
-import type { Item } from "../types";
+import type { Item, ProductRequest } from "../types";
 
 /**
  * Centrale d'achat : tout ce qui entre, du colis commandé jusqu'au stock.
@@ -23,6 +26,9 @@ export default function Achats() {
   const toast = useToast();
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
+  const [requestFor, setRequestFor] = useState<{ request: ProductRequest | null } | null>(null);
+  const [ordering, setOrdering] = useState<ProductRequest | null>(null);
+  const [requestFilter, setRequestFilter] = useQueryState("demandes", "ouvertes");
   const [editing, setEditing] = useState<Item | null>(null);
   const [showArchive, setShowArchive] = useState(false);
 
@@ -63,6 +69,22 @@ export default function Achats() {
   const debt = state.items.filter((i) => !i.purchasePaid).reduce((a, i) => a + costOf(i), 0);
 
   const patch = (id: string, p: Partial<Item>) => dispatch({ type: "patchItem", id, patch: p });
+
+  /* ---- demandes produit ---- */
+  const requests = useMemo(
+    () => [...state.requests].sort((a, b) => b.date.localeCompare(a.date)),
+    [state.requests],
+  );
+  const openRequests = requests.filter((r) => r.status === "brouillon" || r.status === "envoyee");
+  const shownRequests = requestFilter === "toutes" ? requests : openRequests;
+  const requestBudget = (r: ProductRequest) =>
+    r.lines.reduce((a, l) => a + num(l.targetPrice) * Math.max(1, l.quantity), 0);
+  const requestPieces = (r: ProductRequest) => r.lines.reduce((a, l) => a + Math.max(1, l.quantity), 0);
+
+  const advance = (r: ProductRequest, status: ProductRequest["status"]) => {
+    dispatch({ type: "upsertRequest", request: { ...r, status } });
+    toast(`Demande ${REQUEST_LABEL[status].toLowerCase()}`);
+  };
 
   const receive = (i: Item) => {
     patch(i.id, { status: "stock", receiveDate: today() });
@@ -179,6 +201,74 @@ export default function Achats() {
         />
       </div>
 
+      {/* ---------- demandes produit ---------- */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-h">
+          <h3>Demandes produit</h3>
+          <div className="spacer" />
+          <Segmented<string>
+            value={requestFilter}
+            onChange={setRequestFilter}
+            options={[
+              { value: "ouvertes", label: `En cours (${openRequests.length})` },
+              { value: "toutes", label: `Toutes (${requests.length})` },
+            ]}
+          />
+          <button className="btn" onClick={() => setRequestFor({ request: null })}>+ Nouvelle demande</button>
+        </div>
+        {shownRequests.length === 0 ? (
+          <Empty glyph="≡" title={requests.length ? "Aucune demande en cours" : "Aucune demande"}>
+            Décrivez ce que vous cherchez et à quel prix ; une fois la demande acceptée, convertissez-la en
+            commande et ses articles entreront en arrivage.
+          </Empty>
+        ) : (
+          <div className="request-grid">
+            {shownRequests.map((r) => (
+              <article className={`request-card st-${r.status}`} key={r.id}>
+                <header className="request-head">
+                  <span className={`pill req-${r.status}`}>{REQUEST_LABEL[r.status]}</span>
+                  <span className="hint num">{dshort(r.date)}</span>
+                </header>
+                <button className="request-supplier linkish" onClick={() => setRequestFor({ request: r })}>
+                  {r.supplier || "Fournisseur non précisé"}
+                </button>
+                <ul className="request-lines">
+                  {r.lines.slice(0, 3).map((l) => (
+                    <li key={l.key}>
+                      <span className="ellipsis">{l.name || "Article"}</span>
+                      <span className="hint num">×{Math.max(1, l.quantity)}</span>
+                    </li>
+                  ))}
+                  {r.lines.length > 3 && <li className="hint">+ {r.lines.length - 3} autre{r.lines.length - 3 > 1 ? "s" : ""}</li>}
+                </ul>
+                <div className="request-foot">
+                  <span className="hint">{requestPieces(r)} article{requestPieces(r) > 1 ? "s" : ""}</span>
+                  <b className="num">{eur2(requestBudget(r))}</b>
+                </div>
+                <div className="request-actions">
+                  {r.status === "brouillon" && (
+                    <button className="btn sm" onClick={() => advance(r, "envoyee")}>Marquer envoyée</button>
+                  )}
+                  {r.status === "envoyee" && (
+                    <>
+                      <button className="btn sm" onClick={() => setOrdering(r)}>Convertir</button>
+                      <button className="btn sm ghost" onClick={() => advance(r, "refusee")}>Refusée</button>
+                    </>
+                  )}
+                  {r.status === "acceptee" && !r.orderId && (
+                    <button className="btn sm" onClick={() => setOrdering(r)}>Convertir</button>
+                  )}
+                  {r.orderId && <span className="hint">Commande passée</span>}
+                  {r.status === "refusee" && (
+                    <button className="btn sm ghost" onClick={() => advance(r, "envoyee")}>Relancer</button>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* ---------- en arrivage ---------- */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-h">
@@ -289,6 +379,12 @@ export default function Achats() {
       )}
 
       {creating && <OrderModal onClose={() => setCreating(false)} />}
+      {ordering && (
+        <OrderModal fromRequest={ordering} onClose={() => setOrdering(null)} />
+      )}
+      {requestFor && (
+        <RequestModal request={requestFor.request} onClose={() => setRequestFor(null)} />
+      )}
       {editing && <ItemModal item={editing} onClose={() => setEditing(null)} />}
     </>
   );

@@ -39,6 +39,7 @@ export const EMPTY_STATE: AppState = {
   docs: [],
   expenses: [],
   suppliers: [],
+  requests: [],
   settings: DEFAULT_SETTINGS,
   seq: {},
   updatedAt: 0,

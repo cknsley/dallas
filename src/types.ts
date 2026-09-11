@@ -105,6 +105,33 @@ export interface Expense {
   createdAt: number;
 }
 
+/** Ce qu'on demande à un fournisseur avant de commander. */
+export type RequestStatus = "brouillon" | "envoyee" | "acceptee" | "refusee";
+
+export interface RequestLine {
+  key: string;
+  name: string;
+  brand: string;
+  type: string;
+  size: string;
+  quantity: number;
+  /** Prix d'achat visé pour cette ligne. */
+  targetPrice: number;
+}
+
+export interface ProductRequest {
+  id: string;
+  /** Nom du fournisseur, tel qu'il apparaît dans le champ « Source ». */
+  supplier: string;
+  date: string;
+  status: RequestStatus;
+  lines: RequestLine[];
+  notes: string;
+  /** Renseigné quand la demande a donné lieu à une commande. */
+  orderId: string;
+  createdAt: number;
+}
+
 /** Fiche fournisseur : les informations que le stock ne peut pas déduire.
  *  Elle s'attache à un nom de source, ce qui évite toute migration. */
 export interface SupplierRecord {
@@ -152,6 +179,7 @@ export interface AppState {
   docs: SalesDoc[];
   expenses: Expense[];
   suppliers: SupplierRecord[];
+  requests: ProductRequest[];
   settings: Settings;
   seq: Record<string, number>;
   updatedAt: number;

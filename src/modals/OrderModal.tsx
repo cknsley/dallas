@@ -6,7 +6,7 @@ import { ARTICLE_TYPES, CARRIERS } from "../lib/constants";
 import { eur2, num, today } from "../lib/format";
 import { uid } from "../lib/id";
 import { HINT, LABEL, eurLabel } from "../lib/lexicon";
-import type { Item } from "../types";
+import type { Item, ProductRequest } from "../types";
 
 interface Line {
   key: string;
@@ -26,19 +26,41 @@ const newLine = (): Line => ({ key: uid(), name: "", quantity: "1", brand: "", t
  * de port communs. Les articles entrent en « Arrivage » et rejoignent le stock
  * normal dès la réception.
  */
-export default function OrderModal({ onClose, onCreated }: { onClose: () => void; onCreated?: (n: number) => void }) {
+export default function OrderModal({
+  onClose, onCreated, defaultSource = "", fromRequest,
+}: {
+  onClose: () => void;
+  onCreated?: (n: number) => void;
+  /** Fournisseur déjà connu : on part de lui plutôt que d'une page blanche. */
+  defaultSource?: string;
+  /** Demande acceptée qui pré-remplit la commande. */
+  fromRequest?: ProductRequest;
+}) {
   const { state, dispatch } = useStore();
   const toast = useToast();
 
-  const [source, setSource] = useState("");
+  const [source, setSource] = useState(fromRequest?.supplier ?? defaultSource);
   const [buyDate, setBuyDate] = useState(today());
   const [expectedDate, setExpectedDate] = useState("");
   const [carrier, setCarrier] = useState("");
   const [tracking, setTracking] = useState("");
   const [shipping, setShipping] = useState("");
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(fromRequest?.notes ?? "");
   const [purchasePaid, setPurchasePaid] = useState(true);
-  const [lines, setLines] = useState<Line[]>([newLine()]);
+  const [lines, setLines] = useState<Line[]>(
+    fromRequest && fromRequest.lines.length > 0
+      ? fromRequest.lines.map((l) => ({
+          key: uid(),
+          name: l.name,
+          quantity: String(Math.max(1, l.quantity)),
+          brand: l.brand,
+          type: l.type,
+          size: l.size,
+          cost: l.targetPrice ? String(l.targetPrice) : "",
+          estimate: "",
+        }))
+      : [newLine()],
+  );
 
   const patch = (key: string, p: Partial<Line>) => setLines((l) => l.map((x) => (x.key === key ? { ...x, ...p } : x)));
 
@@ -95,6 +117,9 @@ export default function OrderModal({ onClose, onCreated }: { onClose: () => void
       };
       dispatch({ type: "upsertItem", item });
     });
+    if (fromRequest) {
+      dispatch({ type: "upsertRequest", request: { ...fromRequest, status: "acceptee", orderId } });
+    }
     toast(`Commande enregistrée — ${filled.length} article${filled.length > 1 ? "s" : ""} en arrivage`);
     onClose();
     onCreated?.(filled.length);
@@ -102,7 +127,7 @@ export default function OrderModal({ onClose, onCreated }: { onClose: () => void
 
   return (
     <Modal
-      title="Nouvelle commande"
+      title={fromRequest ? `Commande — ${fromRequest.supplier}` : "Nouvelle commande"}
       wide
       onClose={onClose}
       footer={
@@ -124,7 +149,14 @@ export default function OrderModal({ onClose, onCreated }: { onClose: () => void
 
       <div className="fgrid">
         <Field label="Fournisseur / source">
-          <input type="text" list="dl-order-source" value={source} placeholder="Vinted, grossiste, friperie…" onChange={(e) => setSource(e.target.value)} autoFocus />
+          <input
+            type="text"
+            list="dl-order-source"
+            value={source}
+            placeholder="Vinted, grossiste, friperie…"
+            onChange={(e) => setSource(e.target.value)}
+            autoFocus={!defaultSource}
+          />
         </Field>
         <Field label="Date de commande">
           <input type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} />

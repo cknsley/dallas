@@ -21,9 +21,16 @@ export interface Supplier {
   items: Item[];
   orders: SupplierOrder[];
 
+  /** Articles commandés, toutes quantités confondues. */
   pieces: number;
+  /** Articles déjà réceptionnés. */
+  received: number;
+  /** Articles encore en route. */
+  waiting: number;
   purchases: number;
   debt: number;
+  /** Part des achats déjà réglée. */
+  paid: number;
 
   sales: number;
   margin: number;
@@ -48,7 +55,6 @@ export interface Supplier {
 
   firstBuy: string;
   lastBuy: string;
-  waiting: number;
 }
 
 const daysBetween = (a: string, b: string) =>
@@ -67,17 +73,20 @@ export function buildSuppliers(items: Item[], records: SupplierRecord[] = []): S
       byKey.get(key) ??
       ({
         key, name, record: recordByKey.get(key) ?? null, items: [], orders: [],
-        pieces: 0, purchases: 0, debt: 0,
+        pieces: 0, received: 0, waiting: 0, purchases: 0, debt: 0, paid: 0,
         sales: 0, margin: 0, soldPieces: 0, inStockPieces: 0, stockValue: 0,
         sellThrough: 0, marginPerPiece: 0, roi: 0,
         leadTime: null, lateCount: 0, onTimeRate: null, avgOrder: 0,
-        firstBuy: i.buyDate, lastBuy: i.buyDate, waiting: 0,
+        firstBuy: i.buyDate, lastBuy: i.buyDate,
       } as Supplier);
 
     s.items.push(i);
     s.pieces += qtyOf(i);
     s.purchases += costOf(i);
-    if (!i.purchasePaid) s.debt += costOf(i);
+    if (i.purchasePaid) s.paid += costOf(i);
+    else s.debt += costOf(i);
+    if (i.status === "arrivage") s.waiting += qtyOf(i);
+    else s.received += qtyOf(i);
 
     if (i.status === "vendu") {
       s.soldPieces += qtyOf(i);
@@ -86,7 +95,6 @@ export function buildSuppliers(items: Item[], records: SupplierRecord[] = []): S
     } else {
       s.inStockPieces += qtyOf(i);
       s.stockValue += costOf(i);
-      if (i.status === "arrivage") s.waiting += qtyOf(i);
     }
 
     if (i.buyDate && (!s.firstBuy || i.buyDate < s.firstBuy)) s.firstBuy = i.buyDate;

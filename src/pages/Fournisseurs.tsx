@@ -12,6 +12,7 @@ import { STATUS_LABEL } from "../lib/constants";
 import { links } from "../lib/links";
 import ItemModal from "../modals/ItemModal";
 import SupplierModal from "../modals/SupplierModal";
+import OrderModal from "../modals/OrderModal";
 import type { Item, Period, SupplierRecord } from "../types";
 
 type Sort = "purchases" | "roi" | "debt" | "sellThrough" | "leadTime";
@@ -33,6 +34,7 @@ export default function Fournisseurs() {
   const [open, setOpen] = useState("");
   const [editing, setEditing] = useState<Item | null>(null);
   const [recordFor, setRecordFor] = useState<{ name: string; record: SupplierRecord | null } | null>(null);
+  const [ordering, setOrdering] = useState<string | null>(null);
 
   const range = useMemo(() => periodRange(period), [period]);
   const suppliers = useMemo(() => buildSuppliers(state.items, state.suppliers), [state.items, state.suppliers]);
@@ -57,10 +59,10 @@ export default function Fournisseurs() {
   /* ---- balance de la période ---- */
   const bought = state.items.filter((i) => i.buyDate >= range.from && i.buyDate <= range.to);
   const purchases = bought.reduce((a, i) => a + costOf(i), 0);
-  const soldInRange = state.items.filter(
-    (i) => i.status === "vendu" && i.saleDate >= range.from && i.saleDate <= range.to,
-  );
-  const sales = soldInRange.reduce((a, i) => a + revenueOf(i), 0);
+  const paidTotal = bought.filter((i) => i.purchasePaid).reduce((a, i) => a + costOf(i), 0);
+  const boughtPieces = bought.reduce((a, i) => a + qtyOf(i), 0);
+  const waitingPieces = bought.filter((i) => i.status === "arrivage").reduce((a, i) => a + qtyOf(i), 0);
+  const receivedPieces = boughtPieces - waitingPieces;
 
   const debt = suppliers.reduce((a, s) => a + s.debt, 0);
   const debtors = suppliers.filter((s) => s.debt > 0);
@@ -98,6 +100,7 @@ export default function Fournisseurs() {
           style={{ width: 200 }}
           onChange={(e) => setQ(e.target.value)}
         />
+        <button className="btn primary" onClick={() => setOrdering("")}>+ Nouvelle commande</button>
       </HeaderActions>
 
       <div className="kpi-grid">
@@ -129,7 +132,7 @@ export default function Fournisseurs() {
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-h">
-          <h3>Balance de la période</h3>
+          <h3>Vos approvisionnements</h3>
           <div className="spacer" />
           <span className="hint">
             {range.label}
@@ -137,18 +140,24 @@ export default function Fournisseurs() {
           </span>
         </div>
         <div className="card-b">
-          <div className="totrow"><span>Achats (entrées de stock)</span><b className="num">−{eur2(purchases)}</b></div>
-          <div className="totrow"><span>Ventes (sorties de stock)</span><b className="num">+{eur2(sales)}</b></div>
-          <div className="totrow big">
-            <span>Solde achats / ventes</span>
-            <b className={`num ${sales - purchases >= 0 ? "pos" : "neg"}`}>{eur2(sales - purchases)}</b>
+          <div className="totrow">
+            <span>Articles commandés</span>
+            <b className="num">{boughtPieces}</b>
+          </div>
+          <div className="totrow">
+            <span>Déjà réceptionnés</span>
+            <b className="num">{receivedPieces}</b>
+          </div>
+          <div className="totrow">
+            <span>Encore en route</span>
+            <b className={`num ${waitingPieces ? "warn-text" : ""}`}>{waitingPieces}</b>
           </div>
           <hr className="sep" />
-          <div className="totrow"><span>Reste dû aux fournisseurs</span><b className="num neg">{eur2(debt)}</b></div>
-          <div className="totrow"><span>Reste à encaisser des clients</span><b className="num pos">{eur2(receivables)}</b></div>
+          <div className="totrow"><span>Montant commandé</span><b className="num">{eur2(purchases)}</b></div>
+          <div className="totrow"><span>Déjà réglé</span><b className="num pos">{eur2(paidTotal)}</b></div>
           <div className="totrow big">
-            <span>Position nette</span>
-            <b className={`num ${receivables - debt >= 0 ? "pos" : "neg"}`}>{eur2(receivables - debt)}</b>
+            <span>Reste dû aux fournisseurs</span>
+            <b className={`num ${debt > 0 ? "neg" : "pos"}`}>{eur2(debt)}</b>
           </div>
         </div>
       </div>
@@ -199,6 +208,10 @@ export default function Fournisseurs() {
                   </button>
 
                   <div className="supplier-metrics">
+                    <div>
+                      <span>Articles</span>
+                      <b className="num">{s.pieces}{s.waiting > 0 && <small className="hint"> · {s.waiting} en route</small>}</b>
+                    </div>
                     <div><span>Achats</span><b className="num">{eur(s.purchases)}</b></div>
                     <div><span>Marge</span><b className={`num ${s.margin >= 0 ? "pos" : "neg"}`}>{eur(s.margin)}</b></div>
                     <div><span>ROI</span><b className={`num ${s.roi >= 0 ? "pos" : "neg"}`}>{s.soldPieces ? pct(s.roi) : "—"}</b></div>
@@ -226,6 +239,7 @@ export default function Fournisseurs() {
                     {s.debt > 0 && (
                       <button className="btn sm" onClick={() => settle(s)}>Tout régler</button>
                     )}
+                    <button className="btn sm" onClick={() => setOrdering(s.name)}>Commander</button>
                     <button
                       className="btn sm"
                       onClick={() => setRecordFor({ name: s.name, record: s.record })}
@@ -300,6 +314,9 @@ export default function Fournisseurs() {
         </div>
       )}
 
+      {ordering !== null && (
+        <OrderModal defaultSource={ordering} onClose={() => setOrdering(null)} />
+      )}
       {recordFor && (
         <SupplierModal name={recordFor.name} record={recordFor.record} onClose={() => setRecordFor(null)} />
       )}

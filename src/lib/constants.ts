@@ -1,4 +1,4 @@
-import type { Delivery, ItemStatus, Shipping, TodoCol } from "../types";
+import type { Delivery, ItemStatus, RequestStatus, Shipping, TodoCol } from "../types";
 
 export const STATUS_LABEL: Record<ItemStatus, string> = {
   arrivage: "Arrivage",
@@ -59,3 +59,12 @@ export const CARRIERS = [
 export const EXPENSE_CATEGORIES = [
   "Emballage", "Matériel", "Abonnement", "Transport", "Local", "Logiciel", "Marketing", "Autre",
 ];
+
+export const REQUEST_LABEL: Record<RequestStatus, string> = {
+  brouillon: "Brouillon",
+  envoyee: "Envoyée",
+  acceptee: "Acceptée",
+  refusee: "Refusée",
+};
+
+export const REQUEST_ORDER: RequestStatus[] = ["brouillon", "envoyee", "acceptee", "refusee"];

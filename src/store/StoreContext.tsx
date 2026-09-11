@@ -2,7 +2,7 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState,
   type ReactNode,
 } from "react";
-import type { AppState, DocKind, Expense, Item, SalesDoc, Settings, SupplierRecord, Todo } from "../types";
+import type { AppState, DocKind, Expense, Item, ProductRequest, SalesDoc, Settings, SupplierRecord, Todo } from "../types";
 import { EMPTY_STATE, DEFAULT_SETTINGS } from "./defaults";
 import { getSyncInfo, initSync, push, subscribeSyncInfo, type SyncInfo } from "./sync";
 import { deletePhoto } from "./photos";
@@ -29,6 +29,8 @@ type Action =
   | { type: "removeExpense"; id: string }
   | { type: "upsertSupplier"; supplier: SupplierRecord }
   | { type: "removeSupplier"; id: string }
+  | { type: "upsertRequest"; request: ProductRequest }
+  | { type: "removeRequest"; id: string }
   | { type: "settings"; patch: Partial<Settings> };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -99,6 +101,17 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case "removeSupplier":
       return stamp({ ...state, suppliers: state.suppliers.filter((s) => s.id !== action.id) });
+    case "upsertRequest": {
+      const exists = state.requests.some((r) => r.id === action.request.id);
+      return stamp({
+        ...state,
+        requests: exists
+          ? state.requests.map((r) => (r.id === action.request.id ? action.request : r))
+          : [action.request, ...state.requests],
+      });
+    }
+    case "removeRequest":
+      return stamp({ ...state, requests: state.requests.filter((r) => r.id !== action.id) });
     case "settings":
       return stamp({ ...state, settings: { ...state.settings, ...action.patch } });
     default:
@@ -146,6 +159,7 @@ function loadLocal(): AppState {
       docs: parsed.docs ?? [],
       expenses: parsed.expenses ?? [],
       suppliers: parsed.suppliers ?? [],
+      requests: parsed.requests ?? [],
       seq: parsed.seq ?? {},
     };
   } catch {
@@ -193,6 +207,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             items: (remote.items ?? []).map(withLogistics),
             expenses: remote.expenses ?? [],
             suppliers: remote.suppliers ?? [],
+            requests: remote.requests ?? [],
           },
         });
       },
