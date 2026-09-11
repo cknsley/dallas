@@ -28,25 +28,28 @@ export interface Range {
 }
 
 export function periodRange(period: Period, now = new Date()): Range {
+  // Chaque période est fermée : du 1er au dernier jour, jamais ouverte sur l'avenir.
   if (period === "month") {
     const from = new Date(now.getFullYear(), now.getMonth(), 1);
+    const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     return {
       from: toISO(from),
-      to: "9999-12-31",
+      to: toISO(to),
       label: capitalize(now.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })),
     };
   }
   if (period === "quarter") {
     const q = Math.floor(now.getMonth() / 3);
     const from = new Date(now.getFullYear(), q * 3, 1);
-    return {
-      from: toISO(from),
-      to: "9999-12-31",
-      label: `T${q + 1} ${now.getFullYear()}`,
-    };
+    const to = new Date(now.getFullYear(), q * 3 + 3, 0);
+    return { from: toISO(from), to: toISO(to), label: `T${q + 1} ${now.getFullYear()}` };
   }
   if (period === "year") {
-    return { from: `${now.getFullYear()}-01-01`, to: "9999-12-31", label: `Année ${now.getFullYear()}` };
+    return {
+      from: `${now.getFullYear()}-01-01`,
+      to: `${now.getFullYear()}-12-31`,
+      label: `Année ${now.getFullYear()}`,
+    };
   }
   return { from: "0000-01-01", to: "9999-12-31", label: "Depuis le début" };
 }
@@ -189,6 +192,7 @@ export function expenseMonths(e: Expense): string[] {
 export function chargesInRange(expenses: Expense[], r: Range): number {
   const nowMonth = monthKey(new Date().toISOString());
   const fromMonth = monthKey(r.from);
+  // On n'impute jamais un mois à venir : la borne haute s'arrête au mois courant.
   const toMonth = monthKey(r.to) > nowMonth ? nowMonth : monthKey(r.to);
   return expenses.reduce((sum, e) => {
     const share = expenseMonthlyShare(e);
@@ -210,10 +214,12 @@ export function monthsElapsed(r: Range): number {
   const now = new Date();
   const nowMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const from = r.from.slice(0, 7);
-  if (from > nowMonth) return 1;
+  const to = r.to.slice(0, 7);
+  const last = to > nowMonth ? nowMonth : to;
+  if (from > last) return 1;
   const [fy, fm] = from.split("-").map(Number);
-  const [ny, nm] = nowMonth.split("-").map(Number);
-  return Math.max(1, (ny - fy) * 12 + (nm - fm) + 1);
+  const [ly, lm] = last.split("-").map(Number);
+  return Math.max(1, (ly - fy) * 12 + (lm - fm) + 1);
 }
 
 /** Répartition des charges imputées sur la période, par catégorie. */

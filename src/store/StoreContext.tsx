@@ -101,6 +101,7 @@ const withLogistics = (i: Item): Item => ({
   shipping: i.shipping ?? "en_preparation",
   orderId: i.orderId ?? "",
   quantity: i.quantity && i.quantity > 0 ? i.quantity : 1,
+  purchasePaid: i.purchasePaid ?? true,
   carrier: i.carrier ?? "",
   tracking: i.tracking ?? "",
   expectedDate: i.expectedDate ?? "",

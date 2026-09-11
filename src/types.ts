@@ -41,6 +41,8 @@ export interface Item {
   shipping: Shipping;     // avancement de l'envoi
   /** Regroupe les pièces achetées dans une même commande fournisseur. */
   orderId: string;
+  /** Faux tant que le fournisseur n'a pas été réglé : c'est une dette. */
+  purchasePaid: boolean;
 }
 
 /** Une tâche automatique est déduite de l'état des pièces ou des documents :

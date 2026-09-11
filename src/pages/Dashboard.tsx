@@ -41,8 +41,12 @@ const tooltipStyle = {
   borderRadius: 10,
   fontSize: 12,
   color: "var(--ink)",
-  boxShadow: "var(--shadow)",
+  boxShadow: "var(--shadow-lg)",
+  padding: "8px 12px",
 } as const;
+// Recharts colore sinon le texte avec la couleur de la part : illisible sur fond sombre.
+const tooltipItemStyle = { color: "var(--ink)", fontWeight: 600 } as const;
+const tooltipLabelStyle = { color: "var(--ink-3)", marginBottom: 2 } as const;
 const shortEur = (v: number) => (Math.abs(v) >= 1000 ? `${Math.round(v / 1000)}k` : String(Math.round(v)));
 
 /** Une ligne du classement renvoie vers les pièces qu'elle agrège. */
@@ -185,7 +189,7 @@ export default function Dashboard() {
                     <CartesianGrid strokeDasharray="2 5" stroke="var(--line-2)" vertical={false} />
                     <XAxis dataKey="label" tick={axis} axisLine={false} tickLine={false} />
                     <YAxis tick={axis} axisLine={false} tickLine={false} tickFormatter={shortEur} />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number, k) => [eur(v), k === "ca" ? "CA" : "Marge"]} />
+                    <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} formatter={(v: number, k) => [eur(v), k === "ca" ? "CA" : "Marge"]} />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} formatter={(k) => (k === "ca" ? "CA" : "Marge")} />
                     <Line type="monotone" dataKey="ca" stroke="var(--accent)" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
                     <Line type="monotone" dataKey="marge" stroke="var(--accent-2)" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
@@ -205,7 +209,7 @@ export default function Dashboard() {
                     <CartesianGrid strokeDasharray="2 5" stroke="var(--line-2)" vertical={false} />
                     <XAxis dataKey="label" tick={axis} axisLine={false} tickLine={false} />
                     <YAxis tick={axis} axisLine={false} tickLine={false} tickFormatter={shortEur} />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number, k) => [eur(v), k === "ca" ? "CA" : "Marge"]} />
+                    <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} formatter={(v: number, k) => [eur(v), k === "ca" ? "CA" : "Marge"]} />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} formatter={(k) => (k === "ca" ? "CA" : "Marge")} />
                     <Area type="monotone" dataKey="ca" stroke="var(--accent)" strokeWidth={2} fill="url(#gCa)" />
                     <Area type="monotone" dataKey="marge" stroke="var(--accent-2)" strokeWidth={2} fill="url(#gMarge)" />
@@ -215,7 +219,7 @@ export default function Dashboard() {
                     <CartesianGrid strokeDasharray="2 5" stroke="var(--line-2)" vertical={false} />
                     <XAxis dataKey="label" tick={axis} axisLine={false} tickLine={false} />
                     <YAxis tick={axis} axisLine={false} tickLine={false} tickFormatter={shortEur} />
-                    <Tooltip cursor={{ fill: "var(--accent-soft)" }} contentStyle={tooltipStyle} formatter={(v: number, k) => [eur(v), k === "ca" ? "CA" : "Marge"]} />
+                    <Tooltip cursor={{ fill: "var(--accent-soft)" }} contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} formatter={(v: number, k) => [eur(v), k === "ca" ? "CA" : "Marge"]} />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} formatter={(k) => (k === "ca" ? "CA" : "Marge")} />
                     <Bar dataKey="ca" fill="var(--accent)" radius={[5, 5, 0, 0]} maxBarSize={22} />
                     <Bar dataKey="marge" fill="var(--accent-2)" radius={[5, 5, 0, 0]} maxBarSize={22} />
@@ -346,7 +350,7 @@ export default function Dashboard() {
                   >
                     {donutData.map((d) => <Cell key={d.name} fill={d.fill} />)}
                   </Pie>
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number, k) => [eur(v), String(k)]} />
+                  <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} formatter={(v: number, k) => [eur(v), String(k)]} />
                   <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                 </PieChart>
               </ResponsiveContainer>

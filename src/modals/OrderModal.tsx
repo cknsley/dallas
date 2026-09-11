@@ -37,6 +37,7 @@ export default function OrderModal({ onClose, onCreated }: { onClose: () => void
   const [tracking, setTracking] = useState("");
   const [shipping, setShipping] = useState("");
   const [notes, setNotes] = useState("");
+  const [purchasePaid, setPurchasePaid] = useState(true);
   const [lines, setLines] = useState<Line[]>([newLine()]);
 
   const patch = (key: string, p: Partial<Line>) => setLines((l) => l.map((x) => (x.key === key ? { ...x, ...p } : x)));
@@ -90,6 +91,7 @@ export default function OrderModal({ onClose, onCreated }: { onClose: () => void
         createdAt: now + ix,
         carrier: carrier.trim(), tracking: tracking.trim(), expectedDate, shipDate: "",
         orderId,
+        purchasePaid,
       };
       dispatch({ type: "upsertItem", item });
     });
@@ -138,6 +140,12 @@ export default function OrderModal({ onClose, onCreated }: { onClose: () => void
         </Field>
         <Field label={eurLabel("Frais de port de la commande")}>
           <input type="number" step="0.01" value={shipping} placeholder="0,00" onChange={(e) => setShipping(e.target.value)} />
+        </Field>
+        <Field label="Règlement fournisseur">
+          <select value={purchasePaid ? "paye" : "du"} onChange={(e) => setPurchasePaid(e.target.value === "paye")}>
+            <option value="paye">Payée</option>
+            <option value="du">À régler</option>
+          </select>
         </Field>
       </div>
       <datalist id="dl-order-source">{suggestions.source.map((v) => <option key={v} value={v} />)}</datalist>

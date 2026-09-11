@@ -16,7 +16,7 @@ export const blankItem = (): Item => ({
   platform: "", buyer: "", buyerUrl: "", saleFees: 0, shippingCost: 0, shippingPaid: 0,
   status: "arrivage",
   buyDate: today(), receiveDate: "", saleDate: "",
-  delivery: "commandee", shipping: "en_preparation", orderId: "",
+  delivery: "commandee", shipping: "en_preparation", orderId: "", purchasePaid: true,
   notes: "", photoId: null,
   createdAt: Date.now(),
   carrier: "", tracking: "", expectedDate: "", shipDate: "",
@@ -363,6 +363,15 @@ export default function ItemModal({
       <div className="fgrid">
         <Field label="Date d'achat">
           <input type="date" value={draft.buyDate} onChange={(e) => set("buyDate", e.target.value)} />
+        </Field>
+        <Field label="Règlement fournisseur">
+          <select
+            value={draft.purchasePaid ? "paye" : "du"}
+            onChange={(e) => set("purchasePaid", e.target.value === "paye")}
+          >
+            <option value="paye">Payé</option>
+            <option value="du">À régler</option>
+          </select>
         </Field>
         <Field label="Date de réception">
           <input type="date" value={draft.receiveDate} onChange={(e) => set("receiveDate", e.target.value)} />
