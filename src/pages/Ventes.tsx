@@ -117,7 +117,7 @@ export default function Ventes() {
         <Kpi
           label="ROI"
           value={pct(roi)}
-          meta="Marge rapportée à ce qui a été engagé"
+          meta={engaged ? "Marge rapportée à ce qui a été engagé" : "En attente de la première vente"}
           tone={roi >= 0 ? "ok" : "warn"}
         />
       </div>

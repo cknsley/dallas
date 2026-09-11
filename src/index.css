@@ -867,6 +867,15 @@ tr:hover .rowact, .rowact:focus-within, .rowact.always { opacity: 1; }
   font-size: 17px; font-weight: 700; font-family: var(--ff-display);
 }
 
+/* Une ligne de résultat qui mène à sa source. */
+.totrow.linked {
+  text-decoration: none; color: inherit; cursor: pointer;
+  margin: 0 -8px; padding: 7px 8px;
+  border-radius: var(--r-sm); transition: background 0.13s;
+}
+.totrow.linked:hover { background: var(--accent-soft); }
+.totrow.linked:hover > span:first-child { color: var(--accent); }
+
 .toast-wrap { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 300; display: flex; flex-direction: column; gap: 8px; align-items: center; }
 .toast {
   display: flex; align-items: center; gap: 14px;

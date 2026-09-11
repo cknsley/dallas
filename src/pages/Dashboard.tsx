@@ -133,7 +133,7 @@ export default function Dashboard() {
         <Kpi
           label="Marge réalisée"
           value={eur(stats.marge)}
-          meta={`${pct(stats.margePct)} du chiffre d'affaires`}
+          meta={stats.ca ? `${pct(stats.margePct)} du chiffre d'affaires` : "Aucune vente sur la période"}
           tone={stats.marge >= 0 ? "ok" : "warn"}
           to={links.bilan()}
           hint="Détail"

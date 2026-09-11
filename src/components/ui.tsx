@@ -176,13 +176,21 @@ export function PhotoCover({ id }: { id: string | null }) {
 }
 
 /* ---------- Liste de barres ---------- */
-export function BarList({ rows }: { rows: { key: string; label: string; value: number; note?: string; display: string }[] }) {
+export function BarList({
+  rows,
+}: {
+  rows: { key: string; label: string; value: number; note?: string; display: string; to?: string }[];
+}) {
   const max = rows.reduce((m, r) => Math.max(m, r.value), 0);
   return (
     <div className="bars">
       {rows.map((r) => (
         <div className="bar-row" key={r.key}>
-          <div className="bl" title={r.label}>{r.label}</div>
+          {r.to ? (
+            <Link className="bl linkish" to={r.to} title={r.label}>{r.label}</Link>
+          ) : (
+            <div className="bl" title={r.label}>{r.label}</div>
+          )}
           <div className="bar-track">
             <div className="bar-fill" style={{ width: `${max > 0 ? Math.max(1.5, (r.value / max) * 100) : 1.5}%` }} />
           </div>

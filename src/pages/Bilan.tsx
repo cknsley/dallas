@@ -60,6 +60,28 @@ function BalanceRow({
   );
 }
 
+/** Ligne de résultat : quand elle a une source, elle y mène. */
+function ResultRow({
+  label, note, value, to,
+}: {
+  label: string;
+  note?: string;
+  value: string;
+  to?: string;
+}) {
+  const inner = (
+    <>
+      <span>
+        {label}
+        {note && <span className="hint"> ({note})</span>}
+      </span>
+      <b className="num">{value}</b>
+    </>
+  );
+  if (!to) return <div className="totrow">{inner}</div>;
+  return <Link className="totrow linked" to={to}>{inner}</Link>;
+}
+
 /** Montant retranché : le signe n'apparaît que si la valeur est non nulle. */
 const deducted = (v: number) => (v > 0 ? `−${eur2(v)}` : eur2(0));
 
@@ -215,7 +237,14 @@ export default function Bilan() {
           to={links.livraison({ tab: "faire" })}
           hint="Livraison"
         />
-        <Kpi label="Marge réalisée" value={eur(stats.marge)} meta={`${pct(stats.margePct)} du CA · ${range.label}`} tone="ok" />
+        <Kpi
+          label="Marge réalisée"
+          value={eur(stats.marge)}
+          meta={stats.ca ? `${pct(stats.margePct)} du CA · ${range.label}` : `Aucune vente sur ${range.label.toLowerCase()}`}
+          tone="ok"
+          to={links.ventes()}
+          hint="Ventes"
+        />
         <Kpi
           label="Charges générales"
           value={eur(charges)}
@@ -252,23 +281,41 @@ export default function Bilan() {
             <span className="hint">{range.label}</span>
           </div>
           <div className="card-b">
-            <div className="totrow"><span>Chiffre d'affaires</span><b className="num">{eur2(stats.ca)}</b></div>
-            <div className="totrow"><span>{LABEL.shippingPaid}</span><b className="num">{detail.portRecu ? `+${eur2(detail.portRecu)}` : eur2(0)}</b></div>
+            <ResultRow label="Chiffre d'affaires" value={eur2(stats.ca)} to={links.ventes()} />
+            <ResultRow
+              label={LABEL.shippingPaid}
+              value={detail.portRecu ? `+${eur2(detail.portRecu)}` : eur2(0)}
+              to={links.ventes()}
+            />
             <hr className="sep" />
-            <div className="totrow"><span>{LABEL.cost} des articles vendus</span><b className="num">{deducted(detail.achat)}</b></div>
-            <div className="totrow"><span>{LABEL.fees} <span className="hint">({HINT.fees.toLowerCase()})</span></span><b className="num">{deducted(detail.fraisAchat)}</b></div>
-            <div className="totrow"><span>{LABEL.saleFees}</span><b className="num">{deducted(detail.commissions)}</b></div>
-            <div className="totrow"><span>{LABEL.shippingCost}</span><b className="num">{deducted(detail.portPaye)}</b></div>
+            <ResultRow
+              label={`${LABEL.cost} des articles vendus`}
+              value={deducted(detail.achat)}
+              to={links.fournisseurs()}
+            />
+            <ResultRow
+              label={LABEL.fees}
+              note={HINT.fees.toLowerCase()}
+              value={deducted(detail.fraisAchat)}
+              to={links.fournisseurs()}
+            />
+            <ResultRow label={LABEL.saleFees} value={deducted(detail.commissions)} to={links.ventes()} />
+            <ResultRow
+              label={LABEL.shippingCost}
+              value={deducted(detail.portPaye)}
+              to={links.livraison({ tab: "faire" })}
+            />
             <div className="totrow big" style={{ fontSize: 15 }}>
               <span>Marge réalisée</span><b className={`num ${stats.marge >= 0 ? "pos" : "neg"}`}>{eur2(stats.marge)}</b>
             </div>
             {regime.subject && (
-              <div className="totrow"><span>TVA {regime.scheme === "marge" ? "sur la marge" : "sur le prix"} ({regime.rate} %)</span><b className="num">{deducted(tva)}</b></div>
+              <ResultRow
+                label={`TVA ${regime.scheme === "marge" ? "sur la marge" : "sur le prix"} (${regime.rate} %)`}
+                value={deducted(tva)}
+                to={links.facturation()}
+              />
             )}
-            <div className="totrow">
-              <span>Charges générales</span>
-              <b className="num">{deducted(detail.charges)}</b>
-            </div>
+            <ResultRow label="Charges générales" value={deducted(detail.charges)} to={links.charges()} />
             <div className="totrow big">
               <span>Marge nette finale</span>
               <b className={`num ${net >= 0 ? "pos" : "neg"}`}>{eur2(net)}</b>
@@ -293,6 +340,7 @@ export default function Bilan() {
                   value: Math.max(0, b.marge),
                   display: eur(b.marge),
                   note: `${b.qty} article${b.qty > 1 ? "s" : ""}`,
+                  to: links.ventes({ brand: b.key }),
                 }))}
               />
             </div>
