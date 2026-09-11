@@ -119,6 +119,8 @@ export interface Settings {
   iban: string;
   footer: string;
   paymentTerms: number;    // jours
+  /** Commission prélevée par plateforme, en % du prix de vente. */
+  platformFees: Record<string, number>;
 }
 
 export interface AppState {

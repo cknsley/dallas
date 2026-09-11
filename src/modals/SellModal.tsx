@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Field, Modal } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
@@ -37,6 +37,8 @@ export default function SellModal({
   const { state, dispatch } = useStore();
   const toast = useToast();
   const [makeDoc, setMakeDoc] = useState(false);
+  /** Dès que la commission est saisie à la main, on cesse de la recalculer. */
+  const [feeTouched, setFeeTouched] = useState(item.saleFees > 0);
   const [d, setD] = useState<SaleDraft>({
     price: item.price ? String(item.price) : "",
     saleDate: item.saleDate || today(),
@@ -86,6 +88,22 @@ export default function SellModal({
     () => [...new Set([...CARRIERS, ...state.items.map((i) => i.carrier).filter(Boolean)])],
     [state.items],
   );
+
+  /** Taux de commission connu pour la plateforme saisie. */
+  const feeRate = (platform: string): number | null => {
+    const key = Object.keys(state.settings.platformFees).find(
+      (k) => k.toLowerCase() === platform.trim().toLowerCase(),
+    );
+    return key === undefined ? null : state.settings.platformFees[key];
+  };
+  const currentRate = feeRate(d.platform);
+
+  // La commission suit le prix et la plateforme, tant qu'elle n'a pas été forcée.
+  useEffect(() => {
+    if (feeTouched || currentRate === null) return;
+    const computed = currentRate > 0 ? ((num(d.price) * currentRate) / 100).toFixed(2) : "";
+    setD((x) => (x.saleFees === computed ? x : { ...x, saleFees: computed }));
+  }, [d.platform, d.price, feeTouched, currentRate]);
 
   /* ---- calculatrice de marge, port compris ---- */
   const buyCost = costOf(item);
@@ -207,8 +225,14 @@ export default function SellModal({
           <hr className="sep" />
           <div className="field"><span>{LABEL.saleCosts} et livraison</span></div>
           <div className="fgrid">
-            <Field label={eurLabel(LABEL.saleFees)}>
-              <input type="number" step="0.01" value={d.saleFees} placeholder="0,00" onChange={(e) => set("saleFees", e.target.value)} />
+            <Field label={currentRate !== null && !feeTouched ? `${LABEL.saleFees} (${currentRate} %)` : eurLabel(LABEL.saleFees)}>
+              <input
+                type="number"
+                step="0.01"
+                value={d.saleFees}
+                placeholder="0,00"
+                onChange={(e) => { setFeeTouched(true); set("saleFees", e.target.value); }}
+              />
             </Field>
             <Field label={eurLabel(LABEL.shippingPaid)}>
               <input type="number" step="0.01" value={d.shippingPaid} placeholder="0,00" onChange={(e) => set("shippingPaid", e.target.value)} />
@@ -255,6 +279,7 @@ export default function SellModal({
           <Row label={LABEL.saleFees} value={saleFees ? `−${eur2(saleFees)}` : eur2(0)} />
           <Row label={LABEL.shippingCost} value={shippingCost ? `−${eur2(shippingCost)}` : eur2(0)} />
           <div className="totrow sub"><span>Total dépensé</span><b className="num">{eur2(outflow)}</b></div>
+          <div className="totrow"><span>Versé par la plateforme</span><b className="num">{eur2(cashIn - saleFees - shippingCost)}</b></div>
           <div className="totrow big">
             <span>Marge nette</span>
             <b className={`num ${margin >= 0 ? "pos" : "neg"}`}>{eur2(margin)}</b>

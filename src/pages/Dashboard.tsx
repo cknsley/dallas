@@ -15,6 +15,7 @@ import {
 import { eur, pct } from "../lib/format";
 import { STATUS_LABEL } from "../lib/constants";
 import { vatRegime } from "../lib/vat";
+import { buildClients } from "../lib/clients";
 import { links } from "../lib/links";
 import ItemModal from "../modals/ItemModal";
 import OrderModal from "../modals/OrderModal";
@@ -73,6 +74,11 @@ export default function Dashboard() {
   const donutData = rows.slice(0, 7).map((r, ix) => ({ name: r.key, value: Math.round(r.ca), fill: SLICES[ix % SLICES.length] }));
   const others = rows.slice(7).reduce((a, r) => a + r.ca, 0);
   if (others > 0) donutData.push({ name: "Autres", value: Math.round(others), fill: "var(--ink-3)" });
+
+  // Part des acheteurs qui sont revenus : le signal le plus parlant sur la demande.
+  const clients = useMemo(() => buildClients(state.items), [state.items]);
+  const repeatBuyers = clients.filter((c) => c.orders > 1).length;
+  const repeatRate = clients.length ? (repeatBuyers / clients.length) * 100 : 0;
 
   const pipeline = (["arrivage", "stock", "vendu"] as const).map((s) => {
     const items = state.items.filter((i) => i.status === s);
@@ -142,6 +148,16 @@ export default function Dashboard() {
           meta={`${stats.enStock} en stock · ${stats.arrivage} en arrivage`}
           to={links.ventes()}
           hint="Historique"
+        />
+        <Kpi
+          label="Taux de recommande"
+          value={pct(repeatRate)}
+          meta={clients.length
+            ? `${repeatBuyers} acheteur${repeatBuyers > 1 ? "s" : ""} sur ${clients.length} ${repeatBuyers > 1 ? "sont revenus" : "est revenu"}`
+            : "Renseignez l'acheteur à la vente"}
+          tone={repeatRate >= 20 ? "ok" : undefined}
+          to={links.clients()}
+          hint="Clients"
         />
       </div>
 

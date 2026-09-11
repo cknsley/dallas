@@ -6,7 +6,7 @@ import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
 import { useQueryState } from "../lib/useQueryState";
 import { buildClients } from "../lib/clients";
-import { marginOf, qtyOf, revenueOf } from "../lib/calc";
+import { groupBy, marginOf, qtyOf, revenueOf } from "../lib/calc";
 import { dshort, eur, eur2, pct } from "../lib/format";
 import { DELIVERY_LABEL } from "../lib/constants";
 import { links } from "../lib/links";
@@ -41,6 +41,11 @@ export default function Clients() {
   const repeat = clients.filter((c) => c.orders > 1);
   const anonymous = state.items.filter((i) => i.status === "vendu" && !i.buyer.trim()).length;
   const best = clients[0];
+
+  // Ce qui part le mieux auprès de ces acheteurs.
+  const sold = useMemo(() => state.items.filter((i) => i.status === "vendu"), [state.items]);
+  const topItems = useMemo(() => groupBy(sold, "item").slice(0, 3), [sold]);
+  const topBrands = useMemo(() => groupBy(sold, "brand").slice(0, 3), [sold]);
 
   return (
     <>
@@ -87,6 +92,46 @@ export default function Clients() {
           meta="Encaissé moyen par commande nominative"
         />
       </div>
+
+      {sold.length > 0 && (
+        <div className="cols two" style={{ marginBottom: 16 }}>
+          <div className="card">
+            <div className="card-h">
+              <h3>Top 3 best-sellers</h3>
+              <div className="spacer" />
+              <span className="hint">Articles qui rapportent le plus</span>
+            </div>
+            <div className="card-b podium">
+              {topItems.map((r, ix) => (
+                <div className="podium-row" key={r.key}>
+                  <span className={`podium-rank r${ix + 1}`}>{ix + 1}</span>
+                  <span className="podium-name ellipsis" title={r.key}>{r.key}</span>
+                  <span className="hint nowrap">{r.qty} vendu{r.qty > 1 ? "s" : ""}</span>
+                  <b className="num">{eur(r.ca)}</b>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-h">
+              <h3>Marques phares</h3>
+              <div className="spacer" />
+              <span className="hint">Par chiffre d'affaires</span>
+            </div>
+            <div className="card-b podium">
+              {topBrands.map((r, ix) => (
+                <div className="podium-row" key={r.key}>
+                  <span className={`podium-rank r${ix + 1}`}>{ix + 1}</span>
+                  <span className="podium-name ellipsis" title={r.key}>{r.key}</span>
+                  <span className="hint nowrap">{r.qty} pièce{r.qty > 1 ? "s" : ""}</span>
+                  <b className={`num ${r.marge >= 0 ? "pos" : "neg"}`}>{eur(r.marge)}</b>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {clients.length === 0 ? (
         <div className="card">

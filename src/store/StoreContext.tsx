@@ -121,7 +121,11 @@ function loadLocal(): AppState {
     return {
       ...EMPTY_STATE,
       ...parsed,
-      settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        ...(parsed.settings ?? {}),
+        platformFees: { ...DEFAULT_SETTINGS.platformFees, ...(parsed.settings?.platformFees ?? {}) },
+      },
       items: (parsed.items ?? []).map(withLogistics),
       todos: parsed.todos ?? [],
       docs: parsed.docs ?? [],
@@ -164,7 +168,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           state: {
             ...EMPTY_STATE,
             ...remote,
-            settings: { ...DEFAULT_SETTINGS, ...remote.settings },
+            settings: {
+              ...DEFAULT_SETTINGS,
+              ...remote.settings,
+              platformFees: { ...DEFAULT_SETTINGS.platformFees, ...(remote.settings?.platformFees ?? {}) },
+            },
             items: (remote.items ?? []).map(withLogistics),
             expenses: remote.expenses ?? [],
           },

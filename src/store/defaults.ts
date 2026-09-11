@@ -15,6 +15,20 @@ export const DEFAULT_SETTINGS: Settings = {
   iban: "",
   footer: "",
   paymentTerms: 14,
+  // Ordres de grandeur usuels ; chaque taux reste modifiable dans Facturation.
+  platformFees: {
+    Vinted: 0,
+    "Vestiaire Collective": 15,
+    Depop: 10,
+    eBay: 12.8,
+    Leboncoin: 0,
+    Grailed: 9,
+    Instagram: 0,
+    WhatsApp: 0,
+    "Main propre": 0,
+    Boutique: 0,
+    Autre: 0,
+  },
 };
 
 export const EMPTY_STATE: AppState = {

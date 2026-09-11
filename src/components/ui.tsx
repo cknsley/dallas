@@ -108,7 +108,7 @@ export function Kpi({
   );
   if (!to) return <div className={className}>{body}</div>;
   return (
-    <Link className={className} to={to} title={hint ?? `Ouvrir : ${label}`}>
+    <Link className={className} to={to}>
       {body}
     </Link>
   );

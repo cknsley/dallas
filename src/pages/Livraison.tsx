@@ -11,6 +11,8 @@ import { dfr, eur, today } from "../lib/format";
 import { SHIPPING_LABEL, SHIPPING_ORDER } from "../lib/constants";
 import ItemModal from "../modals/ItemModal";
 import SellModal from "../modals/SellModal";
+import OrderModal from "../modals/OrderModal";
+import ShipmentModal from "../modals/ShipmentModal";
 import type { Item, Shipping } from "../types";
 
 type Tab = "faire" | "recevoir";
@@ -51,6 +53,7 @@ export default function Livraison() {
   const [lateOnly, setLateOnly] = useQueryState("late");
   const [editing, setEditing] = useState<Item | null>(null);
   const [selling, setSelling] = useState<Item | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const allIncoming = useMemo(
     () =>
@@ -131,6 +134,11 @@ export default function Livraison() {
             { value: "recevoir", label: `À recevoir (${allIncoming.length})` },
           ]}
         />
+        {tab === "recevoir" ? (
+          <button className="btn primary" onClick={() => setCreating(true)}>+ Nouvelle commande</button>
+        ) : (
+          <button className="btn primary" onClick={() => setCreating(true)}>+ Nouvelle livraison</button>
+        )}
       </HeaderActions>
 
       <div className="kpi-grid">
@@ -151,18 +159,18 @@ export default function Livraison() {
           hint="Filtrer"
         />
         <Kpi
-          label="À livrer"
-          value={eur(sleeping)}
-          meta={`${toShip.length} commande${toShip.length > 1 ? "s" : ""} payée${toShip.length > 1 ? "s" : ""} — argent dormant tant que le colis n'est pas parti`}
+          label="Colis à envoyer"
+          value={String(toShip.length)}
+          meta={toShip.length ? `${eur(sleeping)} encaissés, colis pas encore parti` : "Rien en attente d'envoi"}
           tone={toShip.length ? "warn" : "ok"}
           to={links.livraison({ tab: "faire" })}
           hint="Voir"
         />
         <Kpi
-          label="Livrées"
+          label="Ventes bouclées"
           value={String(delivered.length)}
-          meta={unpaid.length ? `${unpaid.length} vente${unpaid.length > 1 ? "s" : ""} non payée${unpaid.length > 1 ? "s" : ""} en attente` : "Aucune vente en attente de paiement"}
-          to={links.ventes()}
+          meta="Colis reçus par l'acheteur"
+          to={links.ventes({ delivery: "livree" })}
           hint="Ventes"
         />
       </div>
@@ -359,6 +367,10 @@ export default function Livraison() {
         </div>
       )}
 
+      {creating && tab === "recevoir" && (
+        <OrderModal onClose={() => setCreating(false)} onCreated={() => setLateOnly("")} />
+      )}
+      {creating && tab === "faire" && <ShipmentModal onClose={() => setCreating(false)} />}
       {editing && <ItemModal item={editing} onClose={() => setEditing(null)} onSell={(i) => setSelling(i)} />}
       {selling && (
         <SellModal
