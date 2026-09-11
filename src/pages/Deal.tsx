@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 import { HeaderActions } from "../components/Layout";
-import { Empty, Kpi, Segmented } from "../components/ui";
+import { Empty, Kpi } from "../components/ui";
 import { useStore } from "../store/StoreContext";
-import { usePref } from "../lib/usePref";
 import { caOfYear, costOf, revenueOf, saleCostsOf } from "../lib/calc";
 import { eur, eur2, num, pct } from "../lib/format";
 import { STATUS_LABEL } from "../lib/constants";
@@ -298,7 +297,6 @@ function SellCalculator() {
 
 export default function Deal() {
   const { state } = useStore();
-  const [mode, setMode] = usePref<"achat" | "vente">("dealMode", "vente");
 
   const inStock = state.items.filter((i) => i.status !== "vendu");
   const stockCost = inStock.reduce((a, i) => a + costOf(i), 0);
@@ -309,14 +307,7 @@ export default function Deal() {
   return (
     <>
       <HeaderActions>
-        <Segmented<"achat" | "vente">
-          value={mode}
-          onChange={setMode}
-          options={[
-            { value: "achat", label: "Négocier un achat" },
-            { value: "vente", label: "Négocier une vente" },
-          ]}
-        />
+        <span className="hint">Les deux côtés de la négociation, côte à côte</span>
       </HeaderActions>
 
       <div className="kpi-grid">
@@ -331,17 +322,24 @@ export default function Deal() {
         />
       </div>
 
-      <div className="card">
-        <div className="card-h">
-          <h3>{mode === "achat" ? "Négocier un achat" : "Négocier une vente"}</h3>
-          <div className="spacer" />
-          <span className="hint">
-            {mode === "achat"
-              ? "Jusqu'à combien payer ce lot"
-              : "Jusqu'à quelle remise rester gagnant"}
-          </span>
+      <div className="cols two">
+        <div className="card">
+          <div className="card-h">
+            <h3>Négocier un achat</h3>
+            <div className="spacer" />
+            <span className="hint">Jusqu'à combien payer ce lot</span>
+          </div>
+          <BuyCalculator />
         </div>
-        {mode === "achat" ? <BuyCalculator /> : <SellCalculator />}
+
+        <div className="card">
+          <div className="card-h">
+            <h3>Négocier une vente</h3>
+            <div className="spacer" />
+            <span className="hint">Jusqu'à quelle remise rester gagnant</span>
+          </div>
+          <SellCalculator />
+        </div>
       </div>
     </>
   );

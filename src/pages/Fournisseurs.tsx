@@ -80,8 +80,15 @@ export default function Fournisseurs() {
     });
   }, [suppliers, q, sort]);
 
-  /* ---- balance de la période ---- */
-  const bought = state.items.filter((i) => i.buyDate >= range.from && i.buyDate <= range.to);
+  /* ---- balance de la période, fournisseurs seulement ---- */
+  // Un article acheté au détail n'entre pas dans la balance d'approvisionnement.
+  const supplierKeys = useMemo(() => new Set(suppliers.map((s) => s.key)), [suppliers]);
+  const supplierItems = useMemo(
+    () => state.items.filter((i) => supplierKeys.has((i.source.trim() || "Source non renseignée").toLowerCase())),
+    [state.items, supplierKeys],
+  );
+
+  const bought = supplierItems.filter((i) => i.buyDate >= range.from && i.buyDate <= range.to);
   const purchases = bought.reduce((a, i) => a + costOf(i), 0);
   const paidTotal = bought.filter((i) => i.purchasePaid).reduce((a, i) => a + costOf(i), 0);
   const boughtPieces = bought.reduce((a, i) => a + qtyOf(i), 0);
@@ -90,7 +97,7 @@ export default function Fournisseurs() {
 
   const debt = suppliers.reduce((a, s) => a + s.debt, 0);
   const debtors = suppliers.filter((s) => s.debt > 0);
-  const clientDebt = state.items
+  const clientDebt = supplierItems
     .filter((i) => i.status === "vendu" && i.delivery === "non_payee")
     .reduce((a, i) => a + revenueOf(i), 0);
   const unpaidDocs = state.docs.filter((d) => !d.paid).reduce((a, d) => a + d.total, 0);
@@ -143,7 +150,7 @@ export default function Fournisseurs() {
         <Kpi
           label={`Achats — ${range.label}`}
           value={eur(purchases)}
-          meta={`${bought.reduce((a, i) => a + qtyOf(i), 0)} article${bought.length > 1 ? "s" : ""} entrés`}
+          meta={`${boughtPieces} article${boughtPieces > 1 ? "s" : ""} venus de fournisseurs`}
           tone="info"
         />
         <Kpi
