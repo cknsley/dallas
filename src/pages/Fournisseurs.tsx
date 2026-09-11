@@ -131,7 +131,10 @@ export default function Fournisseurs() {
         <div className="card-h">
           <h3>Balance de la période</h3>
           <div className="spacer" />
-          <span className="hint">{range.label} — du {dshort(range.from)} au {dshort(range.to)}</span>
+          <span className="hint">
+            {range.label}
+            {range.bounded && ` — du ${dshort(range.from)} au ${dshort(range.to)}`}
+          </span>
         </div>
         <div className="card-b">
           <div className="totrow"><span>Achats (entrées de stock)</span><b className="num">−{eur2(purchases)}</b></div>
@@ -186,9 +189,12 @@ export default function Fournisseurs() {
                         {" · "}dernier achat {dshort(s.lastBuy)}
                       </div>
                     </div>
-                    <div className={`supplier-score ${score >= 66 ? "good" : score >= 33 ? "mid" : "low"}`}>
-                      <b className="num">{score}</b>
-                      <span>score</span>
+                    <div
+                      className={`supplier-score ${score === null ? "pending" : score >= 66 ? "good" : score >= 33 ? "mid" : "low"}`}
+                      title={score === null ? "Score disponible après la première revente" : undefined}
+                    >
+                      <b className="num">{score ?? "—"}</b>
+                      <span>{score === null ? "à venir" : "score"}</span>
                     </div>
                   </button>
 

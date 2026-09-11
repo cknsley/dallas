@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
 import CashFlowCard from "../components/CashFlowCard";
@@ -6,14 +6,59 @@ import { BarList, Empty, Kpi, Segmented } from "../components/ui";
 import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
 import {
-  caOfYear, chargesInRange, computeStats, groupBy, pendingDeliveryValue, periodRange,
-  remainingToAmortize, soldItems,
+  caOfYear, chargesInRange, computeStats, costOf, expenseMonthlyShare, groupBy,
+  pendingDeliveryValue, periodRange, qtyOf, remainingToAmortize, revenueOf, soldItems,
 } from "../lib/calc";
-import { eur, eur2, num, pct } from "../lib/format";
+import { dshort, eur, eur2, num, pct } from "../lib/format";
+import { STATUS_LABEL } from "../lib/constants";
 import { vatDue, vatRegime } from "../lib/vat";
 import { links } from "../lib/links";
 import { HINT, LABEL } from "../lib/lexicon";
 import type { Period } from "../types";
+
+interface BalanceLine { key: string; label: string; note: string; amount: number; }
+
+/** Une ligne de patrimoine qui se déplie sur ce qui la compose. */
+function BalanceRow({
+  id, label, note, amount, lines, open, onToggle, to, linkLabel, emptyNote,
+}: {
+  id: string;
+  label: string;
+  note: string;
+  amount: number;
+  lines: BalanceLine[];
+  open: string;
+  onToggle: (v: string) => void;
+  to: string;
+  linkLabel: string;
+  emptyNote: string;
+}) {
+  const isOpen = open === id;
+  return (
+    <div className={`balance-block${isOpen ? " open" : ""}`}>
+      <button className="balance-row" onClick={() => onToggle(isOpen ? "" : id)} aria-expanded={isOpen}>
+        <span className="bl-caret" aria-hidden="true">{isOpen ? "▾" : "▸"}</span>
+        <span className="bl-label">{label}<small>{note}</small></span>
+        <b className="num">{eur(amount)}</b>
+      </button>
+      {isOpen && (
+        <div className="balance-detail">
+          {lines.length === 0 ? (
+            <div className="hint">{emptyNote}</div>
+          ) : (
+            lines.map((l) => (
+              <div className="balance-line" key={l.key}>
+                <span className="bl-label">{l.label}<small>{l.note}</small></span>
+                <b className="num">{eur2(l.amount)}</b>
+              </div>
+            ))
+          )}
+          <Link className="btn sm" to={to} style={{ alignSelf: "flex-start" }}>{linkLabel} →</Link>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** Montant retranché : le signe n'apparaît que si la valeur est non nulle. */
 const deducted = (v: number) => (v > 0 ? `−${eur2(v)}` : eur2(0));
@@ -35,6 +80,33 @@ export default function Bilan() {
   const charges = useMemo(() => chargesInRange(state.expenses, range), [state.expenses, range]);
   const sleeping = useMemo(() => pendingDeliveryValue(state.items), [state.items]);
   const immo = useMemo(() => remainingToAmortize(state.expenses), [state.expenses]);
+  const [openRow, setOpenRow] = useState("");
+
+  const heldItems = useMemo(
+    () => state.items.filter((i) => i.status !== "vendu").sort((a, b) => costOf(b) - costOf(a)),
+    [state.items],
+  );
+  const pendingItems = useMemo(
+    () =>
+      state.items
+        .filter((i) => i.status === "vendu" && i.delivery === "commandee")
+        .sort((a, b) => revenueOf(b) - revenueOf(a)),
+    [state.items],
+  );
+  // Part de chaque charge qui n'a pas encore pesé sur la marge.
+  const remainingByExpense = useMemo(
+    () =>
+      state.expenses
+        .map((e) => ({
+          key: e.id,
+          label: e.label || "Sans nom",
+          note: `${e.category || "Autre"} · ${eur2(expenseMonthlyShare(e))} par mois`,
+          amount: remainingToAmortize([e]),
+        }))
+        .filter((r) => r.amount > 0)
+        .sort((a, b) => b.amount - a.amount),
+    [state.expenses],
+  );
   const sleepingCount = state.items.filter((i) => i.status === "vendu" && i.delivery === "commandee").length;
   const net = stats.marge - tva - charges;
 
@@ -71,18 +143,52 @@ export default function Bilan() {
           <span className="hint">Photo à aujourd'hui, toutes périodes confondues</span>
         </div>
         <div className="card-b balance-grid">
-          <Link className="balance-row" to={links.stock({ status: "stock" })}>
-            <span className="bl-label">Stock<small>Articles non vendus, à leur coût total</small></span>
-            <b className="num">{eur(stats.engaged)}</b>
-          </Link>
-          <Link className="balance-row" to={links.livraison({ tab: "faire" })}>
-            <span className="bl-label">Argent dormant<small>Ventes payées, colis pas encore parti</small></span>
-            <b className="num">{eur(sleeping)}</b>
-          </Link>
-          <Link className="balance-row" to={links.charges()}>
-            <span className="bl-label">Matériel non encore absorbé<small>Ce qu'il reste à étaler de vos achats pour l'activité</small></span>
-            <b className="num">{eur(immo)}</b>
-          </Link>
+          <BalanceRow
+            id="stock"
+            label="Stock"
+            note="Articles non vendus, à leur coût total"
+            amount={stats.engaged}
+            open={openRow}
+            onToggle={setOpenRow}
+            to={links.stock({ status: "stock" })}
+            linkLabel="Ouvrir le stock"
+            lines={heldItems.map((i) => ({
+              key: i.id,
+              label: i.name || "Sans nom",
+              note: `${i.brand || "—"}${i.size ? ` · ${i.size}` : ""}${qtyOf(i) > 1 ? ` · ×${qtyOf(i)}` : ""} · ${STATUS_LABEL[i.status]}`,
+              amount: costOf(i),
+            }))}
+            emptyNote="Aucun article en stock."
+          />
+          <BalanceRow
+            id="sleeping"
+            label="Argent dormant"
+            note="Ventes payées, colis pas encore parti"
+            amount={sleeping}
+            open={openRow}
+            onToggle={setOpenRow}
+            to={links.livraison({ tab: "faire" })}
+            linkLabel="Ouvrir les livraisons"
+            lines={pendingItems.map((i) => ({
+              key: i.id,
+              label: i.name || "Sans nom",
+              note: `${i.buyer || "Acheteur non renseigné"}${i.platform ? ` · ${i.platform}` : ""} · vendu le ${dshort(i.saleDate)}`,
+              amount: revenueOf(i),
+            }))}
+            emptyNote="Toutes les ventes payées sont livrées."
+          />
+          <BalanceRow
+            id="immo"
+            label="Matériel non encore absorbé"
+            note="Ce qu'il reste à étaler de vos achats pour l'activité"
+            amount={immo}
+            open={openRow}
+            onToggle={setOpenRow}
+            to={links.charges()}
+            linkLabel="Ouvrir les charges"
+            lines={remainingByExpense}
+            emptyNote="Aucune charge en cours d'étalement."
+          />
           <div className="balance-row total">
             <span className="bl-label">Total immobilisé</span>
             <b className="num">{eur(stats.engaged + sleeping + immo)}</b>

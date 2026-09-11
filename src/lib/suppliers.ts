@@ -152,8 +152,13 @@ export const blankSupplierRecord = (name: string, id: string): SupplierRecord =>
   createdAt: Date.now(),
 });
 
-export const scoreOf = (s: Supplier): number => {
-  // Un score simple : rentabilité, écoulement et ponctualité pèsent à parts égales.
+/**
+ * Note sur 100 : rentabilité, écoulement et ponctualité à parts égales.
+ * Renvoie null tant qu'aucun article n'a été revendu — noter un fournisseur
+ * dont on n'a encore rien vendu n'aurait aucun sens.
+ */
+export const scoreOf = (s: Supplier): number | null => {
+  if (s.soldPieces === 0) return null;
   const roi = Math.max(0, Math.min(100, s.roi));
   const sell = Math.max(0, Math.min(100, s.sellThrough));
   const punctual = s.onTimeRate ?? 100;

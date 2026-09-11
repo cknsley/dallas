@@ -25,6 +25,8 @@ export interface Range {
   from: string;
   to: string;
   label: string;
+  /** Faux pour « depuis le début », dont les bornes n'ont aucun sens à l'écran. */
+  bounded?: boolean;
 }
 
 export function periodRange(period: Period, now = new Date()): Range {
@@ -36,22 +38,25 @@ export function periodRange(period: Period, now = new Date()): Range {
       from: toISO(from),
       to: toISO(to),
       label: capitalize(now.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })),
+      bounded: true,
     };
   }
   if (period === "quarter") {
     const q = Math.floor(now.getMonth() / 3);
     const from = new Date(now.getFullYear(), q * 3, 1);
     const to = new Date(now.getFullYear(), q * 3 + 3, 0);
-    return { from: toISO(from), to: toISO(to), label: `T${q + 1} ${now.getFullYear()}` };
+    return { from: toISO(from), to: toISO(to), label: `T${q + 1} ${now.getFullYear()}`, bounded: true };
   }
   if (period === "year") {
     return {
       from: `${now.getFullYear()}-01-01`,
       to: `${now.getFullYear()}-12-31`,
       label: `Année ${now.getFullYear()}`,
+      bounded: true,
     };
   }
-  return { from: "0000-01-01", to: "9999-12-31", label: "Depuis le début" };
+  // Bornes techniques : « bounded » dit qu'elles ne sont pas affichables.
+  return { from: "0000-01-01", to: "9999-12-31", label: "Depuis le début", bounded: false };
 }
 
 const toISO = (d: Date) =>

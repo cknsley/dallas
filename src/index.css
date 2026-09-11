@@ -531,6 +531,7 @@ a.kpi:hover .go, button.kpi:hover .go { opacity: 1; transform: none; }
 .supplier-score.good { background: var(--ok-soft); color: var(--ok); }
 .supplier-score.mid { background: var(--warn-soft); color: var(--warn); }
 .supplier-score.low { background: var(--bad-soft); color: var(--bad); }
+.supplier-score.pending { background: var(--bg-2); color: var(--ink-3); }
 
 .supplier-metrics {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
@@ -631,15 +632,27 @@ tr.detail-row td { background: var(--surface-2); padding: 0; }
 
 .bar-row .bl.linkish { font-size: 12.5px; }
 
-/* Bilan : lignes de patrimoine, cliquables vers la section concernée. */
+/* Bilan : lignes de patrimoine, dépliables sur ce qui les compose. */
 .balance-grid { display: flex; flex-direction: column; gap: 2px; }
+.balance-block { display: flex; flex-direction: column; }
 .balance-row {
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  padding: 11px 12px; margin: 0 -12px; border-radius: var(--r-sm);
-  text-decoration: none; color: inherit; transition: background 0.13s;
+  width: 100%; padding: 11px 12px; margin: 0 -12px; border-radius: var(--r-sm);
+  text-decoration: none; color: inherit; background: none; border: 0;
+  font: inherit; text-align: left; transition: background 0.13s;
 }
-a.balance-row:hover { background: var(--accent-soft); }
-.balance-row .bl-label { display: flex; flex-direction: column; gap: 2px; font-weight: 600; font-size: 13.5px; }
+button.balance-row { cursor: pointer; }
+a.balance-row:hover, button.balance-row:hover { background: var(--accent-soft); }
+.balance-block.open > .balance-row { background: var(--accent-soft); }
+.bl-caret { flex: 0 0 auto; width: 12px; color: var(--ink-3); font-size: 11px; }
+.balance-detail {
+  display: flex; flex-direction: column; gap: 6px;
+  margin: 2px -12px 8px; padding: 10px 12px 12px 30px;
+  border-left: 2px solid var(--line-2); background: var(--surface-2); border-radius: var(--r-sm);
+}
+.balance-line { display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 13px; }
+.balance-line .bl-label { font-weight: 500; }
+.balance-row .bl-label { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-weight: 600; font-size: 13.5px; }
 .balance-row .bl-label small { font-weight: 400; font-size: 12px; color: var(--ink-3); }
 .balance-row.total {
   border-top: 1px solid var(--line-2); margin-top: 6px; padding-top: 14px;
