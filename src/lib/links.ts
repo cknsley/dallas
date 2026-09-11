@@ -10,7 +10,8 @@ export const links = {
   facturation: (f: { state?: "all" | "unpaid" | "paid" } = {}) => withQuery("/facturation", f),
   newDoc: (itemId: string) => `/facturation?new=${itemId}`,
   doc: (docId: string) => `/facturation?doc=${docId}`,
-  marge: () => "/marge",
+  bilan: () => "/bilan",
+  deal: () => "/deal",
   charges: () => "/charges",
   todo: () => "/todo",
 };

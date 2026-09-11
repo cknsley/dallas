@@ -46,6 +46,17 @@ export function vatRegime(settings: Settings, caYear: number): VatRegime {
     mention: "", alert: null, label: "",
   };
 
+  // Mode éteint : on ne calcule ni n'affiche de TVA, quel que soit le statut.
+  if (!settings.vatEnabled) {
+    return {
+      ...base,
+      subject: false,
+      canInvoice: settings.legalStatus !== "particulier",
+      label: "Mode TVA désactivé",
+      mention: "TVA non applicable.",
+    };
+  }
+
   if (settings.legalStatus === "particulier") {
     return {
       ...base,

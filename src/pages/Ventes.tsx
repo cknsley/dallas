@@ -78,16 +78,16 @@ export default function Ventes() {
           value={eur(fees)}
           meta={`${LABEL.saleFees} + ${LABEL.shippingCost.toLowerCase()}`}
           tone="warn"
-          to={links.marge()}
-          hint="Marge"
+          to={links.bilan()}
+          hint="Bilan"
         />
         <Kpi
           label="Marge nette"
           value={eur(marge)}
           meta={`${pct(cashIn ? (marge / cashIn) * 100 : 0)} de l'encaissé`}
           tone="ok"
-          to={links.marge()}
-          hint="Marge"
+          to={links.bilan()}
+          hint="Bilan"
         />
         <Kpi
           label="À livrer"

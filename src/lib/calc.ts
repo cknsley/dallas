@@ -33,6 +33,15 @@ export function periodRange(period: Period, now = new Date()): Range {
       label: capitalize(now.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })),
     };
   }
+  if (period === "quarter") {
+    const q = Math.floor(now.getMonth() / 3);
+    const from = new Date(now.getFullYear(), q * 3, 1);
+    return {
+      from: toISO(from),
+      to: "9999-12-31",
+      label: `T${q + 1} ${now.getFullYear()}`,
+    };
+  }
   if (period === "year") {
     return { from: `${now.getFullYear()}-01-01`, to: "9999-12-31", label: `Année ${now.getFullYear()}` };
   }
@@ -191,4 +200,60 @@ export function pendingDeliveryValue(items: Item[]): number {
   return items
     .filter((i) => i.status === "vendu" && i.delivery === "commandee")
     .reduce((a, i) => a + revenueOf(i), 0);
+}
+
+/** Nombre de mois déjà entamés dans la période, pour une moyenne honnête. */
+export function monthsElapsed(r: Range): number {
+  const now = new Date();
+  const nowMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const from = r.from.slice(0, 7);
+  if (from > nowMonth) return 1;
+  const [fy, fm] = from.split("-").map(Number);
+  const [ny, nm] = nowMonth.split("-").map(Number);
+  return Math.max(1, (ny - fy) * 12 + (nm - fm) + 1);
+}
+
+/** Répartition des charges imputées sur la période, par catégorie. */
+export function chargesByCategory(expenses: Expense[], r: Range): { key: string; total: number; count: number }[] {
+  const map = new Map<string, { key: string; total: number; count: number }>();
+  for (const e of expenses) {
+    const amount = chargesInRange([e], r);
+    if (amount <= 0) continue;
+    const key = e.category || "Autre";
+    const row = map.get(key) ?? { key, total: 0, count: 0 };
+    row.total += amount;
+    row.count += 1;
+    map.set(key, row);
+  }
+  return [...map.values()].sort((a, b) => b.total - a.total);
+}
+
+/** Charges imputées mois par mois, sur les N derniers mois. */
+export function chargesMonthlySeries(expenses: Expense[], months = 12) {
+  const now = new Date();
+  const out: { key: string; label: string; total: number }[] = [];
+  for (let k = months - 1; k >= 0; k--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - k, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    out.push({ key, label: d.toLocaleDateString("fr-FR", { month: "short" }).replace(".", ""), total: 0 });
+  }
+  const index = new Map(out.map((o) => [o.key, o]));
+  for (const e of expenses) {
+    const share = expenseMonthlyShare(e);
+    for (const m of expenseMonths(e)) {
+      const bucket = index.get(m);
+      if (bucket) bucket.total += share;
+    }
+  }
+  return out;
+}
+
+/** Ce qui n'a pas encore pesé sur la marge : les mois d'utilisation à venir. */
+export function remainingToAmortize(expenses: Expense[]): number {
+  const now = new Date();
+  const nowMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  return expenses.reduce((sum, e) => {
+    const future = expenseMonths(e).filter((m) => m > nowMonth).length;
+    return sum + future * expenseMonthlyShare(e);
+  }, 0);
 }

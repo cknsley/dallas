@@ -102,6 +102,8 @@ export interface Expense {
 
 export interface Settings {
   business: string;
+  /** Mode TVA : tant qu'il est éteint, aucune TVA n'est calculée nulle part. */
+  vatEnabled: boolean;
   legalStatus: LegalStatus;
   country: string;
   vatNumber: string;
@@ -126,4 +128,4 @@ export interface AppState {
   updatedAt: number;
 }
 
-export type Period = "month" | "year" | "all";
+export type Period = "month" | "quarter" | "year" | "all";

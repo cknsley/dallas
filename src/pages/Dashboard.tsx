@@ -122,7 +122,7 @@ export default function Dashboard() {
           value={eur(stats.marge)}
           meta={`${pct(stats.margePct)} du chiffre d'affaires`}
           tone={stats.marge >= 0 ? "ok" : "warn"}
-          to={links.marge()}
+          to={links.bilan()}
           hint="Détail"
         />
         <Kpi

@@ -1,13 +1,18 @@
 import { useMemo, useState } from "react";
 import { HeaderActions } from "../components/Layout";
-import { Confirm, Empty, Field, Kpi, Modal } from "../components/ui";
+import { Confirm, Empty, Field, Kpi, Modal, Segmented } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { EXPENSE_CATEGORIES } from "../lib/constants";
-import { chargesInRange, expenseMonthlyShare, expenseMonths } from "../lib/calc";
-import { dfr, eur, eur2, num, today } from "../lib/format";
+import {
+  chargesByCategory, chargesInRange, chargesMonthlySeries, expenseMonthlyShare,
+  expenseMonths, monthsElapsed, periodRange, remainingToAmortize,
+} from "../lib/calc";
+import { usePref } from "../lib/usePref";
+import { useQueryState } from "../lib/useQueryState";
+import { dfr, eur, eur2, num, pct, today } from "../lib/format";
 import { uid } from "../lib/id";
-import type { Expense } from "../types";
+import type { Expense, Period } from "../types";
 
 const thisMonth = () => new Date().toISOString().slice(0, 7);
 
@@ -20,44 +25,153 @@ const monthName = (ym: string) => {
 export default function Charges() {
   const { state, dispatch } = useStore();
   const toast = useToast();
+  const [period, setPeriod] = usePref<Period>("chargePeriod", "month");
+  const [category, setCategory] = useQueryState("cat");
   const [editing, setEditing] = useState<{ expense: Expense | null } | null>(null);
   const [confirming, setConfirming] = useState<Expense | null>(null);
 
+  const range = useMemo(() => periodRange(period), [period]);
+  const periodTotal = useMemo(() => chargesInRange(state.expenses, range), [state.expenses, range]);
+  const byCategory = useMemo(() => chargesByCategory(state.expenses, range), [state.expenses, range]);
+  const series = useMemo(() => chargesMonthlySeries(state.expenses), [state.expenses]);
+  const remaining = useMemo(() => remainingToAmortize(state.expenses), [state.expenses]);
+
+  const elapsed = monthsElapsed(range);
+  const monthlyAverage = periodTotal / elapsed;
+  const top = byCategory[0];
+  const recurring = state.expenses.filter((e) => e.amortizeMonths > 1).length;
+
   const list = useMemo(
-    () => [...state.expenses].sort((a, b) => b.date.localeCompare(a.date)),
-    [state.expenses],
+    () =>
+      [...state.expenses]
+        .filter((e) => !category || (e.category || "Autre") === category)
+        .sort((a, b) => b.date.localeCompare(a.date)),
+    [state.expenses, category],
   );
 
-  const monthShare = state.expenses.reduce((a, e) => {
-    const months = expenseMonths(e);
-    return a + (months.includes(thisMonth()) ? expenseMonthlyShare(e) : 0);
-  }, 0);
-  const yearRange = { from: `${new Date().getFullYear()}-01-01`, to: "9999-12-31", label: "" };
-  const yearTotal = chargesInRange(state.expenses, yearRange);
-  const totalCommitted = state.expenses.reduce((a, e) => a + num(e.amount), 0);
-  const ongoing = state.expenses.filter((e) => {
-    const months = expenseMonths(e);
-    return months[months.length - 1] >= thisMonth();
-  }).length;
+  const maxMonth = Math.max(...series.map((s) => s.total), 0);
 
   return (
     <>
       <HeaderActions>
+        <Segmented<Period>
+          value={period}
+          onChange={setPeriod}
+          options={[
+            { value: "month", label: "Mois" },
+            { value: "quarter", label: "Trimestre" },
+            { value: "year", label: "Année" },
+            { value: "all", label: "Tout" },
+          ]}
+        />
         <button className="btn primary" onClick={() => setEditing({ expense: null })}>+ Nouvelle charge</button>
       </HeaderActions>
 
       <div className="kpi-grid">
-        <Kpi label="Ce mois-ci" value={eur(monthShare)} meta="Part des charges amorties sur le mois en cours" tone="warn" />
-        <Kpi label="Cette année" value={eur(yearTotal)} meta="Charges imputées depuis janvier" />
-        <Kpi label="Engagé au total" value={eur(totalCommitted)} meta={`${state.expenses.length} charge${state.expenses.length > 1 ? "s" : ""} enregistrée${state.expenses.length > 1 ? "s" : ""}`} />
-        <Kpi label="Encore en service" value={String(ongoing)} meta="Charges qui pèsent encore sur la marge" tone="info" />
+        <Kpi
+          label={`Charges — ${range.label}`}
+          value={eur(periodTotal)}
+          meta={`Réparties sur ${elapsed} mois écoulé${elapsed > 1 ? "s" : ""}`}
+          tone="warn"
+        />
+        <Kpi
+          label="Moyenne par mois"
+          value={eur(monthlyAverage)}
+          meta="Ce que l'activité coûte chaque mois, hors pièces"
+        />
+        <Kpi
+          label="Poste principal"
+          value={top ? top.key : "—"}
+          meta={top ? `${eur(top.total)} · ${pct((top.total / periodTotal) * 100)} des charges` : "Aucune charge sur la période"}
+          tone="info"
+        />
+        <Kpi
+          label="Reste à étaler"
+          value={eur(remaining)}
+          meta={recurring ? `${recurring} charge${recurring > 1 ? "s" : ""} étalée${recurring > 1 ? "s" : ""} sur plusieurs mois` : "Aucune charge étalée"}
+          tone={remaining > 0 ? "info" : "ok"}
+        />
       </div>
 
-      <div className="card">
+      <div className="cols two">
+        <div className="card">
+          <div className="card-h">
+            <h3>Par catégorie</h3>
+            <div className="spacer" />
+            {category ? (
+              <button className="btn ghost sm" onClick={() => setCategory("")}>Filtre : {category} ✕</button>
+            ) : (
+              <span className="hint">{range.label}</span>
+            )}
+          </div>
+          {byCategory.length === 0 ? (
+            <Empty glyph="◈" title="Aucune charge sur la période">
+              Changez de période ou ajoutez une charge.
+            </Empty>
+          ) : (
+            <div className="card-b">
+              <div className="bars">
+                {byCategory.map((c) => (
+                  <div className="bar-row" key={c.key}>
+                    <button
+                      className="bl linkish"
+                      title={`Filtrer sur ${c.key}`}
+                      onClick={() => setCategory(category === c.key ? "" : c.key)}
+                    >
+                      {c.key}
+                    </button>
+                    <div className="bar-track">
+                      <div
+                        className="bar-fill"
+                        style={{ width: `${Math.max(2, (c.total / byCategory[0].total) * 100)}%` }}
+                      />
+                    </div>
+                    <div className="bv">
+                      {eur(c.total)}
+                      <span style={{ color: "var(--ink-3)" }}> · {pct((c.total / periodTotal) * 100)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="card">
+          <div className="card-h">
+            <h3>12 derniers mois</h3>
+            <div className="spacer" />
+            <span className="hint">Charge imputée chaque mois</span>
+          </div>
+          {maxMonth === 0 ? (
+            <Empty glyph="▁▃▅" title="Rien à afficher">
+              Les charges enregistrées se répartiront ici mois par mois.
+            </Empty>
+          ) : (
+            <div className="card-b">
+              <div className="month-bars">
+                {series.map((s) => (
+                  <div className="month-bar" key={s.key} title={`${s.label} — ${eur2(s.total)}`}>
+                    <div className="mb-track">
+                      <div className="mb-fill" style={{ height: `${Math.max(2, (s.total / maxMonth) * 100)}%` }} />
+                    </div>
+                    <div className="mb-label">{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
         <div className="card-h">
           <h3>Charges de l'activité</h3>
           <div className="spacer" />
-          <span className="hint">Matériel, emballages, abonnements — distincts du coût d'une pièce</span>
+          <span className="hint">
+            {list.length} charge{list.length > 1 ? "s" : ""}
+            {category ? ` · ${category}` : ""}
+          </span>
         </div>
         {list.length === 0 ? (
           <Empty glyph="◈" title="Aucune charge enregistrée">
@@ -67,7 +181,7 @@ export default function Charges() {
           </Empty>
         ) : (
           <div className="twrap">
-            <table>
+            <table className="table-compact">
               <thead>
                 <tr>
                   <th>Charge</th>
@@ -76,7 +190,7 @@ export default function Charges() {
                   <th>Depuis</th>
                   <th>Utilisation</th>
                   <th className="r">Coût / mois</th>
-                  <th></th>
+                  <th className="r shrink" />
                 </tr>
               </thead>
               <tbody>
@@ -90,9 +204,13 @@ export default function Charges() {
                         <button className="linkish" onClick={() => setEditing({ expense: e })}>{e.label || "Sans nom"}</button>
                         {e.notes && <div className="hint ellipsis">{e.notes}</div>}
                       </td>
-                      <td><span className="pill neutral">{e.category || "Autre"}</span></td>
+                      <td>
+                        <button className="pill neutral pill-btn" onClick={() => setCategory(e.category || "Autre")}>
+                          {e.category || "Autre"}
+                        </button>
+                      </td>
                       <td className="r num">{eur2(e.amount)}</td>
-                      <td className="num" style={{ fontSize: 12 }}>{dfr(e.date)}</td>
+                      <td className="num nowrap" style={{ fontSize: 12 }}>{dfr(e.date)}</td>
                       <td>
                         {e.amortizeMonths > 1 ? (
                           <span className={`pill ${active ? "info" : "neutral"}`}>
@@ -106,7 +224,7 @@ export default function Charges() {
                         )}
                       </td>
                       <td className="r num">{eur2(share)}</td>
-                      <td className="r">
+                      <td className="r shrink">
                         <div className="rowact">
                           <button className="iconbtn" title="Éditer" onClick={() => setEditing({ expense: e })}>✎</button>
                           <button className="iconbtn del" title="Supprimer" onClick={() => setConfirming(e)}>✕</button>

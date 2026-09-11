@@ -72,10 +72,12 @@ export default function Facturation() {
       <div className="kpi-grid">
         <Kpi label={`CA ${year}`} value={eur(caYear)} meta={regime.label} to={links.ventes()} hint="Ventes" />
         <Kpi
-          label="Seuil de franchise"
-          value={s.legalStatus === "societe" ? "—" : eur(regime.threshold)}
+          label={s.vatEnabled ? "Seuil de franchise" : "Facture pro"}
+          value={!s.vatEnabled ? "Désactivé" : s.legalStatus === "societe" ? "—" : eur(regime.threshold)}
           meta={
-            s.legalStatus === "societe"
+            !s.vatEnabled
+              ? "Activez-la ci-dessous si vous facturez avec TVA"
+              : s.legalStatus === "societe"
               ? "Société assujettie dès le 1er euro"
               : regime.threshold
                 ? `${pct((caYear / regime.threshold) * 100)} atteint`
@@ -87,8 +89,8 @@ export default function Facturation() {
           label="TVA collectée"
           value={eur(vatCollected)}
           meta={regime.subject ? `Sur documents ${year}` : "Non assujetti"}
-          to={links.marge()}
-          hint="Marge"
+          to={links.bilan()}
+          hint="Bilan"
         />
         <Kpi
           label="Impayés"
@@ -109,8 +111,24 @@ export default function Facturation() {
 
       <div className="cols two">
         <div className="card">
-          <div className="card-h"><h3>Compte et régime de TVA</h3></div>
+          <div className="card-h"><h3>Compte et facturation</h3></div>
           <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <label className={`mode-switch${s.vatEnabled ? " on" : ""}`}>
+              <input
+                type="checkbox"
+                checked={s.vatEnabled}
+                onChange={(e) => setSetting("vatEnabled", e.target.checked)}
+              />
+              <div>
+                <b>Facture pro</b>
+                <div className="hint">
+                  {s.vatEnabled
+                    ? "TVA calculée sur les ventes, le bilan et les documents émis."
+                    : "Éteint : reçus simples, aucune TVA nulle part dans l'app."}
+                </div>
+              </div>
+            </label>
+
             <div className="fgrid">
               <Field label="Nom / raison sociale" span>
                 <input type="text" value={s.business} placeholder="Votre nom commercial" onChange={(e) => setSetting("business", e.target.value)} />
@@ -131,37 +149,45 @@ export default function Facturation() {
                   {COUNTRIES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
                 </select>
               </Field>
-              <Field label="N° de TVA intracommunautaire">
-                <input type="text" value={s.vatNumber} placeholder="FR00123456789" onChange={(e) => setSetting("vatNumber", e.target.value)} />
-              </Field>
-              <Field label="Taux de TVA (%)">
-                <input type="number" step="0.1" value={s.vatRate} onChange={(e) => setSetting("vatRate", num(e.target.value))} />
-              </Field>
-              <Field label="Seuil de franchise (€)">
-                <input
-                  type="number"
-                  step="100"
-                  value={s.threshold}
-                  disabled={s.legalStatus === "societe"}
-                  onChange={(e) => setSetting("threshold", num(e.target.value))}
-                />
-              </Field>
+              {s.vatEnabled && (
+                <>
+                  <Field label="N° de TVA intracommunautaire">
+                    <input type="text" value={s.vatNumber} placeholder="FR00123456789" onChange={(e) => setSetting("vatNumber", e.target.value)} />
+                  </Field>
+                  <Field label="Taux de TVA (%)">
+                    <input type="number" step="0.1" value={s.vatRate} onChange={(e) => setSetting("vatRate", num(e.target.value))} />
+                  </Field>
+                  <Field label="Seuil de franchise (€)">
+                    <input
+                      type="number"
+                      step="100"
+                      value={s.threshold}
+                      disabled={s.legalStatus === "societe"}
+                      onChange={(e) => setSetting("threshold", num(e.target.value))}
+                    />
+                  </Field>
+                </>
+              )}
               <Field label="Délai de paiement (jours)">
                 <input type="number" step="1" value={s.paymentTerms} onChange={(e) => setSetting("paymentTerms", num(e.target.value))} />
               </Field>
             </div>
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={s.marginScheme}
-                onChange={(e) => setSetting("marginScheme", e.target.checked)}
-              />
-              Régime de la marge (biens d'occasion) — la TVA porte sur la marge, pas sur le prix de vente
-            </label>
-            <div className={`note ${regime.subject ? "info" : "ok"}`}>
-              <span className="glyph">§</span>
-              <div><b>{regime.label}</b><br />{regime.mention}</div>
-            </div>
+            {s.vatEnabled && (
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={s.marginScheme}
+                  onChange={(e) => setSetting("marginScheme", e.target.checked)}
+                />
+                Régime de la marge (biens d'occasion) — la TVA porte sur la marge, pas sur le prix de vente
+              </label>
+            )}
+            {s.vatEnabled && (
+              <div className={`note ${regime.subject ? "info" : "ok"}`}>
+                <span className="glyph">§</span>
+                <div><b>{regime.label}</b><br />{regime.mention}</div>
+              </div>
+            )}
             <hr className="sep" />
             <div className="fgrid">
               <Field label="Adresse" span>

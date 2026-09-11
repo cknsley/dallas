@@ -2,6 +2,7 @@ import type { AppState, Settings } from "../types";
 
 export const DEFAULT_SETTINGS: Settings = {
   business: "",
+  vatEnabled: false,
   legalStatus: "particulier",
   country: "FR",
   vatNumber: "",

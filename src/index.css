@@ -434,6 +434,64 @@ a.kpi:hover .go, button.kpi:hover .go { opacity: 1; transform: none; }
 
 .nowrap { white-space: nowrap; }
 
+/* Petit histogramme mensuel, sans dépendance graphique. */
+.month-bars { display: flex; align-items: flex-end; gap: 6px; height: 180px; }
+.month-bar { flex: 1; display: flex; flex-direction: column; align-items: stretch; gap: 6px; height: 100%; }
+.mb-track {
+  flex: 1; display: flex; align-items: flex-end;
+  background: var(--accent-soft); border-radius: 6px; overflow: hidden;
+}
+.mb-fill {
+  width: 100%; border-radius: 6px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-2));
+  transition: height 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.mb-label { font-size: 10.5px; color: var(--ink-3); text-align: center; }
+
+.bar-row .bl.linkish { font-size: 12.5px; }
+
+/* Bilan : lignes de patrimoine, cliquables vers la section concernée. */
+.balance-grid { display: flex; flex-direction: column; gap: 2px; }
+.balance-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 11px 12px; margin: 0 -12px; border-radius: var(--r-sm);
+  text-decoration: none; color: inherit; transition: background 0.13s;
+}
+a.balance-row:hover { background: var(--accent-soft); }
+.balance-row .bl-label { display: flex; flex-direction: column; gap: 2px; font-weight: 600; font-size: 13.5px; }
+.balance-row .bl-label small { font-weight: 400; font-size: 12px; color: var(--ink-3); }
+.balance-row.total {
+  border-top: 1px solid var(--line-2); margin-top: 6px; padding-top: 14px;
+  font-family: var(--ff-display); font-size: 16px;
+}
+
+/* Deal : panneau de négociation. */
+.deal-panel {
+  background: var(--accent-soft); border-radius: var(--r); padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.deal-panel-h {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700; color: var(--ink-3);
+}
+.deal-pct { font-size: 20px; letter-spacing: -0.02em; color: var(--accent); text-transform: none; }
+.deal-target { display: flex; align-items: center; gap: 6px; text-transform: none; letter-spacing: 0; font-size: 12px; }
+.deal-target input { width: 64px; padding: 4px 8px; font-size: 13px; }
+.deal-slider { width: 100%; accent-color: var(--accent); cursor: pointer; }
+.deal-steps { display: flex; flex-wrap: wrap; gap: 6px; }
+.deal-panel .totrow { padding: 4px 0; font-size: 13px; }
+
+/* Interrupteur de mode : un réglage qui change le comportement de toute l'app. */
+.mode-switch {
+  display: flex; align-items: flex-start; gap: 12px; cursor: pointer;
+  padding: 12px 14px; border-radius: var(--r); background: var(--surface-2);
+  border: 1px solid var(--line); transition: background 0.13s, border-color 0.13s;
+}
+.mode-switch:hover { border-color: var(--line-2); }
+.mode-switch.on { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.mode-switch input { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; margin-top: 2px; }
+.mode-switch b { font-size: 13.5px; }
+
 .duration-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .duration-presets .hint { margin-right: 2px; }
 
