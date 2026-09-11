@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
 import { Empty, Kpi, Photo, Segmented } from "../components/ui";
 import InlineField from "../components/InlineField";
+import TrackingLink from "../components/TrackingLink";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { useQueryState } from "../lib/useQueryState";
@@ -296,12 +297,15 @@ export default function Livraison() {
                         />
                       </td>
                       <td>
-                        <InlineField
-                          value={i.tracking}
-                          placeholder="N° de suivi"
-                          onCommit={(v) => patch(i.id, { tracking: v })}
-                          width={150}
-                        />
+                        <div className="tracking-cell">
+                          <InlineField
+                            value={i.tracking}
+                            placeholder="N° de suivi"
+                            onCommit={(v) => patch(i.id, { tracking: v })}
+                            width={140}
+                          />
+                          {i.tracking && <TrackingLink carrier={i.carrier} code={i.tracking} />}
+                        </div>
                       </td>
                       <td>
                         <InlineField

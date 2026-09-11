@@ -142,6 +142,8 @@ export interface Settings {
   paymentTerms: number;    // jours
   /** Commission prélevée par plateforme, en % du prix de vente. */
   platformFees: Record<string, number>;
+  /** Adresse de suivi par transporteur, « {code} » remplacé par le numéro. */
+  trackingUrls: Record<string, string>;
 }
 
 export interface AppState {

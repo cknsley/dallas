@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
 import { Empty, Kpi, Photo } from "../components/ui";
 import InlineField from "../components/InlineField";
+import TrackingLink from "../components/TrackingLink";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { costOf, periodRange, qtyOf } from "../lib/calc";
@@ -114,7 +115,10 @@ export default function Achats() {
             <InlineField value={i.carrier} placeholder="Transporteur" onCommit={(v) => patch(i.id, { carrier: v })} width={120} />
           </td>
           <td>
-            <InlineField value={i.tracking} placeholder="Code de suivi" onCommit={(v) => patch(i.id, { tracking: v })} width={140} />
+            <div className="tracking-cell">
+              <InlineField value={i.tracking} placeholder="Code de suivi" onCommit={(v) => patch(i.id, { tracking: v })} width={130} />
+              {i.tracking && <TrackingLink carrier={i.carrier} code={i.tracking} />}
+            </div>
           </td>
           <td>
             <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>

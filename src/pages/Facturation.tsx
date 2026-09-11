@@ -295,6 +295,65 @@ export default function Facturation() {
         </div>
       </div>
 
+      <div className="cols two" style={{ marginTop: 16 }}>
+        <div className="card">
+          <div className="card-h">
+            <h3>Commissions par plateforme</h3>
+            <div className="spacer" />
+            <span className="hint">Appliquées automatiquement à la vente</span>
+          </div>
+          <div className="card-b rate-list">
+            {Object.entries(s.platformFees).map(([name, rate]) => (
+              <label className="rate-row" key={name}>
+                <span>{name}</span>
+                <span className="rate-input">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={rate}
+                    onChange={(e) =>
+                      setSetting("platformFees", { ...s.platformFees, [name]: num(e.target.value) })
+                    }
+                  />
+                  %
+                </span>
+              </label>
+            ))}
+            <div className="hint">
+              Ces taux sont des ordres de grandeur : vérifiez-les auprès de chaque plateforme.
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-h">
+            <h3>Suivi des transporteurs</h3>
+            <div className="spacer" />
+            <span className="hint">« {"{code}"} » est remplacé par le numéro</span>
+          </div>
+          <div className="card-b rate-list">
+            {Object.entries(s.trackingUrls).map(([name, url]) => (
+              <label className="rate-row wide" key={name}>
+                <span>{name}</span>
+                <input
+                  type="url"
+                  value={url}
+                  placeholder="https://…/suivi?code={code}"
+                  onChange={(e) =>
+                    setSetting("trackingUrls", { ...s.trackingUrls, [name]: e.target.value })
+                  }
+                />
+              </label>
+            ))}
+            <div className="hint">
+              Aucune API n'est appelée : le numéro de suivi devient un lien vers la page publique du
+              transporteur. Si une adresse change, corrigez-la ici.
+            </div>
+          </div>
+        </div>
+      </div>
+
       {creating && (
         <DocModal preselect={creating} onClose={() => setCreating(null)} onCreated={(d) => setPreviewId(d.id)} />
       )}

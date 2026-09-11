@@ -1,4 +1,5 @@
 import type { AppState, Settings } from "../types";
+import { DEFAULT_TRACKING_URLS } from "../lib/carriers";
 
 export const DEFAULT_SETTINGS: Settings = {
   business: "",
@@ -29,6 +30,7 @@ export const DEFAULT_SETTINGS: Settings = {
     Boutique: 0,
     Autre: 0,
   },
+  trackingUrls: { ...DEFAULT_TRACKING_URLS },
 };
 
 export const EMPTY_STATE: AppState = {
