@@ -7,6 +7,7 @@ import { EMPTY_STATE, DEFAULT_SETTINGS } from "./defaults";
 import { getSyncInfo, initSync, push, subscribeSyncInfo, type SyncInfo } from "./sync";
 import { deletePhoto } from "./photos";
 import { reconcileTodos } from "./autoTodos";
+import { uid } from "../lib/id";
 import { LEGACY_DELIVERY } from "../lib/constants";
 
 const LS_KEY = "atelier-revente:v1";
@@ -129,6 +130,7 @@ const withLogistics = (i: Item): Item => ({
   quantity: i.quantity && i.quantity > 0 ? i.quantity : 1,
   purchasePaid: i.purchasePaid ?? true,
   lotTag: i.lotTag ?? "",
+  autoReceive: i.autoReceive ?? false,
   carrier: i.carrier ?? "",
   tracking: i.tracking ?? "",
   expectedDate: i.expectedDate ?? "",
@@ -233,6 +235,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const t = window.setTimeout(() => void push(state), 500);
     return () => window.clearTimeout(t);
   }, [state]);
+
+  /**
+   * Réception automatique : une commande marquée ainsi entre seule en stock
+   * dès que sa date d'arrivée est atteinte. Les lignes de plusieurs exemplaires
+   * éclatent à l'unité, comme à la réception manuelle.
+   */
+  useEffect(() => {
+    const day = new Date().toISOString().slice(0, 10);
+    const due = state.items.filter(
+      (i) => i.status === "arrivage" && i.autoReceive && i.expectedDate && i.expectedDate <= day,
+    );
+    if (due.length === 0) return;
+    for (const i of due) {
+      const qty = Math.max(1, i.quantity || 1);
+      const tag = i.lotTag || i.source || "";
+      if (qty <= 1) {
+        dispatch({ type: "patchItem", id: i.id, patch: { status: "stock", receiveDate: day, lotTag: tag } });
+        continue;
+      }
+      dispatch({ type: "removeItem", id: i.id });
+      for (let n = 0; n < qty; n++) {
+        dispatch({
+          type: "upsertItem",
+          item: { ...i, id: uid(), quantity: 1, status: "stock", receiveDate: day, lotTag: tag, createdAt: Date.now() + n },
+        });
+      }
+    }
+  }, [state.items]);
 
   // Les tâches automatiques suivent l'état des pièces et des documents.
   useEffect(() => {

@@ -16,7 +16,7 @@ export const blankItem = (): Item => ({
   platform: "", buyer: "", buyerUrl: "", saleFees: 0, shippingCost: 0, shippingPaid: 0,
   status: "arrivage",
   buyDate: today(), receiveDate: "", saleDate: "",
-  delivery: "commandee", shipping: "en_preparation", orderId: "", purchasePaid: true, lotTag: "",
+  delivery: "commandee", shipping: "en_preparation", orderId: "", purchasePaid: true, lotTag: "", autoReceive: false,
   notes: "", photoId: null,
   createdAt: Date.now(),
   carrier: "", tracking: "", expectedDate: "", shipDate: "",

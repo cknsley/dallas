@@ -45,6 +45,8 @@ export interface Item {
   purchasePaid: boolean;
   /** Étiquette du lot d'origine, conservée après éclatement à l'unité. */
   lotTag: string;
+  /** Entre en stock tout seul dès que la date d'arrivée est atteinte. */
+  autoReceive: boolean;
 }
 
 /** Une tâche automatique est déduite de l'état des pièces ou des documents :

@@ -936,6 +936,15 @@ tr:hover .rowact, .rowact:focus-within, .rowact.always { opacity: 1; }
 }
 .calc-line-h { display: flex; align-items: center; gap: 8px; }
 .calc-line-h input { flex: 1; font-weight: 600; }
+/* Photo de l'article attendu, posée devant son nom. */
+.line-photo {
+  flex: 0 0 auto; width: 38px; height: 46px; border-radius: 6px; cursor: pointer;
+  border: 1px dashed var(--line-2); background: var(--surface-2); overflow: hidden;
+  display: inline-flex; align-items: center; justify-content: center; color: var(--ink-3);
+}
+.line-photo:hover { border-color: var(--accent); }
+.line-photo img { width: 100%; height: 100%; object-fit: cover; }
+.line-photo input { display: none; }
 .calc-line-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
 .calc-line-grid label { display: flex; flex-direction: column; gap: 4px; }
 .calc-line-grid label > span {

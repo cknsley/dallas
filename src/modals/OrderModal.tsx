@@ -5,12 +5,16 @@ import { useStore } from "../store/StoreContext";
 import { ARTICLE_TYPES, CARRIERS } from "../lib/constants";
 import { eur2, num, today } from "../lib/format";
 import { uid } from "../lib/id";
+import { compressImage, savePhoto } from "../store/photos";
 import { HINT, LABEL, eurLabel } from "../lib/lexicon";
 import type { Item, ProductRequest } from "../types";
 
 interface Line {
   key: string;
   name: string;
+  /** Photo de ce que le fournisseur annonce : utile pour les achats à distance. */
+  photo: Blob | null;
+  photoUrl: string | null;
   quantity: string;
   brand: string;
   type: string;
@@ -19,7 +23,7 @@ interface Line {
   estimate: string;
 }
 
-const newLine = (): Line => ({ key: uid(), name: "", quantity: "1", brand: "", type: "", size: "", cost: "", estimate: "" });
+const newLine = (): Line => ({ key: uid(), name: "", photo: null, photoUrl: null, quantity: "1", brand: "", type: "", size: "", cost: "", estimate: "" });
 
 /**
  * Une commande fournisseur : plusieurs pièces achetées d'un coup, avec des frais
@@ -52,11 +56,14 @@ export default function OrderModal({
   const [lotName, setLotName] = useState("");
   const [notes, setNotes] = useState(fromRequest?.notes ?? "");
   const [purchasePaid, setPurchasePaid] = useState(true);
+  const [autoReceive, setAutoReceive] = useState(false);
   const [lines, setLines] = useState<Line[]>(
     fromRequest && fromRequest.lines.length > 0
       ? fromRequest.lines.map((l) => ({
           key: uid(),
           name: l.name,
+          photo: null,
+          photoUrl: null,
           quantity: String(Math.max(1, l.quantity)),
           brand: l.brand,
           type: l.type,
@@ -95,6 +102,21 @@ export default function OrderModal({
         ? ((num(l.cost) * qtyOfLine(l)) / goods) * landedTotal
         : landedTotal / Math.max(1, filled.length);
 
+  const pickPhoto = async (key: string, file: File) => {
+    try {
+      const blob = await compressImage(file);
+      setLines((l) =>
+        l.map((x) => {
+          if (x.key !== key) return x;
+          if (x.photoUrl) URL.revokeObjectURL(x.photoUrl);
+          return { ...x, photo: blob, photoUrl: URL.createObjectURL(blob) };
+        }),
+      );
+    } catch {
+      toast("Image illisible");
+    }
+  };
+
   const submit = () => {
     if (filled.length === 0) {
       toast("Ajoutez au moins un article à la commande");
@@ -109,6 +131,9 @@ export default function OrderModal({
     // À défaut de nom saisi, le lot porte celui de sa source et de sa date.
     const tag = lotName.trim() || [source.trim(), buyDate].filter(Boolean).join(" · ") || "Lot";
     filled.forEach((l, ix) => {
+      // La photo attendue est enregistrée une fois et partagée par les exemplaires.
+      const photoId = l.photo ? uid() : null;
+      if (photoId && l.photo) void savePhoto(photoId, l.photo);
       const item: Item = {
         id: uid(),
         name: l.name.trim() || "Article sans nom",
@@ -125,12 +150,13 @@ export default function OrderModal({
         buyDate, receiveDate: "", saleDate: "",
         delivery: "commandee", shipping: "en_preparation",
         notes: notes.trim(),
-        photoId: null,
+        photoId,
         createdAt: now + ix,
         carrier: carrier.trim(), tracking: tracking.trim(), expectedDate, shipDate: "",
         orderId,
         purchasePaid,
         lotTag: tag,
+        autoReceive,
       };
       dispatch({ type: "upsertItem", item });
     });
@@ -223,6 +249,18 @@ export default function OrderModal({
         {lines.map((l) => (
           <div className="calc-line" key={l.key}>
             <div className="calc-line-h">
+              <label className="line-photo" title="Photo de l'article attendu">
+                {l.photoUrl ? <img src={l.photoUrl} alt="" /> : <span>◫</span>}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void pickPhoto(l.key, f);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
               <input type="text" value={l.name} placeholder="Nom de l’article" onChange={(e) => patch(l.key, { name: e.target.value })} />
               {lines.length > 1 && (
                 <button className="iconbtn del" title="Retirer" onClick={() => setLines((x) => x.filter((y) => y.key !== l.key))}>✕</button>
@@ -247,6 +285,18 @@ export default function OrderModal({
       <button className="btn ghost sm" style={{ alignSelf: "flex-start" }} onClick={() => setLines((l) => [...l, newLine()])}>
         + Ajouter un article
       </button>
+
+      <label className={`mode-switch${autoReceive ? " on" : ""}`}>
+        <input type="checkbox" checked={autoReceive} onChange={(e) => setAutoReceive(e.target.checked)} />
+        <div>
+          <b>Réception automatique</b>
+          <div className="hint">
+            {expectedDate
+              ? `Les articles passeront seuls en stock le ${expectedDate.split("-").reverse().join("/")}.`
+              : "Renseignez une date d'arrivée pour que les articles entrent seuls en stock."}
+          </div>
+        </div>
+      </label>
 
       <Field label="Notes de commande">
         <textarea rows={2} value={notes} placeholder="Numéro de commande, vendeur, remarque…" onChange={(e) => setNotes(e.target.value)} />
