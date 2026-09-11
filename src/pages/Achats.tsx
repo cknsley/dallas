@@ -12,6 +12,7 @@ import { REQUEST_LABEL } from "../lib/constants";
 import { useQueryState } from "../lib/useQueryState";
 import { links } from "../lib/links";
 import OrderModal from "../modals/OrderModal";
+import MenuButton from "../components/MenuButton";
 import RequestModal from "../modals/RequestModal";
 import ItemModal from "../modals/ItemModal";
 import type { Item, ProductRequest } from "../types";
@@ -25,7 +26,8 @@ export default function Achats() {
   const { state, dispatch } = useStore();
   const toast = useToast();
   const navigate = useNavigate();
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState<"lot" | "supplier" | null>(null);
+  const [newItem, setNewItem] = useState(false);
   const [requestFor, setRequestFor] = useState<{ request: ProductRequest | null } | null>(null);
   const [ordering, setOrdering] = useState<ProductRequest | null>(null);
   const [requestFilter, setRequestFilter] = useQueryState("demandes", "ouvertes");
@@ -174,7 +176,15 @@ export default function Achats() {
   return (
     <>
       <HeaderActions>
-        <button className="btn primary" onClick={() => setCreating(true)}>+ Nouvelle commande</button>
+        <MenuButton
+          label="+ Nouvelle commande"
+          options={[
+            { value: "item", label: "Article seul", note: "Une pièce achetée à l'unité" },
+            { value: "lot", label: "Lot", note: "Plusieurs articles, port réparti" },
+            { value: "supplier", label: "Commande fournisseur", note: "Rattachée à un fournisseur suivi" },
+          ]}
+          onSelect={(v) => (v === "item" ? setNewItem(true) : setCreating(v as "lot" | "supplier"))}
+        />
       </HeaderActions>
 
       <div className="kpi-grid">
@@ -378,7 +388,8 @@ export default function Achats() {
         </div>
       )}
 
-      {creating && <OrderModal onClose={() => setCreating(false)} />}
+      {creating && <OrderModal mode={creating} onClose={() => setCreating(null)} />}
+      {newItem && <ItemModal item={null} onClose={() => setNewItem(false)} />}
       {ordering && (
         <OrderModal fromRequest={ordering} onClose={() => setOrdering(null)} />
       )}

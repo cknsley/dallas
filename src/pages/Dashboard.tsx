@@ -6,6 +6,7 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
 import CashFlowCard from "../components/CashFlowCard";
+import StockValueCard from "../components/StockValueCard";
 import { BarList, Empty, Kpi, Segmented } from "../components/ui";
 import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
@@ -120,7 +121,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <CashFlowCard state={state} range={range} />
+      <StockValueCard state={state} />
 
       <div className="kpi-grid">
         <Kpi
@@ -357,6 +358,10 @@ export default function Dashboard() {
             </div>
           )}
         </section>
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <CashFlowCard state={state} range={range} />
       </div>
 
       {creating === "item" && <ItemModal item={null} onClose={() => setCreating(null)} />}

@@ -27,7 +27,7 @@ const newLine = (): Line => ({ key: uid(), name: "", quantity: "1", brand: "", t
  * normal dès la réception.
  */
 export default function OrderModal({
-  onClose, onCreated, defaultSource = "", fromRequest,
+  onClose, onCreated, defaultSource = "", fromRequest, mode = "supplier",
 }: {
   onClose: () => void;
   onCreated?: (n: number) => void;
@@ -35,6 +35,8 @@ export default function OrderModal({
   defaultSource?: string;
   /** Demande acceptée qui pré-remplit la commande. */
   fromRequest?: ProductRequest;
+  /** Un lot n'exige pas de fournisseur identifié, une commande si. */
+  mode?: "lot" | "supplier";
 }) {
   const { state, dispatch } = useStore();
   const toast = useToast();
@@ -90,6 +92,10 @@ export default function OrderModal({
       toast("Ajoutez au moins un article à la commande");
       return;
     }
+    if (mode === "supplier" && !source.trim()) {
+      toast("Indiquez le fournisseur de cette commande");
+      return;
+    }
     const orderId = uid();
     const now = Date.now();
     filled.forEach((l, ix) => {
@@ -127,7 +133,7 @@ export default function OrderModal({
 
   return (
     <Modal
-      title={fromRequest ? `Commande — ${fromRequest.supplier}` : "Nouvelle commande"}
+      title={fromRequest ? `Commande — ${fromRequest.supplier}` : mode === "lot" ? "Nouveau lot" : "Nouvelle commande fournisseur"}
       wide
       onClose={onClose}
       footer={
@@ -148,7 +154,7 @@ export default function OrderModal({
       </div>
 
       <div className="fgrid">
-        <Field label="Fournisseur / source">
+        <Field label={mode === "lot" ? "Source (facultatif)" : "Fournisseur"}>
           <input
             type="text"
             list="dl-order-source"

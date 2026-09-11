@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
 import CashFlowCard from "../components/CashFlowCard";
+import StockValueCard from "../components/StockValueCard";
 import { BarList, Empty, Kpi, Segmented } from "../components/ui";
 import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
@@ -156,7 +157,7 @@ export default function Bilan() {
         />
       </HeaderActions>
 
-      <CashFlowCard state={state} range={range} />
+      <StockValueCard state={state} />
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-h">
@@ -348,6 +349,9 @@ export default function Bilan() {
         </div>
       </div>
 
+      <div style={{ marginTop: 16 }}>
+        <CashFlowCard state={state} range={range} />
+      </div>
     </>
   );
 }
