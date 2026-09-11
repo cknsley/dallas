@@ -189,6 +189,12 @@ a { color: var(--accent); }
 .brand b { font-family: var(--ff-display); font-size: 21px; font-weight: 700; letter-spacing: -0.035em; }
 .brand span { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); }
 .nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.nav-group { display: flex; flex-direction: column; gap: 2px; }
+.nav-group + .nav-group { margin-top: 14px; }
+.nav-group-label {
+  font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 700; padding: 0 10px 4px;
+}
 .nav a {
   display: flex; align-items: center; gap: 10px; padding: 9px 10px;
   border-radius: var(--r-sm); color: var(--ink-2); text-decoration: none;

@@ -4,20 +4,51 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useStore } from "../store/StoreContext";
 import { useTheme } from "./Theme";
 
-export const ROUTES = [
-  { path: "/", label: "Dashboard", icon: "◧", subtitle: "Vue d'ensemble de l'activité", end: true },
-  { path: "/achats", label: "Centrale d'achat", icon: "⇩", subtitle: "Du colis commandé jusqu'à l'entrée en stock" },
-  { path: "/todo", label: "Todo", icon: "☑", subtitle: "À acheter, à faire, à envoyer" },
-  { path: "/stock", label: "Stock", icon: "▦", subtitle: "Ce que vous possédez : arrivages et articles en stock" },
-  { path: "/livraison", label: "Livraison", icon: "⇄", subtitle: "Ce qu'il reste à envoyer et à recevoir" },
-  { path: "/ventes", label: "Ventes", icon: "↗", subtitle: "Historique et suivi des livraisons" },
-  { path: "/charges", label: "Charges", icon: "◈", subtitle: "Matériel, emballages et abonnements de l'activité" },
-  { path: "/fournisseurs", label: "Fournisseurs", icon: "⌂", subtitle: "Achats, dettes fournisseurs et créances clients" },
-  { path: "/clients", label: "Clients", icon: "☻", subtitle: "Acheteurs et historique d'achat" },
-  { path: "/deal", label: "Deal", icon: "⚖", subtitle: "Négocier un achat ou une vente, remise comprise" },
-  { path: "/bilan", label: "Bilan", icon: "%", subtitle: "Ce que vous possédez et ce que l'activité dégage" },
-  { path: "/facturation", label: "Facturation", icon: "§", subtitle: "Factures, reçus et régime de TVA" },
+export interface NavRoute {
+  path: string;
+  label: string;
+  icon: string;
+  subtitle: string;
+  end?: boolean;
+}
+
+/** La navigation est groupée : piloter, acheter, vendre, compter. */
+export const NAV_GROUPS: { label: string; routes: NavRoute[] }[] = [
+  {
+    label: "Pilotage",
+    routes: [
+      { path: "/", label: "Dashboard", icon: "◧", subtitle: "Vue d'ensemble de l'activité", end: true },
+      { path: "/todo", label: "Todo", icon: "☑", subtitle: "À acheter, à faire, à envoyer" },
+    ],
+  },
+  {
+    label: "Achat",
+    routes: [
+      { path: "/achats", label: "Centrale d'achat", icon: "⇩", subtitle: "Du colis commandé jusqu'à l'entrée en stock" },
+      { path: "/stock", label: "Stock", icon: "▦", subtitle: "Ce que vous possédez : arrivages et articles en stock" },
+      { path: "/fournisseurs", label: "Fournisseurs", icon: "⌂", subtitle: "Achats, dettes fournisseurs et créances clients" },
+      { path: "/charges", label: "Charges", icon: "◈", subtitle: "Matériel, emballages et abonnements de l'activité" },
+      { path: "/deal", label: "Deal", icon: "⚖", subtitle: "Négocier un achat ou une vente, remise comprise" },
+    ],
+  },
+  {
+    label: "Vente",
+    routes: [
+      { path: "/livraison", label: "Livraison", icon: "⇄", subtitle: "Ce qu'il reste à envoyer et à recevoir" },
+      { path: "/ventes", label: "Ventes", icon: "↗", subtitle: "Historique et suivi des livraisons" },
+      { path: "/clients", label: "Clients", icon: "☻", subtitle: "Acheteurs et historique d'achat" },
+    ],
+  },
+  {
+    label: "Comptes",
+    routes: [
+      { path: "/bilan", label: "Bilan", icon: "%", subtitle: "Ce que vous possédez et ce que l'activité dégage" },
+      { path: "/facturation", label: "Facturation", icon: "§", subtitle: "Factures, reçus et régime de TVA" },
+    ],
+  },
 ];
+
+export const ROUTES: NavRoute[] = NAV_GROUPS.flatMap((g) => g.routes);
 
 /** Actions injectées par la page courante dans la barre supérieure. */
 export function HeaderActions({ children }: { children: ReactNode }) {
@@ -51,12 +82,17 @@ export default function Layout() {
           <span>Achat · Revente</span>
         </div>
         <nav className="nav">
-          {ROUTES.map((r) => (
-            <NavLink key={r.path} to={r.path} end={r.end}>
-              <span className="ic">{r.icon}</span>
-              {r.label}
-              {badges[r.path] ? <span className="badge">{badges[r.path]}</span> : null}
-            </NavLink>
+          {NAV_GROUPS.map((group) => (
+            <div className="nav-group" key={group.label}>
+              <div className="nav-group-label">{group.label}</div>
+              {group.routes.map((r) => (
+                <NavLink key={r.path} to={r.path} end={r.end}>
+                  <span className="ic">{r.icon}</span>
+                  {r.label}
+                  {badges[r.path] ? <span className="badge">{badges[r.path]}</span> : null}
+                </NavLink>
+              ))}
+            </div>
           ))}
         </nav>
         <div className="side-foot">
