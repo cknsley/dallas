@@ -124,7 +124,7 @@ export default function Clients() {
                 <div className="podium-row" key={r.key}>
                   <span className={`podium-rank r${ix + 1}`}>{ix + 1}</span>
                   <span className="podium-name ellipsis" title={r.key}>{r.key}</span>
-                  <span className="hint nowrap">{r.qty} pièce{r.qty > 1 ? "s" : ""}</span>
+                  <span className="hint nowrap">{r.qty} article{r.qty > 1 ? "s" : ""}</span>
                   <b className={`num ${r.marge >= 0 ? "pos" : "neg"}`}>{eur(r.marge)}</b>
                 </div>
               ))}

@@ -6,7 +6,7 @@ import { eur2 } from "../lib/format";
 import { STATUS_LABEL } from "../lib/constants";
 import type { Item } from "../types";
 
-/** Choisit la pièce du stock à vendre, puis laisse le formulaire de vente faire le reste. */
+/** Choisit l’article du stock à vendre, puis laisse le formulaire de vente faire le reste. */
 export default function PickItemModal({
   title, onPick, onClose, emptyHint,
 }: {
@@ -35,7 +35,7 @@ export default function PickItemModal({
       {state.items.filter((i) => i.status !== "vendu").length === 0 ? (
         <div className="empty" style={{ padding: 28 }}>
           <div className="glyph">▦</div>
-          <h3>Aucune pièce en stock</h3>
+          <h3>Aucun article en stock</h3>
           <div>{emptyHint}</div>
         </div>
       ) : (
@@ -49,7 +49,7 @@ export default function PickItemModal({
           />
           <div className="picker">
             {list.length === 0 ? (
-              <div className="empty" style={{ padding: 22 }}>Aucune pièce ne correspond</div>
+              <div className="empty" style={{ padding: 22 }}>Aucun article ne correspond</div>
             ) : (
               list.map((i) => (
                 <div key={i.id} className="prow" onClick={() => onPick(i)}>

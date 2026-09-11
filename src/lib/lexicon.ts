@@ -4,15 +4,15 @@
  * se multiplient d'un écran à l'autre (« coût d'entrée », « port entrant »…).
  */
 export const LABEL = {
-  /** Ce que la pièce a coûté à l'achat. */
+  /** Ce que l’article a coûté à l'achat. */
   cost: "Prix d'achat",
   /** Tout ce qui s'ajoute à l'achat : livraison reçue, nettoyage, retouche. */
   fees: "Frais d'achat",
   /** Prix d'achat + frais d'achat. */
   totalCost: "Coût total",
-  /** Prix auquel la pièce est partie. */
+  /** Prix auquel l’article est parti. */
   price: "Prix de vente",
-  /** Prix espéré tant que la pièce n'est pas vendue. */
+  /** Prix espéré tant que l’article n’est pas vendu. */
   estimate: "Estimation de revente",
   /** Ce que la plateforme prélève sur la vente. */
   saleFees: "Commission",

@@ -77,7 +77,7 @@ export default function Charges() {
         <Kpi
           label="Moyenne par mois"
           value={eur(monthlyAverage)}
-          meta="Ce que l'activité coûte chaque mois, hors pièces"
+          meta="Ce que l'activité coûte chaque mois, hors articles"
         />
         <Kpi
           label="Poste principal"

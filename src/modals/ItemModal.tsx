@@ -107,7 +107,7 @@ export default function ItemModal({
   const persist = async (): Promise<Item | null> => {
     const name = draft.name.trim();
     if (!name) {
-      toast("Donnez un nom à la pièce");
+      toast("Donnez un nom à l’article");
       return null;
     }
     let photoId = draft.photoId;
@@ -145,7 +145,7 @@ export default function ItemModal({
   const submit = async () => {
     const saved = await persist();
     if (!saved) return;
-    toast(isNew ? "Pièce ajoutée" : "Modifications enregistrées");
+    toast(isNew ? "Article ajouté" : "Modifications enregistrées");
     onClose();
   };
 
@@ -159,7 +159,7 @@ export default function ItemModal({
 
   return (
     <Modal
-      title={isNew ? "Nouvelle pièce" : "Éditer la pièce"}
+      title={isNew ? "Nouvel article" : "Éditer l’article"}
       onClose={onClose}
       footer={
         <>
@@ -173,13 +173,13 @@ export default function ItemModal({
           )}
           <button className="btn" onClick={onClose}>Annuler</button>
           <button className="btn primary" onClick={() => void submit()}>
-            {isNew ? "Ajouter la pièce" : "Enregistrer"}
+            {isNew ? "Ajouter l’article" : "Enregistrer"}
           </button>
         </>
       }
     >
       <div className="fgrid">
-        <Field label="Nom de la pièce" span>
+        <Field label="Nom de l’article" span>
           <input
             type="text"
             value={draft.name}
@@ -375,22 +375,6 @@ export default function ItemModal({
         </Field>
         <Field label="Date de réception">
           <input type="date" value={draft.receiveDate} onChange={(e) => set("receiveDate", e.target.value)} />
-        </Field>
-      </div>
-
-      <hr className="sep" />
-      <div className="fgrid">
-        <Field label="Transporteur">
-          <input type="text" value={draft.carrier} placeholder="Mondial Relay, Colissimo…" onChange={(e) => set("carrier", e.target.value)} />
-        </Field>
-        <Field label="N° de suivi">
-          <input type="text" value={draft.tracking} placeholder="Numéro de colis" onChange={(e) => set("tracking", e.target.value)} />
-        </Field>
-        <Field label="Arrivée prévue">
-          <input type="date" value={draft.expectedDate} onChange={(e) => set("expectedDate", e.target.value)} />
-        </Field>
-        <Field label="Date d'expédition">
-          <input type="date" value={draft.shipDate} onChange={(e) => set("shipDate", e.target.value)} />
         </Field>
       </div>
 

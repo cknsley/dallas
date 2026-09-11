@@ -153,12 +153,12 @@ export default function DocModal({
       </div>
 
       <hr className="sep" />
-      <div className="field"><span>Pièces vendues — {selected.size} sélectionnée{selected.size > 1 ? "s" : ""}</span>
-        <input type="search" value={query} placeholder="Filtrer les pièces…" onChange={(e) => setQuery(e.target.value)} />
+      <div className="field"><span>Articles vendus — {selected.size} sélectionnée{selected.size > 1 ? "s" : ""}</span>
+        <input type="search" value={query} placeholder="Filtrer les articles…" onChange={(e) => setQuery(e.target.value)} />
       </div>
       <div className="picker">
         {sellable.length === 0 ? (
-          <div className="empty" style={{ padding: 22 }}>Aucune pièce disponible</div>
+          <div className="empty" style={{ padding: 22 }}>Aucun article disponible</div>
         ) : (
           sellable.map((i) => (
             <div

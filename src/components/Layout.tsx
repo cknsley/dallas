@@ -8,7 +8,7 @@ export const ROUTES = [
   { path: "/", label: "Dashboard", icon: "◧", subtitle: "Vue d'ensemble de l'activité", end: true },
   { path: "/achats", label: "Centrale d'achat", icon: "⇩", subtitle: "Du colis commandé jusqu'à l'entrée en stock" },
   { path: "/todo", label: "Todo", icon: "☑", subtitle: "À acheter, à faire, à envoyer" },
-  { path: "/stock", label: "Stock", icon: "▦", subtitle: "Ce que vous possédez : arrivages et pièces en stock" },
+  { path: "/stock", label: "Stock", icon: "▦", subtitle: "Ce que vous possédez : arrivages et articles en stock" },
   { path: "/livraison", label: "Livraison", icon: "⇄", subtitle: "Ce qu'il reste à envoyer et à recevoir" },
   { path: "/ventes", label: "Ventes", icon: "↗", subtitle: "Historique et suivi des livraisons" },
   { path: "/charges", label: "Charges", icon: "◈", subtitle: "Matériel, emballages et abonnements de l'activité" },

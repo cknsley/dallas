@@ -280,7 +280,7 @@ export interface CashFlow {
 /**
  * Trésorerie de la période : ce qui est réellement rentré et sorti.
  * Une vente non payée ne compte pas comme une entrée ; un achat compte
- * dès sa date d'achat, même si la pièce n'est pas encore vendue.
+ * dès sa date d'achat, même si l’article n’est pas encore vendu.
  */
 export function cashFlow(state: AppState, r: Range): CashFlow {
   const cashedIn = state.items

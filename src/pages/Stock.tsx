@@ -13,7 +13,6 @@ import { STATUS_LABEL, STATUS_ORDER } from "../lib/constants";
 import { downloadText, itemsToCSV, stockFilename } from "../lib/csv";
 import ItemModal from "../modals/ItemModal";
 import SellModal from "../modals/SellModal";
-import OrderModal from "../modals/OrderModal";
 import type { Item, ItemStatus } from "../types";
 
 type SortKey =
@@ -22,7 +21,7 @@ type SortKey =
 
 const COLUMNS: { key: SortKey | "photo" | "sell" | "actions"; label: string; sortable: boolean; right?: boolean }[] = [
   { key: "photo", label: "", sortable: false },
-  { key: "name", label: "Pièce", sortable: true },
+  { key: "name", label: "Article", sortable: true },
   { key: "quantity", label: "Qté", sortable: true, right: true },
   { key: "brand", label: "Marque", sortable: true },
   { key: "type", label: "Type", sortable: true },
@@ -71,7 +70,6 @@ export default function Stock() {
   const [editing, setEditing] = useState<{ item: Item | null } | null>(null);
   const [selling, setSelling] = useState<Item | null>(null);
   const [confirming, setConfirming] = useState<Item | null>(null);
-  const [ordering, setOrdering] = useState(false);
 
   const uniq = (k: "brand" | "type" | "size") =>
     [...new Set(held.map((i) => i[k]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
@@ -123,7 +121,7 @@ export default function Stock() {
 
   /** Toggle de statut : changer de cran déplace la pièce, et « Vendu » ouvre la vente. */
   const statusToggle = (i: Item) => (
-    <div className="status-toggle" role="group" aria-label="Statut de la pièce">
+    <div className="status-toggle" role="group" aria-label="Statut de l’article">
       {STATUS_ORDER.map((s) => (
         <button
           key={s}
@@ -163,8 +161,7 @@ export default function Stock() {
         <button className="btn" onClick={() => downloadText(stockFilename(), itemsToCSV(list))}>
           ↓ Export CSV
         </button>
-        <button className="btn" onClick={() => setEditing({ item: null })}>+ Nouvelle pièce</button>
-        <button className="btn primary" onClick={() => setOrdering(true)}>+ Nouvelle commande</button>
+        <button className="btn primary" onClick={() => setEditing({ item: null })}>+ Nouvel article</button>
       </HeaderActions>
 
       <div className="toolbar">
@@ -212,8 +209,8 @@ export default function Stock() {
 
       {list.length === 0 ? (
         <div className="card">
-          <Empty glyph="◫" title="Aucune pièce ici">
-            {held.length ? "Aucun résultat pour ces filtres." : "Ajoutez votre première pièce pour démarrer le suivi."}
+          <Empty glyph="◫" title="Aucun article ici">
+            {held.length ? "Aucun résultat pour ces filtres." : "Ajoutez votre premier article pour démarrer le suivi."}
           </Empty>
         </div>
       ) : view === "table" ? (
@@ -307,7 +304,7 @@ export default function Stock() {
         <ItemModal
           item={editing.item}
           onClose={() => setEditing(null)}
-          onDelete={(i) => { deleteItem(i); toast("Pièce supprimée"); }}
+          onDelete={(i) => { deleteItem(i); toast("Article supprimé"); }}
           onSell={(i) => setSelling(i)}
         />
       )}
@@ -322,12 +319,9 @@ export default function Stock() {
           onInvoice={(i) => navigate(links.newDoc(i.id))}
         />
       )}
-      {ordering && (
-        <OrderModal onClose={() => setOrdering(false)} onCreated={() => setStatus("arrivage")} />
-      )}
       {confirming && (
         <Confirm
-          title="Supprimer cette pièce ?"
+          title="Supprimer cet article ?"
           body={
             <>
               « {confirming.name || "Sans nom"} » sera définitivement retirée du stock, photo comprise.
@@ -342,7 +336,7 @@ export default function Stock() {
               )}
             </>
           }
-          onConfirm={() => { deleteItem(confirming); toast("Pièce supprimée"); }}
+          onConfirm={() => { deleteItem(confirming); toast("Article supprimé"); }}
           onClose={() => setConfirming(null)}
         />
       )}

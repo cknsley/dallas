@@ -79,7 +79,7 @@ export default function ShipmentModal({ onClose }: { onClose: () => void }) {
           <input
             type="search"
             value={query}
-            placeholder="Filtrer par pièce, acheteur ou canal…"
+            placeholder="Filtrer par article, acheteur ou canal…"
             onChange={(e) => setQuery(e.target.value)}
           />
           <div className="picker">

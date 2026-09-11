@@ -83,7 +83,7 @@ export default function Achats() {
   const receiveOrder = (orderId: string) => {
     const pieces = incoming.filter((i) => i.orderId === orderId);
     pieces.forEach((i) => patch(i.id, { status: "stock", receiveDate: today() }));
-    toast(`${pieces.length} pièce${pieces.length > 1 ? "s" : ""} passée${pieces.length > 1 ? "s" : ""} en stock`, {
+    toast(`${pieces.length} article${pieces.length > 1 ? "s" : ""} passée${pieces.length > 1 ? "s" : ""} en stock`, {
       label: "Voir le stock",
       onClick: () => navigate(links.stock({ status: "stock" })),
     });
@@ -196,7 +196,7 @@ export default function Achats() {
         )}
         {incoming.length === 0 ? (
           <Empty glyph="⇩" title="Aucun colis en route">
-            Enregistrez une commande : ses pièces arrivent ici avec leur suivi, puis rejoignent le stock.
+            Enregistrez une commande : ses articles arrivent ici avec leur suivi, puis rejoignent le stock.
           </Empty>
         ) : (
           <div className="twrap">
@@ -204,7 +204,7 @@ export default function Achats() {
               <thead>
                 <tr>
                   <th className="shrink" />
-                  <th>Pièce</th>
+                  <th>Article</th>
                   <th>Fournisseur</th>
                   <th className="r">Coût</th>
                   <th className="shrink">Règlement</th>
@@ -233,7 +233,7 @@ export default function Achats() {
               <thead>
                 <tr>
                   <th className="shrink" />
-                  <th>Pièce</th>
+                  <th>Article</th>
                   <th>Fournisseur</th>
                   <th className="r">Coût</th>
                   <th className="shrink">Règlement</th>
@@ -267,7 +267,7 @@ export default function Achats() {
                 <thead>
                   <tr>
                     <th className="shrink" />
-                    <th>Pièce</th>
+                    <th>Article</th>
                     <th>Fournisseur</th>
                     <th className="r">Coût</th>
                     <th className="shrink">Règlement</th>

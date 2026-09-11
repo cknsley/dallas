@@ -72,7 +72,7 @@ export default function Todo() {
         <input
           type="checkbox"
           checked={t.col === "termine"}
-          title={isAuto ? "Cocher exécute l'action sur la pièce ou le document" : undefined}
+          title={isAuto ? "Cocher exécute l’action sur l’article ou le document" : undefined}
           style={{ accentColor: "var(--accent)", marginTop: 2 }}
           onChange={(e) => {
             if (isAuto) {

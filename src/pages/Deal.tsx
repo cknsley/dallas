@@ -73,7 +73,7 @@ function BuyCalculator() {
         })}
       </div>
       <button className="btn ghost sm" style={{ alignSelf: "flex-start" }} onClick={() => setLines((l) => [...l, newBuyLine()])}>
-        + Ajouter une pièce au lot
+        + Ajouter un article au lot
       </button>
 
       <div>
@@ -83,7 +83,7 @@ function BuyCalculator() {
         {totals.withEstimate > 0 && (
           <>
             <div className="totrow" style={{ marginTop: 6 }}>
-              <span>Revente estimée ({totals.withEstimate} pièce{totals.withEstimate > 1 ? "s" : ""})</span>
+              <span>Revente estimée ({totals.withEstimate} article{totals.withEstimate > 1 ? "s" : ""})</span>
               <b className="num">{eur2(totals.estimate)}</b>
             </div>
             <div className="totrow big">
@@ -173,12 +173,12 @@ function SellCalculator() {
   return (
     <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div className="field">
-        <span>Pièces du lot — {selected.size} sélectionnée{selected.size > 1 ? "s" : ""}</span>
+        <span>Articles du lot — {selected.size} sélectionnée{selected.size > 1 ? "s" : ""}</span>
         <input type="search" value={query} placeholder="Filtrer le stock…" onChange={(e) => setQuery(e.target.value)} />
       </div>
       <div className="picker">
         {pickable.length === 0 ? (
-          <div className="empty" style={{ padding: 22 }}>Aucune pièce disponible en stock</div>
+          <div className="empty" style={{ padding: 22 }}>Aucun article disponible en stock</div>
         ) : (
           pickable.map((i) => (
             <div key={i.id} className={`prow${selected.has(i.id) ? " sel" : ""}`} onClick={() => toggle(i.id)}>
@@ -201,7 +201,7 @@ function SellCalculator() {
           {lines.map((l) => (
             <div key={l.id} className="calc-line">
               <div className="calc-line-h">
-                <input type="text" value={l.label} placeholder="Pièce hors stock" onChange={(e) => patch(l.id, { label: e.target.value })} />
+                <input type="text" value={l.label} placeholder="Article hors stock" onChange={(e) => patch(l.id, { label: e.target.value })} />
                 <button className="iconbtn del" title="Retirer" onClick={() => setLines((x) => x.filter((y) => y.id !== l.id))}>✕</button>
               </div>
               <div className="calc-line-grid">
@@ -216,12 +216,12 @@ function SellCalculator() {
         </div>
       )}
       <button className="btn ghost sm" style={{ alignSelf: "flex-start" }} onClick={() => setLines((l) => [...l, newSellLine()])}>
-        + Ajouter une pièce hors stock
+        + Ajouter un article hors stock
       </button>
 
       {lot.count === 0 ? (
         <Empty glyph="%" title="Composez votre lot">
-          Cochez des pièces du stock pour voir jusqu'où vous pouvez négocier.
+          Cochez des articles du stock pour voir jusqu'où vous pouvez négocier.
         </Empty>
       ) : (
         <>
@@ -284,7 +284,7 @@ function SellCalculator() {
               <b className={`num ${net >= 0 ? "pos" : "neg"}`}>{eur2(net)}</b>
             </div>
             <div className="hint" style={{ textAlign: "right" }}>
-              {lot.count} pièce{lot.count > 1 ? "s" : ""} · ROI {pct(lot.cost ? (net / lot.cost) * 100 : 0)}
+              {lot.count} article{lot.count > 1 ? "s" : ""} · ROI {pct(lot.cost ? (net / lot.cost) * 100 : 0)}
               {discount > 0 && ` · remise ${eur2(lot.gross - asked)}`}
             </div>
           </div>

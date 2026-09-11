@@ -60,7 +60,7 @@ export default function Livraison() {
   const receiveOrder = (orderId: string) => {
     const pieces = allIncoming.filter((i) => i.orderId === orderId);
     pieces.forEach((i) => patch(i.id, { status: "stock", receiveDate: today() }));
-    toast(`${pieces.length} pièce${pieces.length > 1 ? "s" : ""} passée${pieces.length > 1 ? "s" : ""} en stock`, {
+    toast(`${pieces.length} article${pieces.length > 1 ? "s" : ""} passée${pieces.length > 1 ? "s" : ""} en stock`, {
       label: "Voir le stock",
       onClick: () => navigate(links.stock({ status: "stock" })),
     });
@@ -159,7 +159,7 @@ export default function Livraison() {
                 Retards uniquement — tout afficher
               </button>
             ) : (
-              <span className="hint">Pièces au statut Arrivage — réceptionnez pour les basculer en stock</span>
+              <span className="hint">Articles au statut Arrivage — réceptionnez pour les basculer en stock</span>
             )}
           </div>
           {orderGroups.length > 0 && (
@@ -179,7 +179,7 @@ export default function Livraison() {
               {lateOnly ? (
                 <button className="btn sm" onClick={() => setLateOnly("")}>Voir tous les colis attendus</button>
               ) : (
-                <>Les pièces créées au statut « Arrivage » apparaissent ici jusqu'à leur réception.</>
+                <>Les articles créés au statut « Arrivage » apparaissent ici jusqu'à leur réception.</>
               )}
             </Empty>
           ) : (
@@ -188,7 +188,7 @@ export default function Livraison() {
                 <thead>
                   <tr>
                     <th />
-                    <th>Pièce</th>
+                    <th>Article</th>
                     <th>Source</th>
                     <th className="r">Coût</th>
                     <th>Transporteur</th>
@@ -270,7 +270,7 @@ export default function Livraison() {
                 <thead>
                   <tr>
                     <th />
-                    <th>Pièce</th>
+                    <th>Article</th>
                     <th>Vendue le</th>
                     <th>Transporteur</th>
                     <th>N° de suivi</th>

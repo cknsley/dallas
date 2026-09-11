@@ -132,7 +132,7 @@ export default function Fournisseurs() {
       {suppliers.length === 0 ? (
         <div className="card">
           <Empty glyph="⇩" title="Aucun fournisseur">
-            Le champ « Source » d'une pièce ou d'une commande alimente cette liste.
+            Le champ « Source » d’un article ou d’une commande alimente cette liste.
           </Empty>
         </div>
       ) : (

@@ -72,7 +72,7 @@ export default function Bilan() {
         </div>
         <div className="card-b balance-grid">
           <Link className="balance-row" to={links.stock({ status: "stock" })}>
-            <span className="bl-label">Stock<small>Pièces non vendues, à leur coût total</small></span>
+            <span className="bl-label">Stock<small>Articles non vendus, à leur coût total</small></span>
             <b className="num">{eur(stats.engaged)}</b>
           </Link>
           <Link className="balance-row" to={links.livraison({ tab: "faire" })}>
@@ -143,7 +143,7 @@ export default function Bilan() {
             <div className="totrow"><span>Chiffre d'affaires</span><b className="num">{eur2(stats.ca)}</b></div>
             <div className="totrow"><span>{LABEL.shippingPaid}</span><b className="num">{detail.portRecu ? `+${eur2(detail.portRecu)}` : eur2(0)}</b></div>
             <hr className="sep" />
-            <div className="totrow"><span>{LABEL.cost} des pièces vendues</span><b className="num">{deducted(detail.achat)}</b></div>
+            <div className="totrow"><span>{LABEL.cost} des articles vendus</span><b className="num">{deducted(detail.achat)}</b></div>
             <div className="totrow"><span>{LABEL.fees} <span className="hint">({HINT.fees.toLowerCase()})</span></span><b className="num">{deducted(detail.fraisAchat)}</b></div>
             <div className="totrow"><span>{LABEL.saleFees}</span><b className="num">{deducted(detail.commissions)}</b></div>
             <div className="totrow"><span>{LABEL.shippingCost}</span><b className="num">{deducted(detail.portPaye)}</b></div>
@@ -180,7 +180,7 @@ export default function Bilan() {
                   label: b.key,
                   value: Math.max(0, b.marge),
                   display: eur(b.marge),
-                  note: `${b.qty} pièce${b.qty > 1 ? "s" : ""}`,
+                  note: `${b.qty} article${b.qty > 1 ? "s" : ""}`,
                 }))}
               />
             </div>

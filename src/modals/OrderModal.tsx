@@ -23,7 +23,7 @@ const newLine = (): Line => ({ key: uid(), name: "", quantity: "1", brand: "", t
 
 /**
  * Une commande fournisseur : plusieurs pièces achetées d'un coup, avec des frais
- * de port communs. Les pièces entrent en « Arrivage » et rejoignent le stock
+ * de port communs. Les articles entrent en « Arrivage » et rejoignent le stock
  * normal dès la réception.
  */
 export default function OrderModal({ onClose, onCreated }: { onClose: () => void; onCreated?: (n: number) => void }) {
@@ -65,7 +65,7 @@ export default function OrderModal({ onClose, onCreated }: { onClose: () => void
 
   const submit = () => {
     if (filled.length === 0) {
-      toast("Ajoutez au moins une pièce à la commande");
+      toast("Ajoutez au moins un article à la commande");
       return;
     }
     const orderId = uid();
@@ -73,7 +73,7 @@ export default function OrderModal({ onClose, onCreated }: { onClose: () => void
     filled.forEach((l, ix) => {
       const item: Item = {
         id: uid(),
-        name: l.name.trim() || "Pièce sans nom",
+        name: l.name.trim() || "Article sans nom",
         brand: l.brand.trim(),
         type: l.type.trim(),
         size: l.size.trim(),
@@ -95,7 +95,7 @@ export default function OrderModal({ onClose, onCreated }: { onClose: () => void
       };
       dispatch({ type: "upsertItem", item });
     });
-    toast(`Commande enregistrée — ${filled.length} pièce${filled.length > 1 ? "s" : ""} en arrivage`);
+    toast(`Commande enregistrée — ${filled.length} article${filled.length > 1 ? "s" : ""} en arrivage`);
     onClose();
     onCreated?.(filled.length);
   };
@@ -117,7 +117,7 @@ export default function OrderModal({ onClose, onCreated }: { onClose: () => void
       <div className="note info">
         <span className="glyph">⇩</span>
         <div>
-          Les pièces entrent en <b>Arrivage</b> et rejoignent le stock normal dès que vous réceptionnez la
+          Les articles entrent en <b>Arrivage</b> et rejoignent le stock normal dès que vous réceptionnez la
           commande, depuis Livraison → À recevoir. Les frais de port se répartissent automatiquement entre elles.
         </div>
       </div>
@@ -155,12 +155,12 @@ export default function OrderModal({ onClose, onCreated }: { onClose: () => void
       <datalist id="dl-order-size">{suggestions.size.map((v) => <option key={v} value={v} />)}</datalist>
 
       <hr className="sep" />
-      <div className="field"><span>Pièces de la commande</span></div>
+      <div className="field"><span>Articles de la commande</span></div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {lines.map((l) => (
           <div className="calc-line" key={l.key}>
             <div className="calc-line-h">
-              <input type="text" value={l.name} placeholder="Nom de la pièce" onChange={(e) => patch(l.key, { name: e.target.value })} />
+              <input type="text" value={l.name} placeholder="Nom de l’article" onChange={(e) => patch(l.key, { name: e.target.value })} />
               {lines.length > 1 && (
                 <button className="iconbtn del" title="Retirer" onClick={() => setLines((x) => x.filter((y) => y.key !== l.key))}>✕</button>
               )}
@@ -182,7 +182,7 @@ export default function OrderModal({ onClose, onCreated }: { onClose: () => void
         ))}
       </div>
       <button className="btn ghost sm" style={{ alignSelf: "flex-start" }} onClick={() => setLines((l) => [...l, newLine()])}>
-        + Ajouter une pièce
+        + Ajouter un article
       </button>
 
       <Field label="Notes de commande">

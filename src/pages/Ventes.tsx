@@ -151,7 +151,7 @@ export default function Ventes() {
       {list.length === 0 ? (
         <div className="card">
           <Empty glyph="↗" title="Aucune vente sur la période">
-            Marquez une pièce comme vendue depuis le stock : le formulaire de vente recueille la plateforme,
+            Marquez un article comme vendu depuis le stock : le formulaire de vente recueille la plateforme,
             l'acheteur, les frais et le suivi, et tout se retrouve ici.
           </Empty>
         </div>
@@ -169,7 +169,7 @@ export default function Ventes() {
               <thead>
                 <tr>
                   <th />
-                  <th>Pièce</th>
+                  <th>Article</th>
                   <th>Canal</th>
                   <th>Vendue</th>
                   <th className="r">Prix</th>
@@ -302,7 +302,7 @@ export default function Ventes() {
       {picking && (
         <PickItemModal
           title="Nouvelle vente"
-          emptyHint="Ajoutez d'abord une pièce depuis le Stock, ou enregistrez une commande."
+          emptyHint="Ajoutez d’abord un article depuis le Stock, ou enregistrez une commande."
           onClose={() => setPicking(false)}
           onPick={(i) => { setPicking(false); setReselling(i); }}
         />
@@ -319,7 +319,7 @@ export default function Ventes() {
         <ItemModal
           item={editing}
           onClose={() => setEditing(null)}
-          onDelete={(i) => { deleteItem(i); toast("Pièce supprimée"); }}
+          onDelete={(i) => { deleteItem(i); toast("Article supprimé"); }}
           onSell={(i) => setReselling(i)}
         />
       )}

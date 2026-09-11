@@ -224,7 +224,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
     if (todo.auto === "receive" && todo.itemId) {
       dispatch({ type: "patchItem", id: todo.itemId, patch: { status: "stock", receiveDate: day } });
-      return "Colis réceptionné — pièce en stock";
+      return "Colis réceptionné — article en stock";
     }
     if (todo.auto === "payment" && todo.docId) {
       dispatch({ type: "patchDoc", id: todo.docId, patch: { paid: true, paidDate: day } });

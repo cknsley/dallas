@@ -97,7 +97,7 @@ export default function Dashboard() {
   return (
     <>
       <HeaderActions>
-        <button className="btn" onClick={() => setCreating("item")}>+ Nouvelle pièce</button>
+        <button className="btn" onClick={() => setCreating("item")}>+ Nouvel article</button>
         <button className="btn primary" onClick={() => setCreating("order")}>+ Nouvelle commande</button>
         <Segmented<Period>
           value={period}
@@ -141,7 +141,7 @@ export default function Dashboard() {
         <Kpi
           label="Valeur estimée du stock"
           value={eur(stats.stockEstimate)}
-          meta={`${stats.stockCount} pièce${stats.stockCount > 1 ? "s" : ""} · ${eur(stats.stockValue)} de coût total`}
+          meta={`${stats.stockCount} article${stats.stockCount > 1 ? "s" : ""} · ${eur(stats.stockValue)} de coût total`}
           tone="info"
           to={links.stock({ status: "stock" })}
           hint="Stock"
@@ -293,7 +293,7 @@ export default function Dashboard() {
 
           {rows.length === 0 ? (
             <Empty glyph="◌" title="Aucune vente sur la période">
-              Changez de période, ou marquez une pièce comme vendue depuis le stock.
+              Changez de période, ou marquez un article comme vendu depuis le stock.
             </Empty>
           ) : split === "table" ? (
             <div className="twrap">

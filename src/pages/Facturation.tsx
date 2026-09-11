@@ -257,7 +257,7 @@ export default function Facturation() {
                         <div className="ellipsis">{d.clientName}</div>
                         {d.itemIds.length > 0 && (
                           <div className="hint">
-                            {d.itemIds.length} pièce{d.itemIds.length > 1 ? "s" : ""} ·{" "}
+                            {d.itemIds.length} article{d.itemIds.length > 1 ? "s" : ""} ·{" "}
                             <a href={`#${links.ventes()}`}>voir les ventes</a>
                           </div>
                         )}
