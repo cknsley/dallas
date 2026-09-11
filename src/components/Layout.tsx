@@ -6,12 +6,13 @@ import { useTheme } from "./Theme";
 
 export const ROUTES = [
   { path: "/", label: "Dashboard", icon: "◧", subtitle: "Vue d'ensemble de l'activité", end: true },
+  { path: "/achats", label: "Centrale d'achat", icon: "⇩", subtitle: "Du colis commandé jusqu'à l'entrée en stock" },
   { path: "/todo", label: "Todo", icon: "☑", subtitle: "À acheter, à faire, à envoyer" },
   { path: "/stock", label: "Stock", icon: "▦", subtitle: "Ce que vous possédez : arrivages et pièces en stock" },
   { path: "/livraison", label: "Livraison", icon: "⇄", subtitle: "Ce qu'il reste à envoyer et à recevoir" },
   { path: "/ventes", label: "Ventes", icon: "↗", subtitle: "Historique et suivi des livraisons" },
   { path: "/charges", label: "Charges", icon: "◈", subtitle: "Matériel, emballages et abonnements de l'activité" },
-  { path: "/fournisseurs", label: "Fournisseurs", icon: "⇩", subtitle: "Achats, dettes fournisseurs et créances clients" },
+  { path: "/fournisseurs", label: "Fournisseurs", icon: "⌂", subtitle: "Achats, dettes fournisseurs et créances clients" },
   { path: "/clients", label: "Clients", icon: "☻", subtitle: "Acheteurs et historique d'achat" },
   { path: "/deal", label: "Deal", icon: "⚖", subtitle: "Négocier un achat ou une vente, remise comprise" },
   { path: "/bilan", label: "Bilan", icon: "%", subtitle: "Ce que vous possédez et ce que l'activité dégage" },
@@ -34,6 +35,7 @@ export default function Layout() {
   const badges: Record<string, number> = {
     "/stock": state.items.filter((i) => i.status !== "vendu").length,
     "/ventes": state.items.filter((i) => i.status === "vendu" && i.delivery === "commandee").length,
+    "/achats": state.items.filter((i) => i.status === "arrivage").length,
     "/livraison":
       state.items.filter((i) => i.status === "arrivage").length +
       state.items.filter((i) => i.status === "vendu" && i.delivery === "commandee").length,

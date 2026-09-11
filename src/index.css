@@ -474,6 +474,13 @@ a.kpi:hover .go, button.kpi:hover .go { opacity: 1; transform: none; }
 .cf-flow-note { font-size: 11.5px; color: var(--ink-3); }
 
 /* Podium : trois lignes, le rang porte la hiérarchie. */
+/* En-tête d'archive : la carte entière fait office de bouton de repli. */
+.archive-toggle {
+  width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line);
+  font: inherit; color: inherit; cursor: pointer; text-align: left;
+}
+.archive-toggle:hover { background: var(--accent-soft); }
+
 .podium { display: flex; flex-direction: column; gap: 10px; }
 .podium-row { display: flex; align-items: center; gap: 12px; }
 .podium-rank {

@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Stock from "./pages/Stock";
+import Achats from "./pages/Achats";
 import Ventes from "./pages/Ventes";
 import Livraison from "./pages/Livraison";
 import Bilan from "./pages/Bilan";
@@ -18,6 +19,7 @@ export default function App() {
       <Route element={<Layout />}>
         <Route index element={<Dashboard />} />
         <Route path="stock" element={<Stock />} />
+        <Route path="achats" element={<Achats />} />
         <Route path="ventes" element={<Ventes />} />
         <Route path="livraison" element={<Livraison />} />
         <Route path="colis" element={<Navigate to="/livraison" replace />} />

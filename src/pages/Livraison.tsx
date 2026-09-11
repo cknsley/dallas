@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
 import { Empty, Kpi, Photo, Segmented } from "../components/ui";
+import InlineField from "../components/InlineField";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { useQueryState } from "../lib/useQueryState";
@@ -16,33 +17,6 @@ import ShipmentModal from "../modals/ShipmentModal";
 import type { Item, Shipping } from "../types";
 
 type Tab = "faire" | "recevoir";
-
-/** Champ modifiable directement dans la ligne, sans ouvrir la fiche. */
-function InlineField({
-  value, placeholder, type = "text", onCommit, width = 140,
-}: {
-  value: string;
-  placeholder: string;
-  type?: "text" | "date";
-  onCommit: (v: string) => void;
-  width?: number;
-}) {
-  const [draft, setDraft] = useState(value);
-  const [focused, setFocused] = useState(false);
-  if (!focused && draft !== value) setDraft(value);
-  return (
-    <input
-      type={type}
-      value={draft}
-      placeholder={placeholder}
-      style={{ width, padding: "4px 7px", fontSize: 12 }}
-      onFocus={() => setFocused(true)}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => { setFocused(false); if (draft !== value) onCommit(draft); }}
-      onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-    />
-  );
-}
 
 export default function Livraison() {
   const { state, dispatch } = useStore();

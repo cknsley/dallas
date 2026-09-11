@@ -14,6 +14,7 @@ export const links = {
   deal: () => "/deal",
   clients: (f: { q?: string; client?: string } = {}) => withQuery("/clients", f),
   fournisseurs: (f: { q?: string } = {}) => withQuery("/fournisseurs", f),
+  achats: () => "/achats",
   charges: () => "/charges",
   todo: () => "/todo",
 };
