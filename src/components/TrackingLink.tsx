@@ -4,20 +4,39 @@ import { trackingUrl } from "../lib/carriers";
 /** Numéro de suivi cliquable : ouvre la page du transporteur quand on la connaît. */
 export default function TrackingLink({ carrier, code }: { carrier: string; code: string }) {
   const { state } = useStore();
-  if (!code.trim()) return <span className="hint">—</span>;
+  const raw = code.trim();
+  if (!raw) return null;
 
-  const url = trackingUrl(carrier, code, state.settings.trackingUrls);
-  if (!url) return <span className="num" style={{ fontSize: 12 }}>{code}</span>;
+  const url =
+    trackingUrl(carrier, raw, state.settings.trackingUrls) ||
+    (raw.startsWith("http") || raw.startsWith("www.")
+      ? raw.startsWith("www.")
+        ? `https://${raw}`
+        : raw
+      : `https://www.google.com/search?q=${encodeURIComponent(raw)}`);
 
   return (
     <a
-      className="tracking-link num"
+      className="tracking-link"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        padding: "4px 9px",
+        borderRadius: "var(--r-sm)",
+        background: "var(--accent-soft)",
+        color: "var(--accent)",
+        fontSize: 11.5,
+        fontWeight: 600,
+        textDecoration: "none",
+        whiteSpace: "nowrap",
+      }}
       href={url}
       target="_blank"
       rel="noreferrer noopener"
-      title={`Suivre le colis sur le site ${carrier}`}
+      title="Ouvrir le lien de suivi direct"
     >
-      {code} ↗
+      🔗 Lien direct ↗
     </a>
   );
 }

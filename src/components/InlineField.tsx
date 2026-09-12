@@ -2,13 +2,14 @@ import { useState } from "react";
 
 /** Champ modifiable directement dans une ligne de tableau, sans ouvrir de fiche. */
 export default function InlineField({
-  value, placeholder, type = "text", onCommit, width = 140,
+  value, placeholder, type = "text", onCommit, width = 140, style,
 }: {
   value: string;
   placeholder: string;
-  type?: "text" | "date";
+  type?: "text" | "date" | "number";
   onCommit: (v: string) => void;
   width?: number;
+  style?: React.CSSProperties;
 }) {
   const [draft, setDraft] = useState(value);
   const [focused, setFocused] = useState(false);
@@ -20,7 +21,7 @@ export default function InlineField({
       type={type}
       value={draft}
       placeholder={placeholder}
-      style={{ width, padding: "4px 7px", fontSize: 12 }}
+      style={{ width, padding: "4px 7px", fontSize: 12, ...style }}
       onFocus={() => setFocused(true)}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => { setFocused(false); if (draft !== value) onCommit(draft); }}

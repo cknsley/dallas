@@ -1,17 +1,16 @@
 import { useMemo, useState } from "react";
 import { HeaderActions } from "../components/Layout";
-import { Confirm, Empty, Field, Kpi, Modal, Segmented } from "../components/ui";
+import { Confirm, Empty, Kpi, Segmented } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
-import { EXPENSE_CATEGORIES } from "../lib/constants";
 import {
-  chargesByCategory, chargesInRange, chargesMonthlySeries, expenseMonthlyShare,
-  expenseMonths, monthsElapsed, periodRange, remainingToAmortize,
+  chargesByCategory, chargesByKind, chargesInRange, chargesMonthlySeries, costOf, expenseKind, expenseMonthlyShare,
+  expenseMonths, inRange, monthsElapsed, periodRange, remainingToAmortize, revenueOf, soldItems,
 } from "../lib/calc";
 import { usePref } from "../lib/usePref";
 import { useQueryState } from "../lib/useQueryState";
-import { dfr, eur, eur2, num, pct, today } from "../lib/format";
-import { uid } from "../lib/id";
+import { dfr, eur, eur2, pct } from "../lib/format";
+import ExpenseModal from "../modals/ExpenseModal";
 import type { Expense, Period } from "../types";
 
 const thisMonth = () => new Date().toISOString().slice(0, 7);
@@ -22,10 +21,15 @@ const monthName = (ym: string) => {
   return new Date(y, m - 1, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
 };
 
+type ChargesTab = "cockpit" | "graph" | "all";
+type KindFilter = "all" | "achat" | "vente" | "activite";
+
 export default function Charges() {
   const { state, dispatch } = useStore();
   const toast = useToast();
   const [period, setPeriod] = usePref<Period>("chargePeriod", "month");
+  const [chargesTab, setChargesTab] = usePref<ChargesTab>("chargesTab", "cockpit");
+  const [kindFilter, setKindFilter] = usePref<KindFilter>("kindFilter", "all");
   const [category, setCategory] = useQueryState("cat");
   const [editing, setEditing] = useState<{ expense: Expense | null } | null>(null);
   const [confirming, setConfirming] = useState<Expense | null>(null);
@@ -33,8 +37,42 @@ export default function Charges() {
   const range = useMemo(() => periodRange(period), [period]);
   const periodTotal = useMemo(() => chargesInRange(state.expenses, range), [state.expenses, range]);
   const byCategory = useMemo(() => chargesByCategory(state.expenses, range), [state.expenses, range]);
+  const byKind = useMemo(() => chargesByKind(state.expenses, range), [state.expenses, range]);
   const series = useMemo(() => chargesMonthlySeries(state.expenses), [state.expenses]);
   const remaining = useMemo(() => remainingToAmortize(state.expenses), [state.expenses]);
+
+  const purchasedItems = useMemo(
+    () => state.items.filter((i) => !range.bounded || inRange(i.buyDate, range)),
+    [state.items, range],
+  );
+
+  const achatsByType = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const i of purchasedItems) {
+      const t = i.type || "Autre";
+      map.set(t, (map.get(t) || 0) + costOf(i));
+    }
+    return Array.from(map.entries())
+      .map(([key, total]) => ({ key, total }))
+      .sort((a, b) => b.total - a.total);
+  }, [purchasedItems]);
+
+  const balanceAchatsTotal = useMemo(() => purchasedItems.reduce((a, i) => a + costOf(i), 0), [purchasedItems]);
+
+  const achatsAVenir = useMemo(
+    () => state.items.filter((i) => i.status === "arrivage").reduce((a, i) => a + costOf(i), 0),
+    [state.items],
+  );
+
+  const stockTotal = useMemo(
+    () => state.items.filter((i) => i.status === "stock").reduce((a, i) => a + costOf(i), 0),
+    [state.items],
+  );
+
+  const ventesTotal = useMemo(
+    () => soldItems(state.items, range).reduce((a, i) => a + revenueOf(i), 0),
+    [state.items, range],
+  );
 
   const elapsed = monthsElapsed(range);
   const monthlyAverage = periodTotal / elapsed;
@@ -45,8 +83,9 @@ export default function Charges() {
     () =>
       [...state.expenses]
         .filter((e) => !category || (e.category || "Autre") === category)
+        .filter((e) => kindFilter === "all" || expenseKind(e) === kindFilter)
         .sort((a, b) => b.date.localeCompare(a.date)),
-    [state.expenses, category],
+    [state.expenses, category, kindFilter],
   );
 
   const maxMonth = Math.max(...series.map((s) => s.total), 0);
@@ -93,76 +132,261 @@ export default function Charges() {
         />
       </div>
 
-      <div className="cols two">
-        <div className="card">
-          <div className="card-h">
-            <h3>Par catégorie</h3>
-            <div className="spacer" />
-            {category ? (
-              <button className="btn ghost sm" onClick={() => setCategory("")}>Filtre : {category} ✕</button>
-            ) : (
-              <span className="hint">{range.label}</span>
-            )}
-          </div>
-          {byCategory.length === 0 ? (
-            <Empty glyph="◈" title="Aucune charge sur la période">
-              Changez de période ou ajoutez une charge.
-            </Empty>
-          ) : (
-            <div className="card-b">
-              <div className="bars">
-                {byCategory.map((c) => (
-                  <div className="bar-row" key={c.key}>
-                    <button
-                      className="bl linkish"
-                      title={`Filtrer sur ${c.key}`}
-                      onClick={() => setCategory(category === c.key ? "" : c.key)}
-                    >
-                      {c.key}
-                    </button>
-                    <div className="bar-track">
-                      <div
-                        className="bar-fill"
-                        style={{ width: `${Math.max(2, (c.total / byCategory[0].total) * 100)}%` }}
-                      />
-                    </div>
-                    <div className="bv">
-                      {eur(c.total)}
-                      <span style={{ color: "var(--ink-3)" }}> · {pct((c.total / periodTotal) * 100)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="card">
-          <div className="card-h">
-            <h3>12 derniers mois</h3>
-            <div className="spacer" />
-            <span className="hint">Charge imputée chaque mois</span>
-          </div>
-          {maxMonth === 0 ? (
-            <Empty glyph="▁▃▅" title="Rien à afficher">
-              Les charges enregistrées se répartiront ici mois par mois.
-            </Empty>
-          ) : (
-            <div className="card-b">
-              <div className="month-bars">
-                {series.map((s) => (
-                  <div className="month-bar" key={s.key} title={`${s.label} — ${eur2(s.total)}`}>
-                    <div className="mb-track">
-                      <div className="mb-fill" style={{ height: `${Math.max(2, (s.total / maxMonth) * 100)}%` }} />
-                    </div>
-                    <div className="mb-label">{s.label}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+      {/* Barre d'onglets pour la page Charges (la même que Ventes) */}
+      <div style={{ margin: "24px 0 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+        <Segmented<ChargesTab>
+          value={chargesTab}
+          onChange={setChargesTab}
+          options={[
+            { value: "cockpit", label: "⚡ Cockpit & Synthèse" },
+            { value: "graph", label: "📊 Répartition & Évolution" },
+            { value: "all", label: "❖ Tout afficher" },
+          ]}
+        />
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <Segmented<KindFilter>
+            value={kindFilter}
+            onChange={setKindFilter}
+            options={[
+              { value: "all", label: "Toutes charges" },
+              { value: "achat", label: "📦 Achats" },
+              { value: "vente", label: "🏷️ Ventes" },
+              { value: "activite", label: "💼 Activité" },
+            ]}
+          />
         </div>
       </div>
+
+      {/* Onglet 1 ou 3 : Cockpit & Pipeline Charges (Version light identique aux screenshots 1 & 2) */}
+      {(chargesTab === "cockpit" || chargesTab === "all") && (
+        <div className="dash-grid" style={{ marginTop: 0, marginBottom: 16 }}>
+          {/* Carte 1 : Performance Charges (Style exact de la photo 2) */}
+          <section className="card col-1">
+            <div className="card-h">
+              <h3>Performance Charges</h3>
+              <div className="spacer" />
+              <span className="hint">{range.label}</span>
+            </div>
+            <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div className="pipe-row" onClick={() => setKindFilter(kindFilter === "achat" ? "all" : "achat")} style={{ cursor: "pointer" }}>
+                <div className="pipe-head">
+                  <span className="pill info">📦 Achats</span>
+                  <span className="spacer" />
+                  <b className="num">{byKind.achat.count}</b>
+                </div>
+                <div className="bar-track">
+                  <div className="bar-fill" style={{ width: `${periodTotal ? (byKind.achat.total / periodTotal) * 100 : 0}%`, background: "#38bdf8" }} />
+                </div>
+                <div className="hint num">{eur(byKind.achat.total)} engagés · {periodTotal ? pct((byKind.achat.total / periodTotal) * 100) : "0 %"}</div>
+              </div>
+
+              <div className="pipe-row" onClick={() => setKindFilter(kindFilter === "vente" ? "all" : "vente")} style={{ cursor: "pointer" }}>
+                <div className="pipe-head">
+                  <span className="pill warn">🏷️ Ventes</span>
+                  <span className="spacer" />
+                  <b className="num">{byKind.vente.count}</b>
+                </div>
+                <div className="bar-track">
+                  <div className="bar-fill" style={{ width: `${periodTotal ? (byKind.vente.total / periodTotal) * 100 : 0}%`, background: "#c084fc" }} />
+                </div>
+                <div className="hint num">{eur(byKind.vente.total)} engagés · {periodTotal ? pct((byKind.vente.total / periodTotal) * 100) : "0 %"}</div>
+              </div>
+
+              <div className="pipe-row" onClick={() => setKindFilter(kindFilter === "activite" ? "all" : "activite")} style={{ cursor: "pointer" }}>
+                <div className="pipe-head">
+                  <span className="pill ok">💼 Activité</span>
+                  <span className="spacer" />
+                  <b className="num">{byKind.activite.count}</b>
+                </div>
+                <div className="bar-track">
+                  <div className="bar-fill" style={{ width: `${periodTotal ? (byKind.activite.total / periodTotal) * 100 : 0}%`, background: "#34d399" }} />
+                </div>
+                <div className="hint num">{eur(byKind.activite.total)} engagés · {periodTotal ? pct((byKind.activite.total / periodTotal) * 100) : "0 %"}</div>
+              </div>
+
+              <hr className="sep" />
+              <div className="totrow"><span>Charges Achats</span><b className="num">{eur(byKind.achat.total)}</b></div>
+              <div className="totrow" style={{ marginTop: -10 }}>
+                <span>Charges Ventes</span>
+                <b className="num">{eur(byKind.vente.total)}</b>
+              </div>
+              <div className="totrow" style={{ marginTop: -10 }}>
+                <span>Charges Activité</span>
+                <b className="num">{eur(byKind.activite.total)}</b>
+              </div>
+              <div className="totrow" style={{ marginTop: -10 }}>
+                <span>Total Général Charges</span>
+                <b className="num neg">{eur(periodTotal)}</b>
+              </div>
+            </div>
+          </section>
+
+          {/* Carte 2 : Balance (Style exact de la photo 1) */}
+          <section className="card col-1">
+            <div className="card-h">
+              <h3>Balance</h3>
+              <div className="spacer" />
+              <span className="hint">{range.label}</span>
+            </div>
+            <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div className="totrow" style={{ fontWeight: 700, fontSize: 14 }}>
+                <span>Achats</span>
+                <b className="num">{eur(balanceAchatsTotal)}</b>
+              </div>
+
+              {/* Sous-catégories d'achats par type d'article */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingLeft: 12, borderLeft: "2px solid var(--line-2)", margin: "2px 0 6px" }}>
+                {achatsByType.length === 0 ? (
+                  <span className="hint" style={{ fontSize: 12 }}>Aucun achat d'article sur la période</span>
+                ) : (
+                  achatsByType.map((t) => (
+                    <div key={t.key} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--ink-2)" }}>
+                      <span>{t.key}</span>
+                      <b className="num" style={{ fontWeight: 500 }}>{eur(t.total)}</b>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <hr className="sep" style={{ margin: "4px 0" }} />
+              <div className="totrow">
+                <span>Achats à venir</span>
+                <b className="num">{eur(achatsAVenir)}</b>
+              </div>
+              <div className="totrow" style={{ marginTop: -6 }}>
+                <span>Stock total</span>
+                <b className="num">{eur(stockTotal)}</b>
+              </div>
+              <div className="totrow" style={{ marginTop: -6 }}>
+                <span>Ventes</span>
+                <b className="num pos">{eur(ventesTotal)}</b>
+              </div>
+            </div>
+          </section>
+
+          {/* Carte 3 : Cockpit Synthétique Charges */}
+          <section className="card col-1">
+            <div className="card-h">
+              <h3>Cockpit Synthétique</h3>
+              <div className="spacer" />
+              <span className="hint">Vue synthétique</span>
+            </div>
+            <div className="card-b">
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {/* Achats */}
+                <div className="cockpit-card c-sourcing" onClick={() => setKindFilter(kindFilter === "achat" ? "all" : "achat")} style={{ cursor: "pointer" }}>
+                  <div className="cockpit-card-h">
+                    <span>📦 Frais d'Achat</span>
+                    <span className="hint-link">Filtrer →</span>
+                  </div>
+                  <div className="cockpit-card-val">
+                    <b>{eur(byKind.achat.total)}</b> ({byKind.achat.count} frais)
+                  </div>
+                  <span className="hint">Approvisionnement & Stock</span>
+                </div>
+
+                {/* Ventes */}
+                <div className="cockpit-card c-shipping" onClick={() => setKindFilter(kindFilter === "vente" ? "all" : "vente")} style={{ cursor: "pointer" }}>
+                  <div className="cockpit-card-h">
+                    <span>🏷️ Frais de Vente</span>
+                    <span className="hint-link">Filtrer →</span>
+                  </div>
+                  <div className="cockpit-card-val">
+                    <b>{eur(byKind.vente.total)}</b> ({byKind.vente.count} frais)
+                  </div>
+                  <span className="hint">Commissions & Port sortant</span>
+                </div>
+
+                {/* Activité */}
+                <div className="cockpit-card c-charges" onClick={() => setKindFilter(kindFilter === "activite" ? "all" : "activite")} style={{ cursor: "pointer" }}>
+                  <div className="cockpit-card-h">
+                    <span>💼 Frais Général & Structure</span>
+                    <span className="hint-link">Filtrer →</span>
+                  </div>
+                  <div className="cockpit-card-val">
+                    <b>{eur(byKind.activite.total)}</b> ({byKind.activite.count} frais)
+                  </div>
+                  <span className="hint">Abonnements, matériel & local</span>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* Onglet 2 ou 3 : Répartition & Évolution */}
+      {(chargesTab === "graph" || chargesTab === "all") && (
+        <div className="cols two">
+          <div className="card">
+            <div className="card-h">
+              <h3>Par catégorie</h3>
+              <div className="spacer" />
+              {category ? (
+                <button className="btn ghost sm" onClick={() => setCategory("")}>Filtre : {category} ✕</button>
+              ) : (
+                <span className="hint">{range.label}</span>
+              )}
+            </div>
+            {byCategory.length === 0 ? (
+              <Empty glyph="◈" title="Aucune charge sur la période">
+                Changez de période ou ajoutez une charge.
+              </Empty>
+            ) : (
+              <div className="card-b">
+                <div className="bars">
+                  {byCategory.map((c) => (
+                    <div className="bar-row" key={c.key}>
+                      <button
+                        className="bl linkish"
+                        title={`Filtrer sur ${c.key}`}
+                        onClick={() => setCategory(category === c.key ? "" : c.key)}
+                      >
+                        {c.key}
+                      </button>
+                      <div className="bar-track">
+                        <div
+                          className="bar-fill"
+                          style={{ width: `${Math.max(2, (c.total / byCategory[0].total) * 100)}%` }}
+                        />
+                      </div>
+                      <div className="bv">
+                        {eur(c.total)}
+                        <span style={{ color: "var(--ink-3)" }}> · {pct((c.total / periodTotal) * 100)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="card">
+            <div className="card-h">
+              <h3>12 derniers mois</h3>
+              <div className="spacer" />
+              <span className="hint">Charge imputée chaque mois</span>
+            </div>
+            {maxMonth === 0 ? (
+              <Empty glyph="▁▃▅" title="Rien à afficher">
+                Les charges enregistrées se répartiront ici mois par mois.
+              </Empty>
+            ) : (
+              <div className="card-b">
+                <div className="month-bars">
+                  {series.map((s) => (
+                    <div className="month-bar" key={s.key} title={`${s.label} — ${eur2(s.total)}`}>
+                      <div className="mb-track">
+                        <div className="mb-fill" style={{ height: `${Math.max(2, (s.total / maxMonth) * 100)}%` }} />
+                      </div>
+                      <div className="mb-label">{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="card" style={{ marginTop: 16 }}>
         <div className="card-h">
@@ -186,6 +410,7 @@ export default function Charges() {
                 <tr>
                   <th>Charge</th>
                   <th>Catégorie</th>
+                  <th>Type</th>
                   <th className="r">Montant</th>
                   <th>Depuis</th>
                   <th>Utilisation</th>
@@ -198,6 +423,7 @@ export default function Charges() {
                   const months = expenseMonths(e);
                   const share = expenseMonthlyShare(e);
                   const active = months[months.length - 1] >= thisMonth();
+                  const k = expenseKind(e);
                   return (
                     <tr key={e.id}>
                       <td>
@@ -208,6 +434,11 @@ export default function Charges() {
                         <button className="pill neutral pill-btn" onClick={() => setCategory(e.category || "Autre")}>
                           {e.category || "Autre"}
                         </button>
+                      </td>
+                      <td>
+                        <span className={`pill ${k === "achat" ? "info" : k === "vente" ? "warn" : "ok"}`}>
+                          {k === "achat" ? "📦 Achat" : k === "vente" ? "🏷️ Vente" : "💼 Activité"}
+                        </span>
                       </td>
                       <td className="r num">{eur2(e.amount)}</td>
                       <td className="num nowrap" style={{ fontSize: 12 }}>{dfr(e.date)}</td>
@@ -258,140 +489,3 @@ export default function Charges() {
   );
 }
 
-function ExpenseModal({
-  expense, onClose, onDelete,
-}: {
-  expense: Expense | null;
-  onClose: () => void;
-  onDelete: (e: Expense) => void;
-}) {
-  const { dispatch } = useStore();
-  const toast = useToast();
-  const isNew = !expense;
-  const [label, setLabel] = useState(expense?.label ?? "");
-  const [category, setCategory] = useState(expense?.category ?? EXPENSE_CATEGORIES[0]);
-  const [amount, setAmount] = useState(expense?.amount ? String(expense.amount) : "");
-  const [date, setDate] = useState(expense?.date ?? today());
-  const initialMonths = expense?.amortizeMonths ?? 1;
-  // On saisit en années dès que la durée tombe juste : « 3 ans » parle plus que « 36 mois ».
-  const [unit, setUnit] = useState<"mois" | "ans">(initialMonths >= 12 && initialMonths % 12 === 0 ? "ans" : "mois");
-  const [duration, setDuration] = useState(String(unit === "ans" ? initialMonths / 12 : initialMonths));
-  const [notes, setNotes] = useState(expense?.notes ?? "");
-
-  const months = Math.max(1, Math.round(num(duration) * (unit === "ans" ? 12 : 1)) || 1);
-  const share = num(amount) / months;
-  const perYear = share * 12;
-
-  const submit = () => {
-    if (!label.trim()) { toast("Donnez un nom à la charge"); return; }
-    if (num(amount) <= 0) { toast("Indiquez un montant"); return; }
-    const next: Expense = {
-      id: expense?.id ?? uid(),
-      label: label.trim(),
-      category,
-      amount: num(amount),
-      date,
-      amortizeMonths: months,
-      notes: notes.trim(),
-      createdAt: expense?.createdAt ?? Date.now(),
-    };
-    if (isNew) dispatch({ type: "addExpense", expense: next });
-    else dispatch({ type: "patchExpense", id: next.id, patch: next });
-    toast(isNew ? "Charge ajoutée" : "Charge mise à jour");
-    onClose();
-  };
-
-  return (
-    <Modal
-      title={isNew ? "Nouvelle charge" : "Éditer la charge"}
-      onClose={onClose}
-      footer={
-        <>
-          {!isNew && expense && (
-            <>
-              <button className="btn danger" onClick={() => { onDelete(expense); onClose(); }}>Supprimer</button>
-              <div className="spacer" />
-            </>
-          )}
-          <button className="btn" onClick={onClose}>Annuler</button>
-          <button className="btn primary" onClick={submit}>{isNew ? "Ajouter" : "Enregistrer"}</button>
-        </>
-      }
-    >
-      <div className="fgrid">
-        <Field label="Intitulé" span>
-          <input type="text" value={label} placeholder="Ex. Housses à vêtements x50" onChange={(e) => setLabel(e.target.value)} autoFocus />
-        </Field>
-        <Field label="Catégorie">
-          <select value={category} onChange={(e) => setCategory(e.target.value)}>
-            {EXPENSE_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
-          </select>
-        </Field>
-        <Field label="Montant (€)">
-          <input type="number" step="0.01" value={amount} placeholder="0,00" onChange={(e) => setAmount(e.target.value)} />
-        </Field>
-        <Field label="Date d'achat">
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </Field>
-        <Field label="Durée d'utilisation">
-          <div style={{ display: "flex", gap: 8 }}>
-            <input
-              type="number"
-              step="1"
-              min="1"
-              value={duration}
-              style={{ flex: 1 }}
-              onChange={(e) => setDuration(e.target.value)}
-            />
-            <select value={unit} style={{ width: "auto" }} onChange={(e) => setUnit(e.target.value as "mois" | "ans")}>
-              <option value="mois">mois</option>
-              <option value="ans">ans</option>
-            </select>
-          </div>
-        </Field>
-      </div>
-
-      <div className="duration-presets">
-        <span className="hint">Combien de temps allez-vous l'utiliser ?</span>
-        {([
-          ["Une seule fois", 1, "mois"],
-          ["6 mois", 6, "mois"],
-          ["1 an", 1, "ans"],
-          ["2 ans", 2, "ans"],
-          ["3 ans", 3, "ans"],
-        ] as [string, number, "mois" | "ans"][]).map(([label, v, u]) => (
-          <button
-            key={label}
-            type="button"
-            className={`btn sm${months === v * (u === "ans" ? 12 : 1) ? " primary" : ""}`}
-            onClick={() => { setUnit(u); setDuration(String(v)); }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div className="note info">
-        <span className="glyph">◈</span>
-        <div>
-          {months > 1 ? (
-            <>
-              <b className="num">{eur2(num(amount))}</b> sur {months} mois d'utilisation, soit{" "}
-              <b className="num">{eur2(share)}</b> par mois
-              {months > 12 && <> (<span className="num">{eur2(perYear)}</span> par an)</>}.
-              <br />
-              Seuls les mois écoulés pèsent sur la marge : la charge se répartit au fil du temps.
-            </>
-          ) : (
-            <>
-              <b className="num">{eur2(num(amount))}</b> comptés en une fois, sur le mois de l'achat.
-            </>
-          )}
-        </div>
-      </div>
-      <Field label="Notes">
-        <textarea rows={2} value={notes} placeholder="Fournisseur, référence…" onChange={(e) => setNotes(e.target.value)} />
-      </Field>
-    </Modal>
-  );
-}

@@ -1,28 +1,23 @@
 import { useMemo, useState } from "react";
 import {
-  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart,
-  Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip,
 } from "recharts";
 import { Link, useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
-import CashFlowCard from "../components/CashFlowCard";
 import StockValueCard from "../components/StockValueCard";
 import { BarList, Empty, Kpi, Segmented } from "../components/ui";
 import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
 import {
-  caOfYear, computeStats, costOf, groupBy, monthlySeries, periodRange, soldItems, type Dimension,
+  caOfYear, computeStats, groupBy, periodRange, soldItems, type Dimension,
 } from "../lib/calc";
 import { eur, pct } from "../lib/format";
-import { STATUS_LABEL } from "../lib/constants";
-import { vatRegime } from "../lib/vat";
-import { buildClients } from "../lib/clients";
 import { links } from "../lib/links";
+import { vatRegime } from "../lib/vat";
 import ItemModal from "../modals/ItemModal";
 import OrderModal from "../modals/OrderModal";
 import type { Period } from "../types";
 
-type TrendKind = "bar" | "line" | "area";
 type SplitKind = "table" | "bars" | "donut";
 
 const DIMS: { value: Dimension; label: string }[] = [
@@ -32,68 +27,63 @@ const DIMS: { value: Dimension; label: string }[] = [
   { value: "size", label: "Taille" },
 ];
 
-/* Palette lisible sur fond clair comme sur fond sombre. */
-const SLICES = ["#7C5CFF", "#56BEE0", "#F2A65A", "#57C6A0", "#E4699B", "#8C7BE6", "#4FA3D1", "#C9A227"];
-
-const axis = { fontSize: 11, fill: "var(--ink-3)" } as const;
-const tooltipStyle = {
-  background: "var(--surface-solid)",
-  border: "1px solid var(--line-2)",
-  borderRadius: 10,
-  fontSize: 12,
-  color: "var(--ink)",
-  boxShadow: "var(--shadow-lg)",
-  padding: "8px 12px",
-} as const;
-// Recharts colore sinon le texte avec la couleur de la part : illisible sur fond sombre.
-const tooltipItemStyle = { color: "var(--ink)", fontWeight: 600 } as const;
-const tooltipLabelStyle = { color: "var(--ink-3)", marginBottom: 2 } as const;
-const shortEur = (v: number) => (Math.abs(v) >= 1000 ? `${Math.round(v / 1000)}k` : String(Math.round(v)));
-
-/** Une ligne du classement renvoie vers les pièces qu'elle agrège. */
-const dimLink = (dim: Dimension, key: string) =>
-  dim === "brand" ? links.stock({ brand: key })
-  : dim === "type" ? links.stock({ type: key })
-  : dim === "size" ? links.stock({ size: key })
-  : links.stock({ q: key });
-
 export default function Dashboard() {
   const { state } = useStore();
   const navigate = useNavigate();
   const [creating, setCreating] = useState<"item" | "order" | null>(null);
   const [period, setPeriod] = usePref<Period>("period", "month");
-  const [dim, setDim] = usePref<Dimension>("dashDim", "brand");
-  const [split, setSplit] = usePref<SplitKind>("dashSplit", "table");
-  const [trend, setTrend] = usePref<TrendKind>("dashTrend", "bar");
+  const [dim, setDim] = usePref<Dimension>("dashDim", "type");
+  const [split, setSplit] = usePref<SplitKind>("dashSplit", "donut");
 
   const range = useMemo(() => periodRange(period), [period]);
   const stats = useMemo(() => computeStats(state, range), [state, range]);
-  const rows = useMemo(() => groupBy(soldItems(state.items, range), dim), [state.items, range, dim]);
-  const months = useMemo(() => monthlySeries(state.items), [state.items]);
   const regime = useMemo(
     () => vatRegime(state.settings, caOfYear(state.items, new Date().getFullYear())),
     [state.settings, state.items],
   );
 
-  const hasSales = state.items.some((i) => i.status === "vendu");
-  const donutData = rows.slice(0, 7).map((r, ix) => ({ name: r.key, value: Math.round(r.ca), fill: SLICES[ix % SLICES.length] }));
-  const others = rows.slice(7).reduce((a, r) => a + r.ca, 0);
-  if (others > 0) donutData.push({ name: "Autres", value: Math.round(others), fill: "var(--ink-3)" });
+  const soldInPeriod = useMemo(() => soldItems(state.items, range), [state.items, range]);
+  const clients = useMemo(
+    () => state.items.filter((i) => i.buyer?.trim()).map((i) => i.buyer.trim()),
+    [state.items],
+  );
+  const buyerCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    clients.forEach((c) => m.set(c, (m.get(c) ?? 0) + 1));
+    return m;
+  }, [clients]);
+  const repeatBuyers = useMemo(
+    () => Array.from(buyerCounts.values()).filter((n) => n > 1).length,
+    [buyerCounts],
+  );
+  const repeatRate = clients.length ? (repeatBuyers / buyerCounts.size) * 100 : 0;
 
-  // Part des acheteurs qui sont revenus : le signal le plus parlant sur la demande.
-  const clients = useMemo(() => buildClients(state.items), [state.items]);
-  const repeatBuyers = clients.filter((c) => c.orders > 1).length;
-  const repeatRate = clients.length ? (repeatBuyers / clients.length) * 100 : 0;
+  const rows = useMemo(() => groupBy(soldInPeriod, dim), [soldInPeriod, dim]);
 
-  const pipeline = (["arrivage", "stock", "vendu"] as const).map((s) => {
-    const items = state.items.filter((i) => i.status === s);
-    return {
-      status: s,
-      count: items.length,
-      value: items.reduce((a, i) => a + (s === "vendu" ? i.price : costOf(i)), 0),
-    };
-  });
-  const pipelineMax = Math.max(1, ...pipeline.map((p) => p.count));
+  const COLORS = ["#7c5cff", "#10b981", "#f59e0b", "#ef4444", "#3b82f6", "#ec4899", "#8b5cf6", "#14b8a6"];
+  const donutData = useMemo(() => {
+    const top = rows.slice(0, 7);
+    const otherCa = rows.slice(7).reduce((a, r) => a + r.ca, 0);
+    const res = top.map((r, idx) => ({
+      name: r.key,
+      value: r.ca,
+      fill: COLORS[idx % COLORS.length],
+    }));
+    if (otherCa > 0) {
+      res.push({ name: "Autres", value: otherCa, fill: "var(--ink-3)" });
+    }
+    return res;
+  }, [rows]);
+
+  const tooltipStyle = {
+    background: "var(--surface-solid)",
+    border: "1px solid var(--line-2)",
+    borderRadius: 8,
+    color: "var(--ink)",
+    fontSize: 12,
+  };
+  const tooltipItemStyle = { color: "var(--ink)" };
+  const tooltipLabelStyle = { fontWeight: 700, color: "var(--ink)" };
 
   return (
     <>
@@ -128,31 +118,23 @@ export default function Dashboard() {
           label="Chiffre d'affaires"
           value={eur(stats.ca)}
           meta={`${stats.count} vente${stats.count > 1 ? "s" : ""} · ${range.label}`}
-          to={links.ventes()}
-          hint="Ventes"
         />
         <Kpi
           label="Marge réalisée"
           value={eur(stats.marge)}
           meta={stats.ca ? `${pct(stats.margePct)} du chiffre d'affaires` : "Aucune vente sur la période"}
           tone={stats.marge >= 0 ? "ok" : "warn"}
-          to={links.bilan()}
-          hint="Détail"
         />
         <Kpi
           label="Valeur estimée du stock"
           value={eur(stats.stockEstimate)}
           meta={`${stats.stockCount} article${stats.stockCount > 1 ? "s" : ""} · ${eur(stats.stockValue)} de coût total`}
           tone="info"
-          to={links.stock({ status: "stock" })}
-          hint="Stock"
         />
         <Kpi
           label="Nombre de ventes"
           value={String(stats.count)}
           meta={`${stats.enStock} en stock · ${stats.arrivage} en arrivage`}
-          to={links.ventes()}
-          hint="Historique"
         />
         <Kpi
           label="Taux de recommande"
@@ -161,113 +143,26 @@ export default function Dashboard() {
             ? `${repeatBuyers} acheteur${repeatBuyers > 1 ? "s" : ""} sur ${clients.length} ${repeatBuyers > 1 ? "sont revenus" : "est revenu"}`
             : "Renseignez l'acheteur à la vente"}
           tone={repeatRate >= 20 ? "ok" : undefined}
-          to={links.clients()}
-          hint="Clients"
         />
       </div>
 
-      <div className="dash-grid">
-        {/* ---------- évolution ---------- */}
-        <section className="card col-2">
+      <div className="cols two">
+        <section className="card col-1">
           <div className="card-h">
-            <h3>Évolution sur 12 mois</h3>
+            <h3>Stock & Immobilisations</h3>
             <div className="spacer" />
-            <Segmented<TrendKind>
-              value={trend}
-              onChange={setTrend}
-              options={[
-                { value: "bar", label: "Barres" },
-                { value: "line", label: "Courbes" },
-                { value: "area", label: "Aires" },
-              ]}
-            />
+            <span className="hint">Au coût d'achat</span>
           </div>
-          <div className="card-b" style={{ height: 330 }}>
-            {hasSales ? (
-              <ResponsiveContainer width="100%" height="100%">
-                {trend === "line" ? (
-                  <LineChart data={months} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="2 5" stroke="var(--line-2)" vertical={false} />
-                    <XAxis dataKey="label" tick={axis} axisLine={false} tickLine={false} />
-                    <YAxis tick={axis} axisLine={false} tickLine={false} tickFormatter={shortEur} />
-                    <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} formatter={(v: number, k) => [eur(v), k === "ca" ? "CA" : "Marge"]} />
-                    <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} formatter={(k) => (k === "ca" ? "CA" : "Marge")} />
-                    <Line type="monotone" dataKey="ca" stroke="var(--accent)" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                    <Line type="monotone" dataKey="marge" stroke="var(--accent-2)" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                  </LineChart>
-                ) : trend === "area" ? (
-                  <AreaChart data={months} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="gCa" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.55} />
-                        <stop offset="100%" stopColor="var(--accent)" stopOpacity={0.04} />
-                      </linearGradient>
-                      <linearGradient id="gMarge" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="var(--accent-2)" stopOpacity={0.5} />
-                        <stop offset="100%" stopColor="var(--accent-2)" stopOpacity={0.04} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="2 5" stroke="var(--line-2)" vertical={false} />
-                    <XAxis dataKey="label" tick={axis} axisLine={false} tickLine={false} />
-                    <YAxis tick={axis} axisLine={false} tickLine={false} tickFormatter={shortEur} />
-                    <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} formatter={(v: number, k) => [eur(v), k === "ca" ? "CA" : "Marge"]} />
-                    <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} formatter={(k) => (k === "ca" ? "CA" : "Marge")} />
-                    <Area type="monotone" dataKey="ca" stroke="var(--accent)" strokeWidth={2} fill="url(#gCa)" />
-                    <Area type="monotone" dataKey="marge" stroke="var(--accent-2)" strokeWidth={2} fill="url(#gMarge)" />
-                  </AreaChart>
-                ) : (
-                  <BarChart data={months} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="2 5" stroke="var(--line-2)" vertical={false} />
-                    <XAxis dataKey="label" tick={axis} axisLine={false} tickLine={false} />
-                    <YAxis tick={axis} axisLine={false} tickLine={false} tickFormatter={shortEur} />
-                    <Tooltip cursor={{ fill: "var(--accent-soft)" }} contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} formatter={(v: number, k) => [eur(v), k === "ca" ? "CA" : "Marge"]} />
-                    <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} formatter={(k) => (k === "ca" ? "CA" : "Marge")} />
-                    <Bar dataKey="ca" fill="var(--accent)" radius={[5, 5, 0, 0]} maxBarSize={22} />
-                    <Bar dataKey="marge" fill="var(--accent-2)" radius={[5, 5, 0, 0]} maxBarSize={22} />
-                  </BarChart>
-                )}
-              </ResponsiveContainer>
-            ) : (
-              <Empty glyph="▁▃▅" title="Pas encore d'historique">
-                Les ventes enregistrées alimenteront ce graphique mois par mois.
-              </Empty>
-            )}
-          </div>
-        </section>
-
-        {/* ---------- pipeline ---------- */}
-        <section className="card">
-          <div className="card-h">
-            <h3>Pipeline</h3>
-            <div className="spacer" />
-            <span className="hint">Toutes périodes</span>
-          </div>
-          <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {pipeline.map((p) => (
-              <Link
-                key={p.status}
-                className="pipe-row"
-                to={p.status === "vendu" ? links.ventes() : links.stock({ status: p.status })}
-              >
-                <div className="pipe-head">
-                  <span className={`pill ${p.status}`}>{STATUS_LABEL[p.status]}</span>
-                  <span className="spacer" />
-                  <b className="num">{p.count}</b>
-                </div>
-                <div className="bar-track">
-                  <div className="bar-fill" style={{ width: `${Math.max(2, (p.count / pipelineMax) * 100)}%` }} />
-                </div>
-                <div className="hint num">
-                  {eur(p.value)} {p.status === "vendu" ? "de ventes" : "immobilisés"}
-                </div>
-              </Link>
-            ))}
-            <hr className="sep" />
-            <div className="totrow"><span>Capital engagé</span><b className="num">{eur(stats.engaged)}</b></div>
+          <div className="card-b">
+            <div className="totrow">
+              <span>Capital immobilisé en stock</span>
+              <b className="num">{eur(stats.stockValue)}</b>
+            </div>
             <div className="totrow" style={{ marginTop: -10 }}>
-              <span>Valeur estimée à la revente</span>
+              <span>Valeur estimée de revente</span>
               <b className="num">{eur(stats.stockEstimate)}</b>
             </div>
+            <hr className="sep" />
             <div className="totrow" style={{ marginTop: -10 }}>
               <span>Marge potentielle estimée</span>
               <b className={`num ${stats.stockPotential >= 0 ? "pos" : "neg"}`}>{eur(stats.stockPotential)}</b>
@@ -275,8 +170,7 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* ---------- répartition ---------- */}
-        <section className="card col-3">
+        <section className="card col-2">
           <div className="card-h">
             <h3>Meilleures ventes</h3>
             <div className="spacer" />
@@ -311,8 +205,8 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {rows.map((r) => (
-                    <tr key={r.key} className="clickable" onClick={() => navigate(dimLink(dim, r.key))}>
-                      <td><span className="linkish">{r.key}</span></td>
+                    <tr key={r.key}>
+                      <td style={{ fontWeight: 600 }}>{r.key}</td>
                       <td className="r num">{r.qty}</td>
                       <td className="r num">{eur(r.ca)}</td>
                       <td className={`r num ${r.marge >= 0 ? "pos" : "neg"}`}>{eur(r.marge)}</td>
@@ -358,10 +252,6 @@ export default function Dashboard() {
             </div>
           )}
         </section>
-      </div>
-
-      <div style={{ marginTop: 16 }}>
-        <CashFlowCard state={state} range={range} />
       </div>
 
       {creating === "item" && <ItemModal item={null} onClose={() => setCreating(null)} />}

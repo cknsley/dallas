@@ -4,15 +4,18 @@ export const num = (v: unknown): number => {
   return Number.isFinite(x) ? x : 0;
 };
 
-export const eur = (v: number, compact = true): string =>
-  (Number.isFinite(v) ? v : 0).toLocaleString("fr-FR", {
+export const eur = (v: number): string => {
+  const val = Number.isFinite(v) ? v : 0;
+  const hasCents = Math.abs(val % 1) > 0.001;
+  return val.toLocaleString("fr-FR", {
     style: "currency",
     currency: "EUR",
-    maximumFractionDigits: compact && Math.abs(v) >= 1000 ? 0 : 2,
-    minimumFractionDigits: compact && Math.abs(v) >= 1000 ? 0 : 2,
+    maximumFractionDigits: hasCents ? 2 : 0,
+    minimumFractionDigits: hasCents ? 2 : 0,
   });
+};
 
-export const eur2 = (v: number): string => eur(v, false);
+export const eur2 = (v: number): string => eur(v);
 
 export const pct = (v: number): string =>
   (Number.isFinite(v) ? v : 0).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " %";
@@ -29,7 +32,7 @@ export const dfr = (d: string | undefined | null): string =>
   d
     ? new Date(d + "T12:00:00").toLocaleDateString("fr-FR", {
         day: "2-digit",
-        month: "short",
+        month: "2-digit",
         year: "numeric",
       })
     : "—";
@@ -37,14 +40,18 @@ export const dfr = (d: string | undefined | null): string =>
 export const dfrLong = (d: string): string =>
   d
     ? new Date(d + "T12:00:00").toLocaleDateString("fr-FR", {
-        day: "numeric",
-        month: "long",
+        day: "2-digit",
+        month: "2-digit",
         year: "numeric",
       })
     : "—";
 
-/** Date compacte pour les tableaux : 10/09/26 */
+/** Date compacte pour les tableaux : 09/12/2026 */
 export const dshort = (d: string | undefined | null): string =>
-  d ? new Date(d + "T12:00:00").toLocaleDateString("fr-FR", {
-    day: "2-digit", month: "2-digit", year: "2-digit",
-  }) : "—";
+  d
+    ? new Date(d + "T12:00:00").toLocaleDateString("fr-FR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+    : "—";

@@ -17,6 +17,9 @@ export const DELIVERY_LABEL: Record<Delivery, string> = {
 export const DELIVERY_ORDER: Delivery[] = ["non_payee", "commandee", "livree"];
 
 export const SHIPPING_LABEL: Record<Shipping, string> = {
+  a_emballer: "À emballer",
+  a_imprimer: "À imprimer",
+  a_deposer: "À déposer",
   en_preparation: "En préparation",
   livree: "Livrée",
   recu: "Reçu",
@@ -61,10 +64,6 @@ export const EXPENSE_CATEGORIES = [
 ];
 
 export const REQUEST_LABEL: Record<RequestStatus, string> = {
-  brouillon: "Brouillon",
-  envoyee: "Envoyée",
-  acceptee: "Acceptée",
-  refusee: "Refusée",
+  en_cours: "En cours",
+  trouve: "Trouvé",
 };
-
-export const REQUEST_ORDER: RequestStatus[] = ["brouillon", "envoyee", "acceptee", "refusee"];

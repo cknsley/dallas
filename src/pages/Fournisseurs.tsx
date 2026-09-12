@@ -10,6 +10,7 @@ import { costOf, periodRange, qtyOf, revenueOf } from "../lib/calc";
 import { dshort, eur, eur2, pct } from "../lib/format";
 import { STATUS_LABEL } from "../lib/constants";
 import { links } from "../lib/links";
+import { uid } from "../lib/id";
 import ItemModal from "../modals/ItemModal";
 import SupplierModal from "../modals/SupplierModal";
 import OrderModal from "../modals/OrderModal";
@@ -131,6 +132,7 @@ export default function Fournisseurs() {
           style={{ width: 200 }}
           onChange={(e) => setQ(e.target.value)}
         />
+        <button className="btn" onClick={() => setRecordFor({ name: "", record: null })}>+ Nouveau fournisseur</button>
         <button className="btn primary" onClick={() => setOrdering("")}>+ Nouvelle commande</button>
       </HeaderActions>
 
@@ -319,15 +321,18 @@ export default function Fournisseurs() {
 
                   {isOpen && (
                     <div className="supplier-detail">
-                      {s.record && (s.record.email || s.record.phone || s.record.url || s.record.notes) && (
-                        <div className="supplier-contact">
-                          {s.record.email && <a href={`mailto:${s.record.email}`}>{s.record.email}</a>}
-                          {s.record.phone && <span>{s.record.phone}</span>}
+                      {s.record && (s.record.email || s.record.phone || s.record.url || s.record.notes || s.record.address) && (
+                        <div className="supplier-contact" style={{ display: "flex", flexDirection: "column", gap: 4, background: "var(--card-bg-2)", padding: 10, borderRadius: 8 }}>
+                          <b style={{ fontSize: 13 }}>👤 Compte & Contact Fournisseur</b>
+                          {s.record.contact && <div><b>Contact :</b> {s.record.contact}</div>}
+                          {s.record.email && <div><b>Email :</b> <a href={`mailto:${s.record.email}`}>{s.record.email}</a></div>}
+                          {s.record.phone && <div><b>Tél :</b> {s.record.phone}</div>}
+                          {s.record.address && <div><b>Adresse :</b> {s.record.address}</div>}
                           {s.record.url && (
-                            <a href={s.record.url} target="_blank" rel="noreferrer noopener">Voir le profil ↗</a>
+                            <div><b>Site :</b> <a href={s.record.url} target="_blank" rel="noreferrer noopener">{s.record.url} ↗</a></div>
                           )}
-                          {s.record.terms > 0 && <span className="hint">Paiement à {s.record.terms} jours</span>}
-                          {s.record.notes && <div className="hint">{s.record.notes}</div>}
+                          {s.record.terms > 0 && <span className="hint">Paiement accordé à {s.record.terms} jours</span>}
+                          {s.record.notes && <div className="hint" style={{ marginTop: 4 }}><b>Notes :</b> {s.record.notes}</div>}
                         </div>
                       )}
 
@@ -335,6 +340,66 @@ export default function Fournisseurs() {
                         Premier achat le {dshort(s.firstBuy)} · panier moyen {eur2(s.avgOrder)} ·{" "}
                         {s.soldPieces ? `${eur2(s.marginPerPiece)} de marge par article revendu` : "aucune revente encore"}
                       </div>
+
+                      {/* --- TÂCHES ASSOCIÉES AU FOURNISSEUR --- */}
+                      {(() => {
+                        const supplierTodos = state.todos.filter(
+                          (t) => (t.supplierName || "").toLowerCase() === s.name.toLowerCase()
+                        );
+                        return (
+                          <div className="supplier-tasks-section" style={{ margin: "8px 0", background: "var(--card-bg-2)", padding: 12, borderRadius: 10, border: "1px solid var(--line)" }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                              <b style={{ fontSize: 13 }}>📋 Tâches pour {s.name} ({supplierTodos.length})</b>
+                            </div>
+
+                            {supplierTodos.length > 0 ? (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
+                                {supplierTodos.map((t) => (
+                                  <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, background: "var(--bg)", padding: "5px 10px", borderRadius: 6 }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={t.col === "termine"}
+                                      style={{ accentColor: "var(--accent)" }}
+                                      onChange={(e) => dispatch({ type: "patchTodo", id: t.id, patch: { col: e.target.checked ? "termine" : "faire" } })}
+                                    />
+                                    <span style={{ flex: 1, textDecoration: t.col === "termine" ? "line-through" : "none" }}>{t.text}</span>
+                                    {t.dueDate && <span className="hint" style={{ fontSize: 11 }}>📅 {t.dueDate}</span>}
+                                    <button className="iconbtn del" title="Supprimer" onClick={() => dispatch({ type: "removeTodo", id: t.id })}>✕</button>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="hint" style={{ marginBottom: 8 }}>Aucune tâche spécifique pour ce fournisseur.</div>
+                            )}
+
+                            <input
+                              type="text"
+                              placeholder="+ Ajouter une tâche pour ce fournisseur (Entrée)..."
+                              style={{ fontSize: 12, padding: "6px 10px", width: "100%" }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  const text = e.currentTarget.value.trim();
+                                  if (text) {
+                                    dispatch({
+                                      type: "addTodo",
+                                      todo: {
+                                        id: uid(),
+                                        text,
+                                        col: "faire",
+                                        order: 1,
+                                        createdAt: Date.now(),
+                                        supplierName: s.name,
+                                      },
+                                    });
+                                    e.currentTarget.value = "";
+                                    toast(`Tâche ajoutée pour ${s.name}`);
+                                  }
+                                }
+                              }}
+                            />
+                          </div>
+                        );
+                      })()}
 
                       {s.orders.map((o) => (
                         <div className="supplier-order" key={o.id}>

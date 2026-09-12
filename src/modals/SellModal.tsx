@@ -26,13 +26,16 @@ interface SaleDraft {
 }
 
 export default function SellModal({
-  item, onClose, onInvoice, onSold,
+  item, onClose, onInvoice, onSold, initialBuyer, initialBuyerUrl, initialPrice,
 }: {
   item: Item;
   onClose: () => void;
   onInvoice: (item: Item) => void;
   /** Prévenu après enregistrement, pour proposer la suite (voir la vente, le colis…). */
   onSold?: (item: Item) => void;
+  initialBuyer?: string;
+  initialBuyerUrl?: string;
+  initialPrice?: number;
 }) {
   const { state, dispatch } = useStore();
   const toast = useToast();
@@ -40,11 +43,11 @@ export default function SellModal({
   /** Dès que la commission est saisie à la main, on cesse de la recalculer. */
   const [feeTouched, setFeeTouched] = useState(item.saleFees > 0);
   const [d, setD] = useState<SaleDraft>({
-    price: item.price ? String(item.price) : "",
+    price: initialPrice ? String(initialPrice) : item.price ? String(item.price) : "",
     saleDate: item.saleDate || today(),
     platform: item.platform,
-    buyer: item.buyer,
-    buyerUrl: item.buyerUrl,
+    buyer: initialBuyer ?? item.buyer,
+    buyerUrl: initialBuyerUrl ?? item.buyerUrl,
     saleFees: item.saleFees ? String(item.saleFees) : "",
     shippingPaid: item.shippingPaid ? String(item.shippingPaid) : "",
     shippingCost: item.shippingCost ? String(item.shippingCost) : "",
@@ -71,14 +74,26 @@ export default function SellModal({
     return map;
   }, [state.items]);
 
-  /** Retrouve le profil déjà enregistré pour un acheteur connu. */
+  /** Retrouve le profil déjà enregistré pour un acheteur connu (base clients ou ventes). */
   const knownBuyers = useMemo(() => {
     const map = new Map<string, string>();
+    for (const c of state.clients) {
+      if (c.name.trim() && c.profileUrl?.trim()) map.set(c.name.trim().toLowerCase(), c.profileUrl.trim());
+    }
     for (const i of state.items) {
-      if (i.buyer.trim() && i.buyerUrl.trim()) map.set(i.buyer.trim().toLowerCase(), i.buyerUrl.trim());
+      if (i.buyer.trim() && i.buyerUrl.trim() && !map.has(i.buyer.trim().toLowerCase())) {
+        map.set(i.buyer.trim().toLowerCase(), i.buyerUrl.trim());
+      }
     }
     return map;
-  }, [state.items]);
+  }, [state.items, state.clients]);
+
+  const buyerSuggestions = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of state.clients) set.add(c.name.trim());
+    for (const i of state.items) if (i.buyer.trim()) set.add(i.buyer.trim());
+    return [...set];
+  }, [state.clients, state.items]);
 
   const platforms = useMemo(
     () => [...new Set([...PLATFORMS, ...state.items.map((i) => i.platform).filter(Boolean)])],
@@ -218,7 +233,7 @@ export default function SellModal({
           </div>
           <datalist id="dl-platform">{platforms.map((v) => <option key={v} value={v} />)}</datalist>
           <datalist id="dl-buyer">
-            {[...new Set(state.items.map((i) => i.buyer).filter(Boolean))].map((v) => <option key={v} value={v} />)}
+            {buyerSuggestions.map((v) => <option key={v} value={v} />)}
           </datalist>
           <datalist id="dl-carrier">{carriers.map((v) => <option key={v} value={v} />)}</datalist>
 

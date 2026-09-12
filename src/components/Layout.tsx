@@ -19,29 +19,32 @@ export const NAV_GROUPS: { label: string; routes: NavRoute[] }[] = [
     routes: [
       { path: "/", label: "Dashboard", icon: "◧", subtitle: "Vue d'ensemble de l'activité", end: true },
       { path: "/todo", label: "Todo", icon: "☑", subtitle: "À acheter, à faire, à envoyer" },
+      { path: "/performance", label: "Performance", icon: "📊", subtitle: "Indicateurs de performance et cockpit d'activité" },
     ],
   },
   {
     label: "Achat",
     routes: [
       { path: "/achats", label: "Sourcing", icon: "⇩", subtitle: "Du colis commandé jusqu'à l'entrée en stock" },
-      { path: "/stock", label: "Stock", icon: "▦", subtitle: "Ce que vous possédez : arrivages et articles en stock" },
-      { path: "/fournisseurs", label: "Fournisseurs", icon: "⌂", subtitle: "Achats, dettes fournisseurs et créances clients" },
-      { path: "/charges", label: "Charges", icon: "◈", subtitle: "Matériel, emballages et abonnements de l'activité" },
+      { path: "/arrivage", label: "Arrivage", icon: "📥", subtitle: "Sortie de colis & déballage express" },
+      { path: "/stock", label: "Stock", icon: "▦", subtitle: "Ce que vous possédez : vos articles en stock" },
       { path: "/deal", label: "Deal", icon: "⚖", subtitle: "Négocier un achat ou une vente, remise comprise" },
     ],
   },
   {
     label: "Vente",
     routes: [
-      { path: "/livraison", label: "Livraison", icon: "⇄", subtitle: "Ce qu'il reste à envoyer et à recevoir" },
       { path: "/ventes", label: "Ventes", icon: "↗", subtitle: "Historique et suivi des livraisons" },
+      { path: "/livraison", label: "Livraison", icon: "⇄", subtitle: "Ce qu'il reste à envoyer et à recevoir" },
+      { path: "/sav", label: "SAV", icon: "🛠", subtitle: "Validation des réceptions et service après-vente" },
       { path: "/clients", label: "Clients", icon: "☻", subtitle: "Acheteurs et historique d'achat" },
     ],
   },
   {
     label: "Comptes",
     routes: [
+      { path: "/fournisseurs", label: "Fournisseurs", icon: "⌂", subtitle: "Achats, dettes fournisseurs et créances clients" },
+      { path: "/charges", label: "Charges", icon: "◈", subtitle: "Matériel, emballages et abonnements de l'activité" },
       { path: "/bilan", label: "Bilan", icon: "%", subtitle: "Ce que vous possédez et ce que l'activité dégage" },
       { path: "/facturation", label: "Facturation", icon: "§", subtitle: "Factures, reçus et régime de TVA" },
     ],
@@ -58,7 +61,7 @@ export function HeaderActions({ children }: { children: ReactNode }) {
 }
 
 export default function Layout() {
-  const { state, sync } = useStore();
+  const { state, sync, resetDemoData } = useStore();
   const theme = useTheme();
   const { pathname } = useLocation();
   const current = ROUTES.find((r) => (r.end ? pathname === r.path : pathname.startsWith(r.path))) ?? ROUTES[0];
@@ -67,6 +70,7 @@ export default function Layout() {
     "/stock": state.items.filter((i) => i.status !== "vendu").length,
     "/ventes": state.items.filter((i) => i.status === "vendu" && i.delivery === "commandee").length,
     "/achats": state.items.filter((i) => i.status === "arrivage").length,
+    "/arrivage": state.items.filter((i) => i.status === "arrivage").length,
     "/livraison":
       state.items.filter((i) => i.status === "arrivage").length +
       state.items.filter((i) => i.status === "vendu" && i.delivery === "commandee").length,
@@ -107,13 +111,29 @@ export default function Layout() {
           <button className="btn ghost" style={{ justifyContent: "flex-start" }} onClick={theme.cycle}>
             {theme.glyph} {theme.label}
           </button>
+          <button
+            className="btn ghost sm"
+            style={{ justifyContent: "flex-start", opacity: 0.8, fontSize: 11 }}
+            title="Recharger toutes les paires, colis, clients et fournisseurs de démonstration"
+            onClick={() => {
+              if (window.confirm("Recharger toutes les données de démo (colis, stock, clients & fournisseurs) ?")) {
+                resetDemoData();
+              }
+            }}
+          >
+            ⚡ Données de démo
+          </button>
         </div>
       </aside>
 
       <div className="main">
         <nav className="mobnav">
           {ROUTES.map((r) => (
-            <NavLink key={r.path} to={r.path} end={r.end}>{r.label}</NavLink>
+            <NavLink key={r.path} to={r.path} end={r.end}>
+              <span className="ic" style={{ marginRight: 4 }}>{r.icon}</span>
+              {r.label}
+              {badges[r.path] ? <span className="badge" style={{ marginLeft: 4 }}>{badges[r.path]}</span> : null}
+            </NavLink>
           ))}
         </nav>
         <header className="topbar">

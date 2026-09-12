@@ -8,12 +8,12 @@ import { usePref } from "../lib/usePref";
 import { useClearQuery, useQueryState } from "../lib/useQueryState";
 import { links } from "../lib/links";
 import { costOf, qtyOf } from "../lib/calc";
-import { dshort, eur, eur2, today } from "../lib/format";
-import { STATUS_LABEL, STATUS_ORDER } from "../lib/constants";
+import { dshort, eur, eur2 } from "../lib/format";
+import { STATUS_LABEL } from "../lib/constants";
 import { downloadText, itemsToCSV, stockFilename } from "../lib/csv";
 import ItemModal from "../modals/ItemModal";
 import SellModal from "../modals/SellModal";
-import type { Item, ItemStatus } from "../types";
+import type { Item } from "../types";
 
 type SortKey = "name" | "brand" | "type" | "size" | "source" | "status" | "cost" | "buyDate" | "quantity";
 
@@ -35,7 +35,7 @@ const sortValue = (i: Item, k: SortKey): string | number => {
   switch (k) {
     case "name": case "brand": case "type": case "size": case "source":
       return i[k].toLowerCase();
-    case "status": return STATUS_ORDER.indexOf(i.status);
+    case "status": return i.status;
     case "quantity": return qtyOf(i);
     case "cost": return costOf(i);
     case "buyDate": return i.buyDate;
@@ -43,18 +43,16 @@ const sortValue = (i: Item, k: SortKey): string | number => {
 };
 
 export default function Stock() {
-  const { state, dispatch, deleteItem } = useStore();
+  const { state, deleteItem } = useStore();
   const toast = useToast();
   const navigate = useNavigate();
 
   const [view, setView] = usePref<"table" | "grid">("stockView", "table");
-  const [statusParam, setStatus] = useQueryState("status", "all");
-  const status = statusParam as ItemStatus | "all";
   const [q, setQ] = useQueryState("q");
   const [brand, setBrand] = useQueryState("brand");
   const [type, setType] = useQueryState("type");
   const [size, setSize] = useQueryState("size");
-  const clearFilters = useClearQuery(["status", "q", "brand", "type", "size"]);
+  const clearFilters = useClearQuery(["q", "brand", "type", "size"]);
   const [sortKey, setSortKey] = useState<SortKey>("buyDate");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
@@ -65,17 +63,16 @@ export default function Stock() {
   const uniq = (k: "brand" | "type" | "size") =>
     [...new Set(held.map((i) => i[k]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
 
-  const held = useMemo(() => state.items.filter((i) => i.status !== "vendu"), [state.items]);
+  const held = useMemo(() => state.items.filter((i) => i.status === "stock"), [state.items]);
 
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const filtered = held.filter((i) => {
-      if (status !== "all" && i.status !== status) return false;
       if (brand && i.brand !== brand) return false;
       if (type && i.type !== type) return false;
       if (size && i.size !== size) return false;
       if (needle) {
-        const hay = [i.name, i.brand, i.type, i.size, i.source, i.notes].join(" ").toLowerCase();
+        const hay = [i.name, i.brand, i.type, i.size, i.source, i.notes, i.sku, i.condition].join(" ").toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
@@ -87,7 +84,7 @@ export default function Stock() {
       if (x === y) return b.createdAt - a.createdAt;
       return (x > y ? 1 : -1) * dir;
     });
-  }, [held, status, brand, type, size, q, sortKey, sortDir]);
+  }, [held, brand, type, size, q, sortKey, sortDir]);
 
   const toggleSort = (k: SortKey) => {
     if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -97,7 +94,7 @@ export default function Stock() {
     }
   };
 
-  const hasFilters = status !== "all" || !!brand || !!type || !!size || !!q;
+  const hasFilters = !!brand || !!type || !!size || !!q;
   const linkedDoc = (i: Item) => state.docs.find((d) => d.itemIds.includes(i.id));
   // Le capital immobilisé ne compte que les pièces encore en stock : une pièce vendue
   // n'immobilise plus rien, l'additionner gonflerait artificiellement le total.
@@ -110,10 +107,10 @@ export default function Stock() {
     </div>
   );
 
-  /** Toggle de statut : changer de cran déplace la pièce, et « Vendu » ouvre la vente. */
+  /** Toggle de statut : « Vendu » ouvre la vente. */
   const statusToggle = (i: Item) => (
     <div className="status-toggle" role="group" aria-label="Statut de l’article">
-      {STATUS_ORDER.map((s) => (
+      {(["stock", "vendu"] as const).map((s) => (
         <button
           key={s}
           type="button"
@@ -122,14 +119,6 @@ export default function Stock() {
           onClick={() => {
             if (i.status === s) return;
             if (s === "vendu") { setSelling(i); return; }
-            dispatch({
-              type: "patchItem",
-              id: i.id,
-              patch: s === "stock"
-                ? { status: "stock", receiveDate: i.receiveDate || today() }
-                : { status: "arrivage" },
-            });
-            toast(`« ${i.name || "Sans nom"} » → ${STATUS_LABEL[s]}`);
           }}
         >
           {STATUS_LABEL[s]}
@@ -156,18 +145,6 @@ export default function Stock() {
       </HeaderActions>
 
       <div className="toolbar">
-        <Segmented<ItemStatus | "all">
-          value={status}
-          onChange={setStatus}
-          options={[
-            { value: "all", label: `Tout (${held.length})` },
-            // En stock d'abord : c'est la vue de travail la plus fréquente.
-            ...(["stock", "arrivage"] as ItemStatus[]).map((s) => ({
-              value: s,
-              label: `${STATUS_LABEL[s]} (${held.filter((i) => i.status === s).length})`,
-            })),
-          ]}
-        />
         <select value={brand} onChange={(e) => setBrand(e.target.value)} style={{ width: "auto", minWidth: 130 }}>
           <option value="">Toutes marques</option>
           {uniq("brand").map((b) => <option key={b}>{b}</option>)}
@@ -184,7 +161,7 @@ export default function Stock() {
           <input
             type="search"
             value={q}
-            placeholder="Rechercher un produit…"
+            placeholder="Rechercher par nom, marque, SKU, état…"
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
@@ -232,10 +209,16 @@ export default function Stock() {
                   <tr key={i.id}>
                     <td className="shrink"><Photo id={i.photoId} /></td>
                     <td>
-                      <button className="linkish ellipsis" title={i.name} onClick={() => setEditing({ item: i })}>
-                        {i.name || "Sans nom"}
-                      </button>
-                      {i.notes && <div className="hint ellipsis">{i.notes}</div>}
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <button className="linkish ellipsis" title={i.name} onClick={() => setEditing({ item: i })}>
+                          {i.name || "Sans nom"}
+                        </button>
+                        {i.sku && <span className="pill ghost" style={{ fontSize: 10, padding: "1px 6px" }}>SKU: {i.sku}</span>}
+                      </div>
+                      <div className="hint ellipsis" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 2 }}>
+                        {i.condition && <span style={{ color: "var(--accent)", fontWeight: 600 }}>{i.condition}</span>}
+                        {i.notes && <span>{i.notes}</span>}
+                      </div>
                     </td>
                     <td className="r num shrink">{qtyOf(i)}</td>
                     <td>{i.brand || "—"}</td>
@@ -261,17 +244,24 @@ export default function Stock() {
                 <StatusPill status={i.status} />
               </div>
               <div className="gb">
-                <div className="brand-line">{i.brand || "—"}</div>
-                <button className="linkish" onClick={() => setEditing({ item: i })}>
-                  {i.name || "Sans nom"}
-                </button>
-                <div className="meta">
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="brand-line">{i.brand || "—"}</div>
+                    <button className="linkish" onClick={() => setEditing({ item: i })}>
+                      {i.name || "Sans nom"}
+                    </button>
+                  </div>
+                  <div style={{ flexShrink: 0, marginTop: -2 }}>{actions(i)}</div>
+                </div>
+                <div className="meta" style={{ marginTop: 4 }}>
                   {i.type || "—"}{i.size ? ` · ${i.size}` : ""}
+                  {i.condition ? ` · ${i.condition}` : ""}
                   {qtyOf(i) > 1 && <span className="qty-badge">×{qtyOf(i)}</span>}
                 </div>
+                {i.sku && <div className="meta hint" style={{ fontSize: 11 }}>SKU: {i.sku}</div>}
                 <div className="meta num">Coût {eur2(costOf(i))}</div>
               </div>
-              <div className="gf">{statusToggle(i)}<div className="spacer" />{actions(i)}</div>
+              <div className="gf">{statusToggle(i)}</div>
             </article>
           ))}
         </div>

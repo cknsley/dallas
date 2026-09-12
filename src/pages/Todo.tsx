@@ -9,6 +9,7 @@ import { uid } from "../lib/id";
 import { links } from "../lib/links";
 import { useToast } from "../components/Toast";
 import type { Todo as TodoItem, TodoCol } from "../types";
+import PickLinkModal from "../modals/PickLinkModal";
 
 export default function Todo() {
   const { state, dispatch, resolveAutoTodo } = useStore();
@@ -18,6 +19,8 @@ export default function Todo() {
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<TodoCol | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingDateTodoId, setEditingDateTodoId] = useState<string | null>(null);
+  const [linkingTodo, setLinkingTodo] = useState<TodoItem | null>(null);
 
   const byCol = (c: TodoCol) => state.todos.filter((t) => t.col === c).sort((a, b) => a.order - b.order);
 
@@ -59,6 +62,32 @@ export default function Todo() {
 
   const card = (t: TodoItem) => {
     const isAuto = !!t.auto;
+    const linkedIds = t.itemIds?.length ? t.itemIds : (t.itemId ? [t.itemId] : []);
+    const linkedItems = state.items.filter((i) => linkedIds.includes(i.id));
+    const isEditingDate = editingDateTodoId === t.id;
+
+    const dateBadge = () => {
+      if (!t.dueDate) return null;
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const target = new Date(t.dueDate);
+      target.setHours(0, 0, 0, 0);
+      const diff = Math.round((target.getTime() - now.getTime()) / 86400000);
+      const formatted = target.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+      let cls = "kcard-date-btn";
+      let label = `📅 ${formatted}`;
+      if (diff < 0 && t.col !== "termine") {
+        cls += " overdue";
+        label = `⚠️ En retard (${formatted})`;
+      } else if (diff === 0 && t.col !== "termine") {
+        cls += " today";
+        label = `📌 Aujourd'hui`;
+      }
+      return { cls, label };
+    };
+
+    const db = dateBadge();
+
     return (
       <div
         key={t.id}
@@ -69,40 +98,157 @@ export default function Todo() {
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => { e.stopPropagation(); drop(t.col, t.id); }}
       >
-        <input
-          type="checkbox"
-          checked={t.col === "termine"}
-          title={isAuto ? "Cocher exécute l’action sur l’article ou le document" : undefined}
-          style={{ accentColor: "var(--accent)", marginTop: 2 }}
-          onChange={(e) => {
-            if (isAuto) {
-              if (e.target.checked) completeAuto(t);
-              return;
-            }
-            dispatch({ type: "patchTodo", id: t.id, patch: { col: e.target.checked ? "termine" : "faire" } });
-          }}
-        />
-        {editingId === t.id ? (
-          <input
-            type="text"
-            defaultValue={t.text}
-            autoFocus
-            onBlur={(e) => { dispatch({ type: "patchTodo", id: t.id, patch: { text: e.target.value.trim() || t.text } }); setEditingId(null); }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-              if (e.key === "Escape") setEditingId(null);
-            }}
-          />
-        ) : isAuto ? (
-          <button className="tx linkish" onClick={() => navigate(autoTarget(t))}>{t.text}</button>
-        ) : (
-          <div className="tx" onDoubleClick={() => setEditingId(t.id)}>{t.text}</div>
-        )}
-        {isAuto ? (
-          <span className="auto-tag" title="Tâche déduite de l'état de l'app">auto</span>
-        ) : (
-          <button className="iconbtn del" title="Supprimer" onClick={() => dispatch({ type: "removeTodo", id: t.id })}>✕</button>
-        )}
+        <div className="kcard-inner">
+          <div className="kcard-row">
+            <input
+              type="checkbox"
+              checked={t.col === "termine"}
+              title={isAuto ? "Cocher exécute l’action sur l’article ou le document" : undefined}
+              style={{ accentColor: "var(--accent)", marginTop: 2 }}
+              onChange={(e) => {
+                if (isAuto) {
+                  if (e.target.checked) completeAuto(t);
+                  return;
+                }
+                dispatch({ type: "patchTodo", id: t.id, patch: { col: e.target.checked ? "termine" : "faire" } });
+              }}
+            />
+            {editingId === t.id ? (
+              <input
+                type="text"
+                defaultValue={t.text}
+                autoFocus
+                onBlur={(e) => { dispatch({ type: "patchTodo", id: t.id, patch: { text: e.target.value.trim() || t.text } }); setEditingId(null); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                  if (e.key === "Escape") setEditingId(null);
+                }}
+                style={{ flex: 1 }}
+              />
+            ) : isAuto ? (
+              <button className="tx linkish" onClick={() => navigate(autoTarget(t))}>{t.text}</button>
+            ) : (
+              <div className="tx" onDoubleClick={() => setEditingId(t.id)}>{t.text}</div>
+            )}
+            {isAuto ? (
+              <span className="auto-tag" title="Tâche déduite de l'état de l'app">auto</span>
+            ) : (
+              <button className="iconbtn del" title="Supprimer" onClick={() => dispatch({ type: "removeTodo", id: t.id })}>✕</button>
+            )}
+          </div>
+
+          {/* Métadonnées Kanban : Date, Fournisseur, Client et Articles liés */}
+          {!isAuto && (
+            <div className="kcard-meta">
+              {/* Saisie ou affichage de la date */}
+              {isEditingDate ? (
+                <input
+                  type="date"
+                  defaultValue={t.dueDate || ""}
+                  autoFocus
+                  onChange={(e) => {
+                    dispatch({ type: "patchTodo", id: t.id, patch: { dueDate: e.target.value } });
+                    setEditingDateTodoId(null);
+                  }}
+                  onBlur={() => setEditingDateTodoId(null)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "Escape") setEditingDateTodoId(null);
+                  }}
+                  style={{ fontSize: 11, padding: "1px 5px", height: 24, borderRadius: 6, width: "auto" }}
+                />
+              ) : (
+                <button
+                  className={db ? db.cls : "kcard-date-btn"}
+                  title="Cliquer pour définir ou modifier la date d'échéance"
+                  onClick={() => setEditingDateTodoId(t.id)}
+                >
+                  {db ? db.label : "+ Date"}
+                </button>
+              )}
+
+              {/* Fournisseur lié */}
+              {t.supplierName && (
+                <span
+                  className="kcard-item-chip"
+                  style={{ borderColor: "var(--accent-soft)", background: "rgba(59, 130, 246, 0.1)" }}
+                  title={`Fournisseur : ${t.supplierName}`}
+                >
+                  <span
+                    className="ellipsis"
+                    style={{ cursor: "pointer" }}
+                    onClick={() => navigate(links.fournisseurs({ q: t.supplierName }))}
+                  >
+                    🏢 {t.supplierName}
+                  </span>
+                  <span
+                    className="remove"
+                    title="Détacher ce fournisseur"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      dispatch({ type: "patchTodo", id: t.id, patch: { supplierName: "" } });
+                    }}
+                  >
+                    ✕
+                  </span>
+                </span>
+              )}
+
+              {/* Client lié */}
+              {t.clientName && (
+                <span
+                  className="kcard-item-chip"
+                  style={{ borderColor: "var(--accent-soft)", background: "rgba(16, 185, 129, 0.1)" }}
+                  title={`Client : ${t.clientName}`}
+                >
+                  <span
+                    className="ellipsis"
+                    style={{ cursor: "pointer" }}
+                    onClick={() => navigate(links.clients({ q: t.clientName }))}
+                  >
+                    👤 {t.clientName}
+                  </span>
+                  <span
+                    className="remove"
+                    title="Détacher ce client"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      dispatch({ type: "patchTodo", id: t.id, patch: { clientName: "" } });
+                    }}
+                  >
+                    ✕
+                  </span>
+                </span>
+              )}
+
+              {/* Articles liés */}
+              {linkedItems.map((item) => (
+                <span key={item.id} className="kcard-item-chip" title={`${item.brand || ""} ${item.name} (${item.size || "Taille —"})`}>
+                  <span className="ellipsis">📦 {item.brand ? `${item.brand} ` : ""}{item.name}</span>
+                  <span
+                    className="remove"
+                    title="Détacher cet article"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const updated = linkedIds.filter((id) => id !== item.id);
+                      dispatch({ type: "patchTodo", id: t.id, patch: { itemIds: updated, itemId: updated[0] } });
+                    }}
+                  >
+                    ✕
+                  </span>
+                </span>
+              ))}
+
+              {/* Bouton pour ouvrir la modal de liaison universelle */}
+              <button
+                className="kcard-add-link-btn"
+                title="Lier un fournisseur, client ou des articles à cette tâche"
+                onClick={() => setLinkingTodo(t)}
+              >
+                + Lien
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -180,51 +326,113 @@ export default function Todo() {
             <div className="tlist">
               {[...state.todos]
                 .sort((a, b) => TODO_ORDER.indexOf(a.col) - TODO_ORDER.indexOf(b.col) || a.order - b.order)
-                .map((t) => (
-                  <div className="row" key={t.id}>
-                    <input
-                      type="checkbox"
-                      checked={t.col === "termine"}
-                      style={{ accentColor: "var(--accent)" }}
-                      onChange={(e) => {
-                        if (t.auto) {
-                          if (e.target.checked) completeAuto(t);
-                          return;
-                        }
-                        dispatch({ type: "patchTodo", id: t.id, patch: { col: e.target.checked ? "termine" : "faire" } });
-                      }}
-                    />
-                    {t.auto ? (
-                      <button className="linkish" style={{ flex: 1 }} onClick={() => navigate(autoTarget(t))}>
-                        {t.text}
-                      </button>
-                    ) : (
-                      <div style={{ flex: 1, textDecoration: t.col === "termine" ? "line-through" : "none", color: t.col === "termine" ? "var(--ink-3)" : undefined }}>
-                        {t.text}
-                      </div>
-                    )}
-                    {t.auto ? (
-                      <span className="auto-tag">auto</span>
-                    ) : (
-                      <>
-                        <select
-                          value={t.col}
-                          style={{ width: "auto", padding: "3px 6px", fontSize: 12 }}
-                          onChange={(e) => dispatch({ type: "patchTodo", id: t.id, patch: { col: e.target.value as TodoCol } })}
-                        >
-                          {TODO_ORDER.map((c) => (
-                            <option key={c} value={c}>{TODO_LABEL[c]}</option>
+                .map((t) => {
+                  const linkedIds = t.itemIds?.length ? t.itemIds : (t.itemId ? [t.itemId] : []);
+                  const linkedItems = state.items.filter((i) => linkedIds.includes(i.id));
+                  return (
+                    <div className="row" key={t.id} style={{ flexWrap: "wrap", gap: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={t.col === "termine"}
+                        style={{ accentColor: "var(--accent)" }}
+                        onChange={(e) => {
+                          if (t.auto) {
+                            if (e.target.checked) completeAuto(t);
+                            return;
+                          }
+                          dispatch({ type: "patchTodo", id: t.id, patch: { col: e.target.checked ? "termine" : "faire" } });
+                        }}
+                      />
+                      {t.auto ? (
+                        <button className="linkish" style={{ flex: 1 }} onClick={() => navigate(autoTarget(t))}>
+                          {t.text}
+                        </button>
+                      ) : (
+                        <div style={{ flex: 1, minWidth: 200, textDecoration: t.col === "termine" ? "line-through" : "none", color: t.col === "termine" ? "var(--ink-3)" : undefined }}>
+                          {t.text}
+                        </div>
+                      )}
+
+                      {!t.auto && (
+                        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                          <input
+                            type="date"
+                            value={t.dueDate || ""}
+                            onChange={(e) => dispatch({ type: "patchTodo", id: t.id, patch: { dueDate: e.target.value } })}
+                            style={{ fontSize: 11, padding: "2px 4px", height: 24 }}
+                          />
+
+                          {t.supplierName && (
+                            <span className="kcard-item-chip" style={{ background: "rgba(59, 130, 246, 0.1)" }}>
+                              🏢 {t.supplierName}
+                            </span>
+                          )}
+
+                          {t.clientName && (
+                            <span className="kcard-item-chip" style={{ background: "rgba(16, 185, 129, 0.1)" }}>
+                              👤 {t.clientName}
+                            </span>
+                          )}
+
+                          {linkedItems.map((item) => (
+                            <span key={item.id} className="kcard-item-chip">
+                              📦 {item.name}
+                            </span>
                           ))}
-                        </select>
-                        <button className="iconbtn del" title="Supprimer" onClick={() => dispatch({ type: "removeTodo", id: t.id })}>✕</button>
-                      </>
-                    )}
-                  </div>
-                ))}
+                          <button className="btn sm ghost" onClick={() => setLinkingTodo(t)}>
+                            + Lien
+                          </button>
+                        </div>
+                      )}
+
+                      {t.auto ? (
+                        <span className="auto-tag">auto</span>
+                      ) : (
+                        <>
+                          <select
+                            value={t.col}
+                            style={{ width: "auto", padding: "3px 6px", fontSize: 12 }}
+                            onChange={(e) => dispatch({ type: "patchTodo", id: t.id, patch: { col: e.target.value as TodoCol } })}
+                          >
+                            {TODO_ORDER.map((c) => (
+                              <option key={c} value={c}>{TODO_LABEL[c]}</option>
+                            ))}
+                          </select>
+                          <button className="iconbtn del" title="Supprimer" onClick={() => dispatch({ type: "removeTodo", id: t.id })}>✕</button>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
             </div>
           )}
         </div>
       )}
+
+      {/* Modal de liaison (Fournisseur, Client, Articles) */}
+      {linkingTodo && (
+        <PickLinkModal
+          title={`Lier à « ${linkingTodo.text} »`}
+          initialSupplier={linkingTodo.supplierName || ""}
+          initialClient={linkingTodo.clientName || ""}
+          initialSelectedIds={linkingTodo.itemIds?.length ? linkingTodo.itemIds : (linkingTodo.itemId ? [linkingTodo.itemId] : [])}
+          onClose={() => setLinkingTodo(null)}
+          onSave={({ supplierName, clientName, itemIds }) => {
+            dispatch({
+              type: "patchTodo",
+              id: linkingTodo.id,
+              patch: {
+                supplierName,
+                clientName,
+                itemIds,
+                itemId: itemIds[0],
+              },
+            });
+            setLinkingTodo(null);
+          }}
+        />
+      )}
     </>
   );
 }
+

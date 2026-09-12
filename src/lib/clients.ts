@@ -1,14 +1,13 @@
-import type { Item } from "../types";
+import type { ClientRecord, Item } from "../types";
 import { costOf, marginOf, qtyOf, revenueOf } from "./calc";
 
-/** Un acheteur reconstitué depuis les ventes : l'app n'a pas de fiche client
- *  séparée, c'est l'historique qui fait le client. */
 export interface Client {
-  /** Clé stable : pseudo + plateforme, insensible à la casse. */
+  /** Clé stable : nom/pseudo du client, insensible à la casse. */
   key: string;
   name: string;
+  record: ClientRecord | null;
   platforms: string[];
-  /** Lien vers son profil sur la plateforme, s'il a été renseigné une fois. */
+  /** Lien vers son profil sur la plateforme. */
   profileUrl: string;
   items: Item[];
   orders: number;
@@ -22,31 +21,60 @@ export interface Client {
   unpaid: number;
 }
 
-const keyOf = (i: Item) => `${i.buyer.trim().toLowerCase()}|${i.platform.trim().toLowerCase()}`;
+export const clientKey = (name: string) => name.trim().toLowerCase();
 
-/** Regroupe les ventes par acheteur. Une vente sans acheteur nommé est ignorée. */
-export function buildClients(items: Item[]): Client[] {
+/** Regroupe les clients à partir de la base de données fiches clients ET des ventes. */
+export function buildClients(items: Item[], records: ClientRecord[] = []): Client[] {
   const map = new Map<string, Client>();
+  const recordByKey = new Map(records.map((r) => [clientKey(r.name), r]));
 
-  for (const i of items) {
-    if (i.status !== "vendu" || !i.buyer.trim()) continue;
-    const key = keyOf(i);
-    const c = map.get(key) ?? {
+  // 1. Initialiser avec toutes les fiches clients enregistrées en base
+  for (const r of records) {
+    const key = clientKey(r.name);
+    map.set(key, {
       key,
-      name: i.buyer.trim(),
-      platforms: [],
-      profileUrl: "",
+      name: r.name,
+      record: r,
+      platforms: r.platform ? [r.platform] : [],
+      profileUrl: r.profileUrl || "",
       items: [],
       orders: 0,
       pieces: 0,
       revenue: 0,
       cost: 0,
       margin: 0,
-      firstSale: i.saleDate,
-      lastSale: i.saleDate,
+      firstSale: "",
+      lastSale: "",
       pendingDelivery: 0,
       unpaid: 0,
-    };
+    });
+  }
+
+  // 2. Associer l'historique des ventes (par clientId ou par nom d'acheteur)
+  for (const i of items) {
+    if (i.status !== "vendu" || !i.buyer.trim()) continue;
+    const name = i.buyer.trim();
+    const key = clientKey(name);
+
+    const c =
+      map.get(key) ??
+      ({
+        key,
+        name,
+        record: recordByKey.get(key) ?? null,
+        platforms: [],
+        profileUrl: "",
+        items: [],
+        orders: 0,
+        pieces: 0,
+        revenue: 0,
+        cost: 0,
+        margin: 0,
+        firstSale: i.saleDate,
+        lastSale: i.saleDate,
+        pendingDelivery: 0,
+        unpaid: 0,
+      } as Client);
 
     c.items.push(i);
     c.orders += 1;
@@ -65,6 +93,6 @@ export function buildClients(items: Item[]): Client[] {
   }
 
   return [...map.values()]
-    .map((c) => ({ ...c, items: c.items.sort((a, b) => b.saleDate.localeCompare(a.saleDate)) }))
-    .sort((a, b) => b.revenue - a.revenue);
+    .map((c) => ({ ...c, items: c.items.sort((a, b) => (b.saleDate || "").localeCompare(a.saleDate || "")) }))
+    .sort((a, b) => b.revenue - a.revenue || a.name.localeCompare(b.name));
 }

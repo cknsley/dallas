@@ -7,6 +7,7 @@ export const links = {
   ventes: (f: { delivery?: Delivery | "all"; platform?: string; brand?: string } = {}) =>
     withQuery("/ventes", f),
   livraison: (f: { tab?: "faire" | "recevoir"; late?: string } = {}) => withQuery("/livraison", f),
+  sav: () => "/sav",
   facturation: (f: { state?: "all" | "unpaid" | "paid" } = {}) => withQuery("/facturation", f),
   newDoc: (itemId: string) => `/facturation?new=${itemId}`,
   doc: (docId: string) => `/facturation?doc=${docId}`,
@@ -15,8 +16,10 @@ export const links = {
   clients: (f: { q?: string; client?: string } = {}) => withQuery("/clients", f),
   fournisseurs: (f: { q?: string } = {}) => withQuery("/fournisseurs", f),
   achats: () => "/achats",
+  arrivage: () => "/arrivage",
   charges: () => "/charges",
   todo: () => "/todo",
+  performance: () => "/performance",
 };
 
 function withQuery(path: string, filters: Record<string, string | undefined>): string {

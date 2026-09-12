@@ -1,18 +1,25 @@
 export type ItemStatus = "arrivage" | "stock" | "vendu";
 export type Delivery = "non_payee" | "commandee" | "livree";
 /** Avancement de l'expédition, suivi dans l'onglet Livraison. */
-export type Shipping = "en_preparation" | "livree" | "recu";
+export type Shipping = "a_emballer" | "a_imprimer" | "a_deposer" | "en_preparation" | "livree" | "recu";
 export type TodoCol = "acheter" | "faire" | "envoyer" | "termine";
 export type LegalStatus = "particulier" | "micro" | "societe";
 export type DocKind = "facture" | "recu";
 
+export type PackagingKind = "tout" | "boite" | "dustbag" | "remplacement" | "rien";
+
 export interface Item {
   id: string;
+  sku?: string;          // Référence unique / Code SKU
+  condition?: string;    // État de l'article (Neuf avec étiquette, Très bon état...)
   name: string;
   brand: string;
   type: string;
   size: string;
+  packaging?: PackagingKind;
+  estimatedPrice?: number; // Price d'estimation / revente visé
   source: string;
+  supplierId?: string;   // ID de la fiche fournisseur liée
   /** Nombre d'exemplaires identiques sur cette ligne. */
   quantity: number;
   cost: number;          // coût d'entrée, par exemplaire
@@ -21,6 +28,7 @@ export interface Item {
   /* côté vente */
   platform: string;      // plateforme ou canal de vente
   buyer: string;         // acheteur
+  clientId?: string;     // ID de la fiche client liée
   buyerUrl: string;      // lien vers son profil sur la plateforme
   saleFees: number;      // commission de la plateforme
   shippingCost: number;  // port payé par le vendeur
@@ -38,6 +46,7 @@ export interface Item {
   tracking: string;       // numéro de suivi
   expectedDate: string;   // arrivée prévue (colis entrant)
   shipDate: string;       // date d'expédition (colis sortant)
+  validationDate?: string; // Date de validation SAV (YYYY-MM-DD)
   shipping: Shipping;     // avancement de l'envoi
   /** Regroupe les pièces achetées dans une même commande fournisseur. */
   orderId: string;
@@ -47,6 +56,12 @@ export interface Item {
   lotTag: string;
   /** Entre en stock tout seul dès que la date d'arrivée est atteinte. */
   autoReceive: boolean;
+  /* SAV & Litiges */
+  litigeState?: "en_cours" | "attente" | "resolu";
+  litigeCategory?: string;
+  litigeFile?: string;
+  litigeFileName?: string;
+  litigeLogs?: { id: string; date: string; category: string; text: string; fileUrl?: string; fileName?: string }[];
 }
 
 /** Une tâche automatique est déduite de l'état des pièces ou des documents :
@@ -62,7 +77,13 @@ export interface Todo {
   /** Renseigné pour les tâches générées par l'app. */
   auto?: AutoKind;
   itemId?: string;
+  itemIds?: string[];
   docId?: string;
+  supplierId?: string;   // ID du fournisseur lié
+  supplierName?: string; // Nom du fournisseur lié
+  clientId?: string;     // ID du client lié
+  clientName?: string;   // Nom du client / acheteur lié
+  dueDate?: string;      // YYYY-MM-DD
 }
 
 export interface DocLine {
@@ -79,6 +100,7 @@ export interface SalesDoc {
   date: string;
   dueDate: string;
   clientName: string;
+  clientId?: string;
   clientAddress: string;
   clientVat: string;
   lines: DocLine[];
@@ -96,12 +118,15 @@ export interface SalesDoc {
   createdAt: number;
 }
 
+export type ChargeKind = "achat" | "vente" | "activite";
+
 /** Une charge générale de l'activité — matériel, emballages, abonnements —
  *  distincte du coût d'une pièce. Peut être étalée sur plusieurs mois. */
 export interface Expense {
   id: string;
   label: string;
   category: string;
+  kind?: ChargeKind;
   amount: number;
   date: string;          // premier mois d'imputation, YYYY-MM-DD
   amortizeMonths: number; // 1 = comptée en une fois
@@ -109,35 +134,28 @@ export interface Expense {
   createdAt: number;
 }
 
-/** Ce qu'on demande à un fournisseur avant de commander. */
-export type RequestStatus = "brouillon" | "envoyee" | "acceptee" | "refusee";
-
-export interface RequestLine {
-  key: string;
-  name: string;
-  brand: string;
-  type: string;
-  size: string;
-  quantity: number;
-  /** Prix d'achat visé pour cette ligne. */
-  targetPrice: number;
-}
+/** Un pense-bête : ce qu'un client a demandé, ou ce qu'on cherche pour le stock. */
+export type RequestStatus = "en_cours" | "trouve";
+export type RequestFor = "client" | "stock";
 
 export interface ProductRequest {
   id: string;
-  /** Nom du fournisseur, tel qu'il apparaît dans le champ « Source ». */
-  supplier: string;
-  date: string;
-  status: RequestStatus;
-  lines: RequestLine[];
+  for: RequestFor;
+  /** Nom du client, utile seulement quand `for` vaut "client". */
+  client: string;
+  clientId?: string;
+  /** Ce qu'on cherche. */
+  name: string;
+  /** Prix d'achat espéré. */
+  budget: number;
   notes: string;
-  /** Renseigné quand la demande a donné lieu à une commande. */
-  orderId: string;
+  status: RequestStatus;
+  /** Comment la demande a été résolue, une fois trouvée. */
+  resolvedAs: "" | "stock" | "vente";
   createdAt: number;
 }
 
-/** Fiche fournisseur : les informations que le stock ne peut pas déduire.
- *  Elle s'attache à un nom de source, ce qui évite toute migration. */
+/** Fiche fournisseur : base de données fournisseurs. */
 export interface SupplierRecord {
   id: string;
   /** Nom tel qu'il est saisi dans le champ « Source » d'un article. */
@@ -151,6 +169,21 @@ export interface SupplierRecord {
   terms: number;
   /** Appréciation de 1 à 5, 0 si non notée. */
   rating: number;
+  notes: string;
+  createdAt: number;
+}
+
+/** Fiche client : base de données clients / acheteurs. */
+export interface ClientRecord {
+  id: string;
+  name: string;
+  contact?: string;
+  email: string;
+  phone: string;
+  address: string;
+  vatNumber?: string;
+  platform?: string;     // Canal habituel (Vinted, Vestiaire, Instagram...)
+  profileUrl?: string;   // Lien vers son profil
   notes: string;
   createdAt: number;
 }
@@ -177,6 +210,8 @@ export interface Settings {
   trackingUrls: Record<string, string>;
   /** Sources écartées de l'onglet Fournisseurs : outlet, magasin, achat en direct. */
   nonSuppliers: string[];
+  /** Coffre-fort / Trésorerie sécurisée (argent mis de côté). */
+  vaultAmount?: number;
 }
 
 export interface AppState {
@@ -185,6 +220,7 @@ export interface AppState {
   docs: SalesDoc[];
   expenses: Expense[];
   suppliers: SupplierRecord[];
+  clients: ClientRecord[];
   requests: ProductRequest[];
   settings: Settings;
   seq: Record<string, number>;

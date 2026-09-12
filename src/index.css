@@ -948,6 +948,11 @@ button.totrow { width: 100%; background: none; border: 0; font: inherit; color: 
   border-top: 1px solid var(--line-2); margin-top: 6px; padding-top: 12px;
   font-size: 17px; font-weight: 700; font-family: var(--ff-display);
 }
+.totrow.big:first-child {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0;
+}
 
 /* Une ligne de résultat qui mène à sa source. */
 .totrow.linked {

@@ -87,25 +87,39 @@ export function Field({ label, children, span }: { label: string; children: Reac
 
 /* ---------- KPI ---------- */
 export function Kpi({
-  label, value, meta, tone, to, hint,
+  label, value, meta, tone, to, hint, onClick, featured,
 }: {
   label: string;
   value: string;
   meta?: string;
   tone?: "ok" | "warn" | "info";
+  featured?: boolean;
   /** Destination ouverte au clic — le chiffre mène à la liste qu'il résume. */
   to?: string;
   hint?: string;
+  onClick?: () => void;
 }) {
-  const className = `kpi${tone ? " " + tone : ""}`;
+  const className = `kpi${tone ? " " + tone : ""}${featured ? " featured" : ""}`;
   const body = (
     <>
-      {to && <span className="go" aria-hidden="true">{hint ?? "Ouvrir"} →</span>}
+      {(to || onClick) && <span className="go" aria-hidden="true">{hint ?? "Ouvrir"} →</span>}
       <div className="lbl">{label}</div>
       <div className="val">{value}</div>
       {meta && <div className="meta">{meta}</div>}
     </>
   );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        className={`${className} clickable-kpi`}
+        onClick={onClick}
+        style={{ textAlign: "left", cursor: "pointer", font: "inherit" }}
+      >
+        {body}
+      </button>
+    );
+  }
   if (!to) return <div className={className}>{body}</div>;
   return (
     <Link className={className} to={to}>
@@ -164,10 +178,10 @@ function usePhoto(id: string | null | undefined): string | null {
   );
 }
 
-export function Photo({ id, className = "thumb", alt = "" }: { id: string | null; className?: string; alt?: string }) {
+export function Photo({ id, className = "thumb", alt = "", style }: { id: string | null; className?: string; alt?: string; style?: React.CSSProperties }) {
   const url = usePhoto(id);
-  if (!url) return <div className={`${className} placeholder`} aria-hidden="true">◫</div>;
-  return <img className={className} src={url} alt={alt} />;
+  if (!url) return <div className={`${className} placeholder`} style={style} aria-hidden="true">◫</div>;
+  return <img className={className} src={url} alt={alt} style={style} />;
 }
 
 export function PhotoCover({ id }: { id: string | null }) {

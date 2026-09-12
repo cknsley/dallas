@@ -1,10 +1,13 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
+import PerformancePage from "./pages/PerformancePage";
 import Stock from "./pages/Stock";
 import Achats from "./pages/Achats";
+import Arrivage from "./pages/Arrivage";
 import Ventes from "./pages/Ventes";
 import Livraison from "./pages/Livraison";
+import Sav from "./pages/Sav";
 import Bilan from "./pages/Bilan";
 import Deal from "./pages/Deal";
 import Clients from "./pages/Clients";
@@ -18,10 +21,13 @@ export default function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<Dashboard />} />
+        <Route path="performance" element={<PerformancePage />} />
         <Route path="stock" element={<Stock />} />
         <Route path="achats" element={<Achats />} />
+        <Route path="arrivage" element={<Arrivage />} />
         <Route path="ventes" element={<Ventes />} />
         <Route path="livraison" element={<Livraison />} />
+        <Route path="sav" element={<Sav />} />
         <Route path="colis" element={<Navigate to="/livraison" replace />} />
         <Route path="bilan" element={<Bilan />} />
         <Route path="deal" element={<Deal />} />

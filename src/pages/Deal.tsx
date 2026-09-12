@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { HeaderActions } from "../components/Layout";
 import { Empty, Kpi } from "../components/ui";
+import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { caOfYear, costOf, revenueOf, saleCostsOf } from "../lib/calc";
 import { eur, eur2, num, pct } from "../lib/format";
@@ -8,6 +9,9 @@ import { STATUS_LABEL } from "../lib/constants";
 import { HINT, LABEL } from "../lib/lexicon";
 import { vatDue, vatRegime } from "../lib/vat";
 import { uid } from "../lib/id";
+import OrderModal, { type OrderPresetLine } from "../modals/OrderModal";
+import SellModal from "../modals/SellModal";
+import type { Item } from "../types";
 
 const deducted = (v: number) => (v > 0 ? `−${eur2(v)}` : eur2(0));
 
@@ -18,7 +22,7 @@ const newBuyLine = (): BuyLine => ({ id: uid(), label: "", price: "", fees: "", 
 
 /** Simule un lot à acheter : ce qu'il engage, ce qu'il peut rapporter,
  *  et jusqu'où on peut monter le prix d'achat sans y perdre. */
-function BuyCalculator() {
+function BuyCalculator({ onConvert }: { onConvert: (lines: OrderPresetLine[]) => void }) {
   const [lines, setLines] = useState<BuyLine[]>([newBuyLine()]);
   const [targetMargin, setTargetMargin] = useState("30");
   const patch = (id: string, p: Partial<BuyLine>) => setLines((l) => l.map((x) => (x.id === id ? { ...x, ...p } : x)));
@@ -38,6 +42,18 @@ function BuyCalculator() {
   const target = Math.max(0, num(targetMargin));
   const maxBuy = totals.estimate > 0 ? totals.estimate * (1 - target / 100) - totals.fees : 0;
   const headroom = maxBuy - totals.price;
+
+  const validLines = lines.filter((l) => l.label.trim() || num(l.price) > 0);
+
+  const handleConvert = () => {
+    const presets: OrderPresetLine[] = validLines.map((l) => ({
+      name: l.label || "Article simulé",
+      cost: l.price,
+      fees: l.fees,
+      estimate: l.estimate,
+    }));
+    onConvert(presets.length > 0 ? presets : [{ name: "Lot simulé", cost: String(totals.price), fees: String(totals.fees), estimate: String(totals.estimate) }]);
+  };
 
   return (
     <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -71,9 +87,16 @@ function BuyCalculator() {
           );
         })}
       </div>
-      <button className="btn ghost sm" style={{ alignSelf: "flex-start" }} onClick={() => setLines((l) => [...l, newBuyLine()])}>
-        + Ajouter un article au lot
-      </button>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <button className="btn ghost sm" onClick={() => setLines((l) => [...l, newBuyLine()])}>
+          + Ajouter un article au lot
+        </button>
+        {totals.price > 0 && (
+          <button className="btn sm primary" onClick={handleConvert}>
+            ⇩ Créer la commande à partir de cette simulation
+          </button>
+        )}
+      </div>
 
       <div>
         <div className="totrow"><span>{LABEL.cost} du lot</span><b className="num">{eur2(totals.price)}</b></div>
@@ -128,7 +151,7 @@ interface SellLine { id: string; label: string; price: string; cost: string; sal
 const newSellLine = (): SellLine => ({ id: uid(), label: "", price: "", cost: "", saleFees: "", shippingCost: "", shippingPaid: "" });
 
 /** Compose un lot à vendre et montre jusqu'à quelle remise on reste gagnant. */
-function SellCalculator() {
+function SellCalculator({ onSellItem }: { onSellItem: (item: Item, targetPrice: number) => void }) {
   const { state } = useStore();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [lines, setLines] = useState<SellLine[]>([]);
@@ -168,6 +191,20 @@ function SellCalculator() {
   // Remise maximale avant de vendre à perte.
   const maxDiscount = lot.gross > 0 ? Math.max(0, (1 - lot.cost / lot.gross) * 100) : 0;
   const floorPrice = lot.cost;
+
+  const pickedItems = state.items.filter((i) => selected.has(i.id));
+
+  const handleStartSale = () => {
+    if (pickedItems.length === 1) {
+      const first = pickedItems[0];
+      const targetPrice = first.price ? first.price * (1 - discount / 100) : asked;
+      onSellItem(first, targetPrice);
+    } else if (pickedItems.length > 1) {
+      const first = pickedItems[0];
+      const targetPrice = asked / pickedItems.length;
+      onSellItem(first, targetPrice);
+    }
+  };
 
   return (
     <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -282,10 +319,16 @@ function SellCalculator() {
               <span>{regime.subject ? "Marge nette" : "Marge"}</span>
               <b className={`num ${net >= 0 ? "pos" : "neg"}`}>{eur2(net)}</b>
             </div>
-            <div className="hint" style={{ textAlign: "right" }}>
+            <div className="hint" style={{ textAlign: "right", marginBottom: 12 }}>
               {lot.count} article{lot.count > 1 ? "s" : ""} · ROI {pct(lot.cost ? (net / lot.cost) * 100 : 0)}
               {discount > 0 && ` · remise ${eur2(lot.gross - asked)}`}
             </div>
+
+            {pickedItems.length > 0 && (
+              <button className="btn primary sm" style={{ width: "100%", justifyContent: "center" }} onClick={handleStartSale}>
+                € Enregistrer la vente du lot ({eur2(asked)})
+              </button>
+            )}
           </div>
         </>
       )}
@@ -297,6 +340,10 @@ function SellCalculator() {
 
 export default function Deal() {
   const { state } = useStore();
+  const toast = useToast();
+
+  const [convertingOrder, setConvertingOrder] = useState<OrderPresetLine[] | null>(null);
+  const [sellingPreset, setSellingPreset] = useState<{ item: Item; price: number } | null>(null);
 
   const inStock = state.items.filter((i) => i.status !== "vendu");
   const stockCost = inStock.reduce((a, i) => a + costOf(i), 0);
@@ -329,7 +376,7 @@ export default function Deal() {
             <div className="spacer" />
             <span className="hint">Jusqu'à combien payer ce lot</span>
           </div>
-          <BuyCalculator />
+          <BuyCalculator onConvert={(lines) => setConvertingOrder(lines)} />
         </div>
 
         <div className="card">
@@ -338,9 +385,26 @@ export default function Deal() {
             <div className="spacer" />
             <span className="hint">Jusqu'à quelle remise rester gagnant</span>
           </div>
-          <SellCalculator />
+          <SellCalculator onSellItem={(item, price) => setSellingPreset({ item, price })} />
         </div>
       </div>
+
+      {convertingOrder && (
+        <OrderModal
+          mode="lot"
+          initialLines={convertingOrder}
+          onClose={() => setConvertingOrder(null)}
+        />
+      )}
+
+      {sellingPreset && (
+        <SellModal
+          item={sellingPreset.item}
+          initialPrice={sellingPreset.price}
+          onClose={() => setSellingPreset(null)}
+          onInvoice={(i) => toast(`Doc à générer pour ${i.name}`)}
+        />
+      )}
     </>
   );
 }

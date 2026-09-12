@@ -7,7 +7,7 @@ import { eur2, num, today } from "../lib/format";
 import { uid } from "../lib/id";
 import { compressImage, savePhoto } from "../store/photos";
 import { HINT, LABEL, eurLabel } from "../lib/lexicon";
-import type { Item, ProductRequest } from "../types";
+import type { Item } from "../types";
 
 interface Line {
   key: string;
@@ -30,49 +30,62 @@ const newLine = (): Line => ({ key: uid(), name: "", photo: null, photoUrl: null
  * de port communs. Les articles entrent en « Arrivage » et rejoignent le stock
  * normal dès la réception.
  */
+export interface OrderPresetLine {
+  name: string;
+  cost: string;
+  fees: string;
+  estimate: string;
+  brand?: string;
+  type?: string;
+  size?: string;
+  quantity?: string;
+}
+
 export default function OrderModal({
-  onClose, onCreated, defaultSource = "", fromRequest, mode = "supplier",
+  onClose, onCreated, defaultSource = "", mode = "supplier", initialLines, initialShipping,
 }: {
   onClose: () => void;
   onCreated?: (n: number) => void;
   /** Fournisseur déjà connu : on part de lui plutôt que d'une page blanche. */
   defaultSource?: string;
-  /** Demande acceptée qui pré-remplit la commande. */
-  fromRequest?: ProductRequest;
   /** Un lot n'exige pas de fournisseur identifié, une commande si. */
   mode?: "lot" | "supplier";
+  /** Pre-remplissage depuis une simulation de deal */
+  initialLines?: OrderPresetLine[];
+  initialShipping?: string;
 }) {
   const { state, dispatch } = useStore();
   const toast = useToast();
 
-  const [source, setSource] = useState(fromRequest?.supplier ?? defaultSource);
+  const [source, setSource] = useState(defaultSource);
   const [buyDate, setBuyDate] = useState(today());
   const [expectedDate, setExpectedDate] = useState("");
   const [carrier, setCarrier] = useState("");
   const [tracking, setTracking] = useState("");
-  const [shipping, setShipping] = useState("");
+  const [shipping, setShipping] = useState(initialShipping ?? "");
   const [customs, setCustoms] = useState("");
   const [handling, setHandling] = useState("");
   const [lotName, setLotName] = useState("");
-  const [notes, setNotes] = useState(fromRequest?.notes ?? "");
+  const [notes, setNotes] = useState("");
   const [purchasePaid, setPurchasePaid] = useState(true);
   const [autoReceive, setAutoReceive] = useState(false);
-  const [lines, setLines] = useState<Line[]>(
-    fromRequest && fromRequest.lines.length > 0
-      ? fromRequest.lines.map((l) => ({
-          key: uid(),
-          name: l.name,
-          photo: null,
-          photoUrl: null,
-          quantity: String(Math.max(1, l.quantity)),
-          brand: l.brand,
-          type: l.type,
-          size: l.size,
-          cost: l.targetPrice ? String(l.targetPrice) : "",
-          estimate: "",
-        }))
-      : [newLine()],
-  );
+  const [lines, setLines] = useState<Line[]>(() => {
+    if (initialLines && initialLines.length > 0) {
+      return initialLines.map((l) => ({
+        key: uid(),
+        name: l.name || "",
+        photo: null,
+        photoUrl: null,
+        quantity: l.quantity || "1",
+        brand: l.brand || "",
+        type: l.type || "",
+        size: l.size || "",
+        cost: l.cost || "",
+        estimate: l.estimate || "",
+      }));
+    }
+    return [newLine()];
+  });
 
   const patch = (key: string, p: Partial<Line>) => setLines((l) => l.map((x) => (x.key === key ? { ...x, ...p } : x)));
 
@@ -160,9 +173,6 @@ export default function OrderModal({
       };
       dispatch({ type: "upsertItem", item });
     });
-    if (fromRequest) {
-      dispatch({ type: "upsertRequest", request: { ...fromRequest, status: "acceptee", orderId } });
-    }
     toast(`Commande enregistrée — ${filled.length} article${filled.length > 1 ? "s" : ""} en arrivage`);
     onClose();
     onCreated?.(filled.length);
@@ -170,7 +180,7 @@ export default function OrderModal({
 
   return (
     <Modal
-      title={fromRequest ? `Commande — ${fromRequest.supplier}` : mode === "lot" ? "Nouveau lot" : "Nouvelle commande fournisseur"}
+      title={mode === "lot" ? "Nouveau lot" : "Nouvelle commande fournisseur"}
       wide
       onClose={onClose}
       footer={

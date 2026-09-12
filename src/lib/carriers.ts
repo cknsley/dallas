@@ -25,6 +25,8 @@ export function trackingUrl(
 ): string | null {
   const clean = code.trim();
   if (!clean) return null;
+  if (clean.startsWith("http://") || clean.startsWith("https://")) return clean;
+  if (clean.startsWith("www.")) return `https://${clean}`;
 
   const table = { ...DEFAULT_TRACKING_URLS, ...overrides };
   const key = Object.keys(table).find((k) => k.toLowerCase() === carrier.trim().toLowerCase());

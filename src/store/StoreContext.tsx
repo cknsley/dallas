@@ -2,15 +2,15 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState,
   type ReactNode,
 } from "react";
-import type { AppState, DocKind, Expense, Item, ProductRequest, SalesDoc, Settings, SupplierRecord, Todo } from "../types";
-import { EMPTY_STATE, DEFAULT_SETTINGS } from "./defaults";
+import type { AppState, ClientRecord, DocKind, Expense, Item, ProductRequest, SalesDoc, Settings, SupplierRecord, Todo } from "../types";
+import { EMPTY_STATE, DEFAULT_SETTINGS, DEMO_STATE } from "./defaults";
 import { getSyncInfo, initSync, push, subscribeSyncInfo, type SyncInfo } from "./sync";
 import { deletePhoto } from "./photos";
 import { reconcileTodos } from "./autoTodos";
 import { uid } from "../lib/id";
 import { LEGACY_DELIVERY } from "../lib/constants";
 
-const LS_KEY = "atelier-revente:v1";
+const LS_KEY = "atelier-revente:v4";
 
 type Action =
   | { type: "replace"; state: AppState }
@@ -30,6 +30,8 @@ type Action =
   | { type: "removeExpense"; id: string }
   | { type: "upsertSupplier"; supplier: SupplierRecord }
   | { type: "removeSupplier"; id: string }
+  | { type: "upsertClient"; client: ClientRecord }
+  | { type: "removeClient"; id: string }
   | { type: "upsertRequest"; request: ProductRequest }
   | { type: "removeRequest"; id: string }
   | { type: "settings"; patch: Partial<Settings> };
@@ -102,6 +104,17 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case "removeSupplier":
       return stamp({ ...state, suppliers: state.suppliers.filter((s) => s.id !== action.id) });
+    case "upsertClient": {
+      const exists = state.clients.some((c) => c.id === action.client.id);
+      return stamp({
+        ...state,
+        clients: exists
+          ? state.clients.map((c) => (c.id === action.client.id ? action.client : c))
+          : [...state.clients, action.client],
+      });
+    }
+    case "removeClient":
+      return stamp({ ...state, clients: state.clients.filter((c) => c.id !== action.id) });
     case "upsertRequest": {
       const exists = state.requests.some((r) => r.id === action.request.id);
       return stamp({
@@ -146,8 +159,12 @@ const withLogistics = (i: Item): Item => ({
 function loadLocal(): AppState {
   try {
     const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return EMPTY_STATE;
+    if (!raw) return DEMO_STATE;
     const parsed = JSON.parse(raw) as Partial<AppState>;
+    const loadedItems = parsed.items ?? [];
+    if (loadedItems.length === 0) {
+      return DEMO_STATE;
+    }
     return {
       ...EMPTY_STATE,
       ...parsed,
@@ -158,16 +175,17 @@ function loadLocal(): AppState {
         trackingUrls: { ...DEFAULT_SETTINGS.trackingUrls, ...(parsed.settings?.trackingUrls ?? {}) },
         nonSuppliers: parsed.settings?.nonSuppliers ?? [],
       },
-      items: (parsed.items ?? []).map(withLogistics),
+      items: loadedItems.map(withLogistics),
       todos: parsed.todos ?? [],
       docs: parsed.docs ?? [],
       expenses: parsed.expenses ?? [],
       suppliers: parsed.suppliers ?? [],
+      clients: parsed.clients ?? DEMO_STATE.clients,
       requests: parsed.requests ?? [],
       seq: parsed.seq ?? {},
     };
   } catch {
-    return EMPTY_STATE;
+    return DEMO_STATE;
   }
 }
 
@@ -180,6 +198,7 @@ interface StoreValue {
   /** Numéro séquentiel suivant pour un type de document, sans le consommer. */
   peekNumber: (kind: DocKind, date: string) => { number: string; seqKey: string };
   deleteItem: (item: Item) => void;
+  resetDemoData: () => void;
 }
 
 const Ctx = createContext<StoreValue | null>(null);
@@ -190,6 +209,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const stateRef = useRef(state);
   stateRef.current = state;
   const hydrating = useRef(false);
+
+  const resetDemoData = useCallback(() => {
+    dispatch({ type: "replace", state: DEMO_STATE });
+  }, []);
 
   useEffect(() => subscribeSyncInfo(setSync), []);
 
@@ -304,8 +327,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<StoreValue>(
-    () => ({ state, dispatch, sync, peekNumber, deleteItem, resolveAutoTodo }),
-    [state, sync, peekNumber, deleteItem, resolveAutoTodo],
+    () => ({ state, dispatch, sync, peekNumber, deleteItem, resolveAutoTodo, resetDemoData }),
+    [state, sync, peekNumber, deleteItem, resolveAutoTodo, resetDemoData],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

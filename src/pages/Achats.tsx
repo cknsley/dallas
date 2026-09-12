@@ -14,7 +14,8 @@ import { uid } from "../lib/id";
 import OrderModal from "../modals/OrderModal";
 import MenuButton from "../components/MenuButton";
 import RequestModal from "../modals/RequestModal";
-import ItemModal from "../modals/ItemModal";
+import ItemModal, { blankItem } from "../modals/ItemModal";
+import SellModal from "../modals/SellModal";
 import type { Item, ProductRequest } from "../types";
 
 /**
@@ -29,9 +30,9 @@ export default function Achats() {
   const [creating, setCreating] = useState<"lot" | "supplier" | null>(null);
   const [newItem, setNewItem] = useState(false);
   const [requestFor, setRequestFor] = useState<{ request: ProductRequest | null } | null>(null);
-  const [ordering, setOrdering] = useState<ProductRequest | null>(null);
   const [requestFilter, setRequestFilter] = useQueryState("demandes", "ouvertes");
   const [editing, setEditing] = useState<Item | null>(null);
+  const [selling, setSelling] = useState<Item | null>(null);
   const [openOrder, setOpenOrder] = useState("");
 
   const now = today();
@@ -70,24 +71,32 @@ export default function Achats() {
 
   const patch = (id: string, p: Partial<Item>) => dispatch({ type: "patchItem", id, patch: p });
 
-  /* ---- demandes produit ---- */
+  /* ---- demandes produit : un pense-bête, pas une négociation ---- */
   const requests = useMemo(
-    () => [...state.requests].sort((a, b) => b.date.localeCompare(a.date)),
+    () => [...state.requests].sort((a, b) => b.createdAt - a.createdAt),
     [state.requests],
   );
-  const openRequests = requests.filter((r) => r.status === "brouillon" || r.status === "envoyee");
+  const openRequests = requests.filter((r) => r.status === "en_cours");
   const shownRequests = requestFilter === "toutes" ? requests : openRequests;
-  const requestBudget = (r: ProductRequest) =>
-    r.lines.reduce((a, l) => a + num(l.targetPrice) * Math.max(1, l.quantity), 0);
-  const requestSummary = (r: ProductRequest) => {
-    const first = r.lines[0]?.name?.trim();
-    if (!first) return "Article non précisé";
-    return r.lines.length > 1 ? `${first} + ${r.lines.length - 1} autre${r.lines.length - 1 > 1 ? "s" : ""}` : first;
+
+  /** Une fois trouvé, l'article part directement en stock… */
+  const resolveToStock = (r: ProductRequest) => {
+    const item: Item = { ...blankItem(), name: r.name, cost: r.budget, status: "stock", receiveDate: today(), notes: r.notes };
+    dispatch({ type: "upsertItem", item });
+    dispatch({ type: "upsertRequest", request: { ...r, status: "trouve", resolvedAs: "stock" } });
+    toast(`« ${r.name} » ajouté au stock`, { label: "Voir le stock", onClick: () => navigate(links.stock()) });
   };
 
-  const advance = (r: ProductRequest, status: ProductRequest["status"]) => {
-    dispatch({ type: "upsertRequest", request: { ...r, status } });
-    toast(`Demande ${REQUEST_LABEL[status].toLowerCase()}`);
+  const [pendingSaleRequest, setPendingSaleRequest] = useState<ProductRequest | null>(null);
+
+  /** …ou en vente directe, quand elle répond à une demande client. */
+  const resolveToSale = (r: ProductRequest) => {
+    const item: Item = {
+      ...blankItem(), name: r.name, cost: r.budget, status: "stock", receiveDate: today(),
+      buyer: r.client, notes: r.notes,
+    };
+    setPendingSaleRequest(r);
+    setSelling(item);
   };
 
   /**
@@ -193,7 +202,7 @@ export default function Achats() {
         <div className="card-h">
           <h3>Stock en arrivage</h3>
         </div>
-        <div className="hint" style={{ padding: "0 16px 10px" }}>
+        <div className="hint" style={{ padding: "14px 16px 10px" }}>
           {incoming.length
             ? `${incomingOrders.length} commande${incomingOrders.length > 1 ? "s" : ""} · ${eur(inTransit)} engagés${late.length ? ` · ${late.length} en retard` : ""}`
             : "Rien en chemin"}
@@ -307,8 +316,12 @@ export default function Achats() {
       <div className="card achats-col">
         <div className="card-h">
           <h3>Demande produit</h3>
+          <div className="spacer" />
+          <button className="btn sm primary" onClick={() => setRequestFor({ request: null })}>
+            + Nouvelle
+          </button>
         </div>
-        <div style={{ padding: "0 16px 10px", display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ padding: "14px 16px 12px" }}>
           <Segmented<string>
             value={requestFilter}
             onChange={setRequestFilter}
@@ -317,43 +330,33 @@ export default function Achats() {
               { value: "toutes", label: `Toutes (${requests.length})` },
             ]}
           />
-          <div className="spacer" />
-          <button className="btn sm" onClick={() => setRequestFor({ request: null })}>+ Nouvelle</button>
         </div>
         {shownRequests.length === 0 ? (
           <Empty glyph="≡" title={requests.length ? "Aucune demande en cours" : "Aucune demande"}>
-            Décrivez ce que vous cherchez ; une fois acceptée, convertissez-la en commande.
+            Notez ce qu'un client demande, ou ce que vous cherchez pour le stock.
           </Empty>
         ) : (
           <div className="request-list">
             {shownRequests.map((r) => (
               <article className={`request-card st-${r.status}`} key={r.id}>
                 <header className="request-head">
-                  <span className={`pill req-${r.status}`}>{REQUEST_LABEL[r.status]}</span>
-                  <b className="num">{eur2(requestBudget(r))}</b>
+                  <span className={`pill req-${r.status}`}>
+                    {r.status === "trouve"
+                      ? `${REQUEST_LABEL.trouve}${r.resolvedAs === "vente" ? " · vendu" : r.resolvedAs === "stock" ? " · en stock" : ""}`
+                      : r.for === "client" ? "Client" : "Stock"}
+                  </span>
+                  <b className="num">{eur2(r.budget)}</b>
                 </header>
                 <button className="request-supplier linkish ellipsis" onClick={() => setRequestFor({ request: r })}>
-                  {requestSummary(r)}
+                  {r.name || "Article non précisé"}
                 </button>
-                <div className="hint ellipsis">{r.supplier || "Fournisseur non précisé"}</div>
-                <div className="request-actions">
-                  {r.status === "brouillon" && (
-                    <button className="btn sm" onClick={() => advance(r, "envoyee")}>Marquer envoyée</button>
-                  )}
-                  {r.status === "envoyee" && (
-                    <>
-                      <button className="btn sm" onClick={() => setOrdering(r)}>Convertir</button>
-                      <button className="btn sm ghost" onClick={() => advance(r, "refusee")}>Refusée</button>
-                    </>
-                  )}
-                  {r.status === "acceptee" && !r.orderId && (
-                    <button className="btn sm" onClick={() => setOrdering(r)}>Convertir</button>
-                  )}
-                  {r.orderId && <span className="hint">Commande passée</span>}
-                  {r.status === "refusee" && (
-                    <button className="btn sm ghost" onClick={() => advance(r, "envoyee")}>Relancer</button>
-                  )}
-                </div>
+                {r.for === "client" && <div className="hint ellipsis">{r.client || "Client non précisé"}</div>}
+                {r.status === "en_cours" && (
+                  <div className="request-actions">
+                    <button className="btn sm" onClick={() => resolveToStock(r)}>→ Stock</button>
+                    <button className="btn sm ghost" onClick={() => resolveToSale(r)}>→ Vente directe</button>
+                  </div>
+                )}
               </article>
             ))}
           </div>
@@ -365,7 +368,7 @@ export default function Achats() {
         <div className="card-h">
           <h3>Balance</h3>
         </div>
-        <div style={{ padding: "0 16px 16px" }}>
+        <div style={{ padding: "14px 16px 16px" }}>
           <div className="totrow big">
             <span>Achats</span>
             <b className="num">{eur2(balance.bought)}</b>
@@ -381,11 +384,11 @@ export default function Achats() {
             </button>
           ))}
           <hr className="sep" />
-          <button className="totrow linked" onClick={() => navigate(links.stock({ status: "arrivage" }))}>
+          <button className="totrow linked" onClick={() => navigate("/arrivage")}>
             <span>Achats à venir</span>
             <b className="num">{eur2(balance.arrivage)}</b>
           </button>
-          <button className="totrow linked" onClick={() => navigate(links.stock({ status: "stock" }))}>
+          <button className="totrow linked" onClick={() => navigate(links.stock())}>
             <span>Stock total</span>
             <b className="num">{eur2(balance.stockTotal)}</b>
           </button>
@@ -399,13 +402,25 @@ export default function Achats() {
 
       {creating && <OrderModal mode={creating} onClose={() => setCreating(null)} />}
       {newItem && <ItemModal item={null} onClose={() => setNewItem(false)} />}
-      {ordering && (
-        <OrderModal fromRequest={ordering} onClose={() => setOrdering(null)} />
-      )}
       {requestFor && (
         <RequestModal request={requestFor.request} onClose={() => setRequestFor(null)} />
       )}
       {editing && <ItemModal item={editing} onClose={() => setEditing(null)} />}
+      {selling && (
+        <SellModal
+          item={selling}
+          onClose={() => { setSelling(null); setPendingSaleRequest(null); }}
+          onSold={(i) => {
+            if (pendingSaleRequest) {
+              dispatch({ type: "upsertRequest", request: { ...pendingSaleRequest, status: "trouve", resolvedAs: "vente" } });
+              setPendingSaleRequest(null);
+            }
+            toast(`« ${i.name} » est passée en Ventes`);
+            navigate(links.ventes({ platform: i.platform || undefined }));
+          }}
+          onInvoice={(i) => navigate(links.newDoc(i.id))}
+        />
+      )}
     </>
   );
 }

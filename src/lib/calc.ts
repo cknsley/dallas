@@ -77,7 +77,9 @@ export interface Stats {
   shippingIn: number;
   saleCosts: number;
   cost: number;
+  charges: number;
   marge: number;
+  margeNette: number;
   margePct: number;
   count: number;
   stockValue: number;
@@ -94,6 +96,8 @@ export function computeStats(state: AppState, r: Range): Stats {
   const saleCosts = sold.reduce((a, i) => a + saleCostsOf(i), 0);
   const cost = sold.reduce((a, i) => a + costOf(i), 0);
   const marge = ca + shippingIn - cost - saleCosts;
+  const charges = chargesInRange(state.expenses, r);
+  const margeNette = marge - charges;
   const inStock = state.items.filter((i) => i.status !== "vendu");
   const stockValue = inStock.reduce((a, i) => a + costOf(i), 0);
   // Une pièce sans estimation est comptée à son coût : jamais de valeur inventée.
@@ -104,8 +108,10 @@ export function computeStats(state: AppState, r: Range): Stats {
     shippingIn,
     saleCosts,
     cost,
+    charges,
     marge,
-    margePct: ca ? (marge / ca) * 100 : 0,
+    margeNette,
+    margePct: ca ? (margeNette / ca) * 100 : 0,
     count,
     stockValue,
     stockEstimate,
@@ -225,6 +231,35 @@ export function monthsElapsed(r: Range): number {
   const [fy, fm] = from.split("-").map(Number);
   const [ly, lm] = last.split("-").map(Number);
   return Math.max(1, (ly - fy) * 12 + (lm - fm) + 1);
+}
+
+/** Macro-catégorie d'une charge : Achat, Vente ou Activité générale. */
+export function expenseKind(e: Partial<Expense>): "achat" | "vente" | "activite" {
+  if (e.kind === "achat" || e.kind === "vente" || e.kind === "activite") return e.kind;
+  const text = `${e.category || ""} ${e.label || ""} ${e.notes || ""}`.toLowerCase();
+  if (text.includes("appro") || text.includes("reconditionnement") || text.includes("lot") || text.includes("grossiste") || text.includes("stock") || text.includes("achat")) {
+    return "achat";
+  }
+  if (text.includes("emballage") || text.includes("commission") || text.includes("envoi") || text.includes("port") || text.includes("vinted") || text.includes("vestiaire") || text.includes("vente")) {
+    return "vente";
+  }
+  return "activite";
+}
+
+export function chargesByKind(expenses: Expense[], r: Range): Record<"achat" | "vente" | "activite", { total: number; count: number }> {
+  const result = {
+    achat: { total: 0, count: 0 },
+    vente: { total: 0, count: 0 },
+    activite: { total: 0, count: 0 },
+  };
+
+  for (const e of expenses) {
+    const k = expenseKind(e);
+    const amount = chargesInRange([e], r);
+    result[k].total += amount;
+    if (amount > 0) result[k].count += 1;
+  }
+  return result;
 }
 
 /** Répartition des charges imputées sur la période, par catégorie. */
