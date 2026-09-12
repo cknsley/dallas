@@ -86,11 +86,58 @@ Les taux par pays sont pré-remplis et restent modifiables.
 
 ```
 src/
-  lib/        calculs, formats, moteur TVA, export CSV, constantes
+  lib/        calculs, formats, moteur TVA, export CSV, constantes, helpers réutilisables
   store/      état global (reducer + contexte), persistance, synchro, photos IndexedDB
-  components/ layout, briques d'interface, thème, toasts
-  pages/      Dashboard, Stock, Ventes, Colis, Marge, Todo, Facturation
-  modals/     fiche pièce, vente, création de document, aperçu imprimable
+  components/ layout, briques d'interface, thème, toasts, modals réutilisables
+  pages/      Dashboard, Stock, Ventes, Livraison, Marge, Todo, Facturation, Charges, etc.
+  modals/     fiche pièce, vente, création de document, aperçu, clients, dépenses, todo-link
 ```
 
 Mode nuit manuel : bouton en bas de la barre latérale (système → nuit → jour).
+
+## Dev — conventions et patterns
+
+### Types d'abord
+Les types en `src/types.ts` sont le contrat. Déclarer la shape avant de coder la UI qui l'utilise.
+Les types ajoutés doivent être utilisés — pas de champs fantasmes qui traînent sans lecteur.
+
+### State & store
+L'état vit dans `StoreContext` (reducers) et se persiste dans localStorage. Pour décider si une valeur va en store ou en `useState` local :
+- **Store** : tout ce qui se sauve (pièces, ventes, documents, réglages, photos)
+- **Local** : état de la page/modal (ouvrir/fermer un modal, sélection temporaire, édition en cours)
+
+Quand tu touche à un type (ajouter un champ à `Item`, `Document`, etc.), passe par `StoreContext` pour que la persistance l'attrape.
+
+### Helpers & lib
+- `calc.ts` : toute la math (marge, stats, TVA) — pas de calculs épars dans les pages
+- `format.ts` : formatage (dates, euros, nombres, %a) — utilise `eur()`, `num()`, `pct()` partout
+- `constants.ts` : énums, labels, ordres (STATUS_ORDER, SHIPPING_LABEL, etc.)
+- `clients.ts` : logique client (matching par nom, déduplique)
+- Si une fonction sert 2+ fichiers, elle va en `lib/`, sinon reste inline
+
+Noms courts OK (`idx`, `e`, `cat`) pour les boucles/évènements ; explicites pour les données (`itemId`, `expenseAmount`).
+
+### Pages & modals
+- Pages : écrans principaux (Stock, Ventes, etc.), pas de logique calculée — c'est `lib/` qui fait
+- Modals : formulaires pour créer/éditer une entité (ItemModal, OrderModal, etc.) ou choisir/picker (PickLinkModal, PickMultiItemsModal)
+- Limiter à ~400 lignes par fichier, sinon scinder en components
+
+### Anti-patterns à éviter
+- Pas de `as any` — typer proprement ou remonter le problème
+- Pas de `console.log()` oublié
+- Pas de fichier > 400 lignes
+- Les styles inline OK pour du one-off ; couleurs/espacements en CSS réutilisable
+
+### Navigation & linking
+`src/lib/links.ts` centralise les routes (ex: `links.stock({ brand: "Nike" })`).
+Passe par là plutôt que des strings `/stock` éparpillées.
+
+## Tests & build
+
+```bash
+npm run typecheck    # TypeScript — aucun bug type n'échappe
+npm run build        # Produit dist/ prêt à déployer
+npm run preview      # Sert le build local sur http://localhost:4173
+```
+
+Pas de tests unitaires. Type-check + intégration manuelle dans le navigateur suffisent pour du solo dev à cette échelle.
