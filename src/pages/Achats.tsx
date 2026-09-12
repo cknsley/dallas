@@ -18,9 +18,9 @@ import ItemModal from "../modals/ItemModal";
 import type { Item, ProductRequest } from "../types";
 
 /**
- * Centrale d'achat : tout ce qui entre, du colis commandé jusqu'au stock.
+ * Sourcing : tout ce qui entre, du colis commandé jusqu'au stock.
  * Une pièce arrive en « Arrivage » avec son suivi, puis bascule en stock à la
- * réception. Les achats plus anciens restent consultables dans l'archive.
+ * réception.
  */
 export default function Achats() {
   const { state, dispatch } = useStore();
@@ -44,15 +44,25 @@ export default function Achats() {
     [state.items],
   );
 
-  /** Balance globale : ce qui est sorti, ce qui est rentré, ce qui dort encore en stock. */
+/**
+   * Balance globale : les achats détaillés par catégorie, séparés de ce qui
+   * est encore en chemin (arrivage) et de ce qui est déjà dans le stock —
+   * une pièce en arrivage ne compte dans le stock total qu'une fois reçue.
+   */
   const balance = useMemo(() => {
-    let bought = 0, sold = 0, held = 0;
+    let sold = 0, arrivage = 0, stockTotal = 0;
+    const byType = new Map<string, number>();
     for (const i of state.items) {
-      bought += costOf(i);
+      const c = costOf(i);
+      const k = i.type.trim() || "Sans catégorie";
+      byType.set(k, (byType.get(k) ?? 0) + c);
       if (i.status === "vendu") sold += revenueOf(i);
-      else held += costOf(i);
+      else if (i.status === "arrivage") arrivage += c;
+      else stockTotal += c;
     }
-    return { bought, sold, held };
+    const categories = [...byType.entries()].sort((a, b) => b[1] - a[1]);
+    const bought = categories.reduce((a, [, v]) => a + v, 0);
+    return { sold, arrivage, stockTotal, categories, bought };
   }, [state.items]);
 
   const late = incoming.filter((i) => i.expectedDate && i.expectedDate < now);
@@ -356,17 +366,32 @@ export default function Achats() {
           <h3>Balance</h3>
         </div>
         <div style={{ padding: "0 16px 16px" }}>
-          <button className="totrow linked" onClick={() => navigate(links.stock())}>
+          <div className="totrow big">
             <span>Achats</span>
             <b className="num">{eur2(balance.bought)}</b>
+          </div>
+          {balance.categories.map(([type, total]) => (
+            <button
+              key={type}
+              className="totrow linked sub"
+              onClick={() => navigate(links.stock(type === "Sans catégorie" ? {} : { type }))}
+            >
+              <span>{type}</span>
+              <b className="num">{eur2(total)}</b>
+            </button>
+          ))}
+          <hr className="sep" />
+          <button className="totrow linked" onClick={() => navigate(links.stock({ status: "arrivage" }))}>
+            <span>Achats à venir</span>
+            <b className="num">{eur2(balance.arrivage)}</b>
+          </button>
+          <button className="totrow linked" onClick={() => navigate(links.stock({ status: "stock" }))}>
+            <span>Stock total</span>
+            <b className="num">{eur2(balance.stockTotal)}</b>
           </button>
           <button className="totrow linked" onClick={() => navigate(links.ventes())}>
             <span>Ventes</span>
             <b className="num">{eur2(balance.sold)}</b>
-          </button>
-          <button className="totrow big linked" onClick={() => navigate(links.stock())}>
-            <span>Argent immobilisé</span>
-            <b className="num">{eur2(balance.held)}</b>
           </button>
         </div>
       </div>

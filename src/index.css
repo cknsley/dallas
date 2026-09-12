@@ -957,6 +957,8 @@ button.totrow { width: 100%; background: none; border: 0; font: inherit; color: 
 }
 .totrow.linked:hover { background: var(--accent-soft); }
 .totrow.linked:hover > span:first-child { color: var(--accent); }
+.totrow.sub { padding-top: 4px; padding-bottom: 4px; font-size: 12.5px; color: var(--ink-2); }
+.totrow.sub b { font-weight: 600; }
 
 .toast-wrap { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 300; display: flex; flex-direction: column; gap: 8px; align-items: center; }
 .toast {

@@ -24,7 +24,7 @@ export const NAV_GROUPS: { label: string; routes: NavRoute[] }[] = [
   {
     label: "Achat",
     routes: [
-      { path: "/achats", label: "Centrale d'achat", icon: "⇩", subtitle: "Du colis commandé jusqu'à l'entrée en stock" },
+      { path: "/achats", label: "Sourcing", icon: "⇩", subtitle: "Du colis commandé jusqu'à l'entrée en stock" },
       { path: "/stock", label: "Stock", icon: "▦", subtitle: "Ce que vous possédez : arrivages et articles en stock" },
       { path: "/fournisseurs", label: "Fournisseurs", icon: "⌂", subtitle: "Achats, dettes fournisseurs et créances clients" },
       { path: "/charges", label: "Charges", icon: "◈", subtitle: "Matériel, emballages et abonnements de l'activité" },
