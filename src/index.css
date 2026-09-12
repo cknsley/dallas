@@ -678,12 +678,6 @@ tr.detail-row td { background: var(--surface-2); padding: 0; }
 }
 .tracking-link:hover { text-decoration: underline; }
 
-.lot-tag {
-  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 99px;
-  background: var(--info-soft); color: var(--info); font-size: 10px; font-weight: 600;
-  max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;
-}
-
 .qty-badge {
   display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 99px;
   background: var(--accent-soft); color: var(--accent);

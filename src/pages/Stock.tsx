@@ -7,7 +7,7 @@ import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
 import { useClearQuery, useQueryState } from "../lib/useQueryState";
 import { links } from "../lib/links";
-import { costOf, marginOf, qtyOf, roiOf } from "../lib/calc";
+import { costOf, qtyOf } from "../lib/calc";
 import { dshort, eur, eur2, today } from "../lib/format";
 import { STATUS_LABEL, STATUS_ORDER } from "../lib/constants";
 import { downloadText, itemsToCSV, stockFilename } from "../lib/csv";
@@ -15,9 +15,7 @@ import ItemModal from "../modals/ItemModal";
 import SellModal from "../modals/SellModal";
 import type { Item, ItemStatus } from "../types";
 
-type SortKey =
-  | "name" | "brand" | "type" | "size" | "source" | "status"
-  | "cost" | "price" | "margin" | "roi" | "buyDate" | "saleDate" | "quantity";
+type SortKey = "name" | "brand" | "type" | "size" | "source" | "status" | "cost" | "buyDate" | "quantity";
 
 const COLUMNS: { key: SortKey | "photo" | "sell" | "actions"; label: string; sortable: boolean; right?: boolean }[] = [
   { key: "photo", label: "", sortable: false },
@@ -28,10 +26,7 @@ const COLUMNS: { key: SortKey | "photo" | "sell" | "actions"; label: string; sor
   { key: "size", label: "Taille", sortable: true },
   { key: "source", label: "Source", sortable: true },
   { key: "cost", label: "Coût", sortable: true, right: true },
-  { key: "price", label: "Prix vente", sortable: true, right: true },
-  { key: "margin", label: "Marge", sortable: true, right: true },
   { key: "buyDate", label: "Achat", sortable: true },
-  { key: "saleDate", label: "Vente", sortable: true },
   { key: "status", label: "Statut", sortable: true, right: true },
   { key: "actions", label: "", sortable: false, right: true },
 ];
@@ -43,11 +38,7 @@ const sortValue = (i: Item, k: SortKey): string | number => {
     case "status": return STATUS_ORDER.indexOf(i.status);
     case "quantity": return qtyOf(i);
     case "cost": return costOf(i);
-    case "price": return i.price;
-    case "margin": return marginOf(i);
-    case "roi": return roiOf(i);
     case "buyDate": return i.buyDate;
-    case "saleDate": return i.saleDate;
   }
 };
 
@@ -237,67 +228,52 @@ export default function Stock() {
                 </tr>
               </thead>
               <tbody>
-                {list.map((i) => {
-                  const m = marginOf(i);
-                  return (
-                    <tr key={i.id}>
-                      <td className="shrink"><Photo id={i.photoId} /></td>
-                      <td>
-                        <button className="linkish ellipsis" title={i.name} onClick={() => setEditing({ item: i })}>
-                          {i.name || "Sans nom"}
-                        </button>
-                        {i.lotTag && <span className="lot-tag" title="Lot d'origine">{i.lotTag}</span>}
-                        {i.notes && <div className="hint ellipsis">{i.notes}</div>}
-                      </td>
-                      <td className="r num shrink">{qtyOf(i)}</td>
-                      <td>{i.brand || "—"}</td>
-                      <td>{i.type || "—"}</td>
-                      <td>{i.size || "—"}</td>
-                      <td>{i.source || "—"}</td>
-                      <td className="r num">{eur2(costOf(i))}</td>
-                      <td className="r num">{i.price ? eur2(i.price) : "—"}</td>
-                      <td className={`r num ${m >= 0 ? "pos" : "neg"}`}>{i.price ? eur2(m) : "—"}</td>
-                      <td className="num nowrap" style={{ fontSize: 12 }}>{dshort(i.buyDate)}</td>
-                      <td className="num nowrap" style={{ fontSize: 12 }}>{dshort(i.saleDate)}</td>
-                      <td className="r shrink">{statusToggle(i)}</td>
-                      <td className="r shrink">{actions(i)}</td>
-                    </tr>
-                  );
-                })}
+                {list.map((i) => (
+                  <tr key={i.id}>
+                    <td className="shrink"><Photo id={i.photoId} /></td>
+                    <td>
+                      <button className="linkish ellipsis" title={i.name} onClick={() => setEditing({ item: i })}>
+                        {i.name || "Sans nom"}
+                      </button>
+                      {i.notes && <div className="hint ellipsis">{i.notes}</div>}
+                    </td>
+                    <td className="r num shrink">{qtyOf(i)}</td>
+                    <td>{i.brand || "—"}</td>
+                    <td>{i.type || "—"}</td>
+                    <td>{i.size || "—"}</td>
+                    <td>{i.source || "—"}</td>
+                    <td className="r num">{eur2(costOf(i))}</td>
+                    <td className="num nowrap" style={{ fontSize: 12 }}>{dshort(i.buyDate)}</td>
+                    <td className="r shrink">{statusToggle(i)}</td>
+                    <td className="r shrink">{actions(i)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         </div>
       ) : (
         <div className="gallery">
-          {list.map((i) => {
-            const m = marginOf(i);
-            return (
-              <article className="gcard" key={i.id}>
-                <div className="ph">
-                  <PhotoCover id={i.photoId} />
-                  <StatusPill status={i.status} />
+          {list.map((i) => (
+            <article className="gcard" key={i.id}>
+              <div className="ph">
+                <PhotoCover id={i.photoId} />
+                <StatusPill status={i.status} />
+              </div>
+              <div className="gb">
+                <div className="brand-line">{i.brand || "—"}</div>
+                <button className="linkish" onClick={() => setEditing({ item: i })}>
+                  {i.name || "Sans nom"}
+                </button>
+                <div className="meta">
+                  {i.type || "—"}{i.size ? ` · ${i.size}` : ""}
+                  {qtyOf(i) > 1 && <span className="qty-badge">×{qtyOf(i)}</span>}
                 </div>
-                <div className="gb">
-                  <div className="brand-line">{i.brand || "—"}</div>
-                  <button className="linkish" onClick={() => setEditing({ item: i })}>
-                    {i.name || "Sans nom"}
-                  </button>
-                  <div className="meta">
-                    {i.type || "—"}{i.size ? ` · ${i.size}` : ""}
-                    {qtyOf(i) > 1 && <span className="qty-badge">×{qtyOf(i)}</span>}
-                  </div>
-                  <div className="meta num">
-                    Coût {eur2(costOf(i))}
-                    {i.price ? (
-                      <> → {eur2(i.price)} <span className={m >= 0 ? "pos" : "neg"}>({m >= 0 ? "+" : ""}{eur2(m)})</span></>
-                    ) : null}
-                  </div>
-                </div>
-                <div className="gf">{statusToggle(i)}<div className="spacer" />{actions(i)}</div>
-              </article>
-            );
-          })}
+                <div className="meta num">Coût {eur2(costOf(i))}</div>
+              </div>
+              <div className="gf">{statusToggle(i)}<div className="spacer" />{actions(i)}</div>
+            </article>
+          ))}
         </div>
       )}
 

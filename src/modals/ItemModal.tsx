@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { Field, Modal, Photo, Segmented } from "../components/ui";
+import TrackingLink from "../components/TrackingLink";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { compressImage, deletePhoto, savePhoto } from "../store/photos";
@@ -70,6 +71,7 @@ export default function ItemModal({
   }, [state.items]);
 
   const isSold = draft.status === "vendu";
+  const isArrivage = draft.status === "arrivage";
   /** Version « Item » du brouillon, pour la passer au formulaire de vente. */
   const draftToItem = (): Item => ({
     ...draft,
@@ -327,6 +329,30 @@ export default function ItemModal({
           )}
         </div>
       </div>
+
+      {isArrivage && (
+        <>
+          <hr className="sep" />
+          <div className="field"><span>Livraison</span></div>
+          <div className="fgrid">
+            <Field label="Lot">
+              <input type="text" value={draft.lotTag} placeholder="Nom du lot / de la commande" onChange={(e) => set("lotTag", e.target.value)} />
+            </Field>
+            <Field label="Transporteur">
+              <input type="text" value={draft.carrier} placeholder="Colissimo, Chronopost…" onChange={(e) => set("carrier", e.target.value)} />
+            </Field>
+            <Field label="Code de suivi">
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input type="text" value={draft.tracking} placeholder="—" onChange={(e) => set("tracking", e.target.value)} />
+                {draft.tracking && <TrackingLink carrier={draft.carrier} code={draft.tracking} />}
+              </div>
+            </Field>
+            <Field label="Arrivée prévue">
+              <input type="date" value={draft.expectedDate} onChange={(e) => set("expectedDate", e.target.value)} />
+            </Field>
+          </div>
+        </>
+      )}
 
       <hr className="sep" />
       <div className="field">
