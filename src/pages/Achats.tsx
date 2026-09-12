@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
 import { Empty, Photo, Segmented } from "../components/ui";
 import InlineField from "../components/InlineField";
-import TrackingLink from "../components/TrackingLink";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { costOf, qtyOf } from "../lib/calc";
@@ -33,7 +32,6 @@ export default function Achats() {
   const [ordering, setOrdering] = useState<ProductRequest | null>(null);
   const [requestFilter, setRequestFilter] = useQueryState("demandes", "ouvertes");
   const [editing, setEditing] = useState<Item | null>(null);
-  const [showArchive, setShowArchive] = useState(false);
   const [openOrder, setOpenOrder] = useState("");
 
   const now = today();
@@ -46,22 +44,9 @@ export default function Achats() {
     [state.items],
   );
 
-  // Reçu récemment : ce qui est entré en stock dans les 30 derniers jours.
-  const recentLimit = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
-  const received = useMemo(
-    () =>
-      state.items
-        .filter((i) => i.status !== "arrivage" && i.receiveDate && i.receiveDate >= recentLimit)
-        .sort((a, b) => b.receiveDate.localeCompare(a.receiveDate)),
-    [state.items, recentLimit],
-  );
-
-  const archive = useMemo(
-    () =>
-      state.items
-        .filter((i) => i.status !== "arrivage" && (!i.receiveDate || i.receiveDate < recentLimit))
-        .sort((a, b) => b.buyDate.localeCompare(a.buyDate)),
-    [state.items, recentLimit],
+  const archiveCount = useMemo(
+    () => state.items.filter((i) => i.status !== "arrivage").length,
+    [state.items],
   );
 
   const late = incoming.filter((i) => i.expectedDate && i.expectedDate < now);
@@ -169,65 +154,6 @@ export default function Achats() {
     });
   };
 
-  const row = (i: Item, mode: "arrivage" | "recu") => (
-    <tr key={i.id}>
-      <td className="shrink"><Photo id={i.photoId} /></td>
-      <td>
-        <button className="linkish ellipsis" title={i.name} onClick={() => setEditing(i)}>
-          {i.name || "Sans nom"}
-        </button>
-        <div className="hint nowrap">
-          {i.brand || "—"}{i.size ? ` · ${i.size}` : ""}
-          {qtyOf(i) > 1 && <span className="qty-badge">×{qtyOf(i)}</span>}
-        </div>
-      </td>
-      <td>{i.source || <span className="hint">—</span>}</td>
-      <td className="r num">{eur2(costOf(i))}</td>
-      <td className="shrink">
-        <span className={`pill ${i.purchasePaid ? "good" : "bad"}`}>
-          {i.purchasePaid ? "Réglé" : "À régler"}
-        </span>
-      </td>
-      {mode === "arrivage" ? (
-        <>
-          <td>
-            <InlineField value={i.carrier} placeholder="Transporteur" onCommit={(v) => patch(i.id, { carrier: v })} width={120} />
-          </td>
-          <td>
-            <div className="tracking-cell">
-              <InlineField value={i.tracking} placeholder="Code de suivi" onCommit={(v) => patch(i.id, { tracking: v })} width={130} />
-              {i.tracking && <TrackingLink carrier={i.carrier} code={i.tracking} />}
-            </div>
-          </td>
-          <td>
-            <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-              <InlineField value={i.expectedDate} type="date" placeholder="" onCommit={(v) => patch(i.id, { expectedDate: v })} width={128} />
-              {i.expectedDate && i.expectedDate < now && <span className="pill bad">Retard</span>}
-            </span>
-          </td>
-          <td className="r shrink">
-            <button className="btn sm" onClick={() => receive(i)}>⇩ Réceptionner</button>
-          </td>
-        </>
-      ) : (
-        <>
-          <td className="num nowrap" style={{ fontSize: 12 }}>{dshort(i.buyDate)}</td>
-          <td className="num nowrap" style={{ fontSize: 12 }}>{dshort(i.receiveDate)}</td>
-          <td className="shrink">
-            <span className={`pill ${i.status === "vendu" ? "vendu" : "stock"}`}>
-              {i.status === "vendu" ? "Vendu" : "En stock"}
-            </span>
-          </td>
-          <td className="r shrink">
-            <div className="rowact">
-              <button className="iconbtn" title="Éditer" onClick={() => setEditing(i)}>✎</button>
-            </div>
-          </td>
-        </>
-      )}
-    </tr>
-  );
-
   return (
     <>
       <HeaderActions>
@@ -258,14 +184,13 @@ export default function Achats() {
           </Empty>
         ) : (
           <div className="arrival-queue">
-            {incomingOrders.map((o, ix) => {
+            {incomingOrders.map((o) => {
               const isLate = !!o.expectedDate && o.expectedDate < now;
               const days = o.expectedDate
                 ? Math.round((new Date(o.expectedDate + "T12:00:00").getTime() - Date.now()) / 864e5)
                 : null;
               return (
                 <article className={`arrival-row${isLate ? " late" : ""}`} key={o.id}>
-                  <div className="arrival-rank">{ix + 1}</div>
                   <div className="arrival-id">
                     <b>{o.tag}</b>
                     <span className="hint">
@@ -290,16 +215,10 @@ export default function Achats() {
                     )}
                   </div>
                   <div className="arrival-costs">
-                    <span><small>Marchandise</small><b className="num">{eur2(o.goods)}</b></span>
-                    <span>
-                      <small>Frais d'approche</small>
-                      <b className="num">{o.landed > 0 ? `+${eur2(o.landed)}` : "—"}</b>
-                    </span>
-                    <span><small>Total</small><b className="num">{eur2(o.goods + o.landed)}</b></span>
+                    <b className="num">{eur2(o.goods + o.landed)}</b>
+                    <span className={`pill ${o.paid ? "good" : "bad"}`}>{o.paid ? "Réglé" : "À régler"}</span>
                   </div>
                   <div className="arrival-actions">
-                    <span className={`pill ${o.paid ? "good" : "bad"}`}>{o.paid ? "Réglé" : "À régler"}</span>
-                    {o.tracking && <TrackingLink carrier={o.carrier} code={o.tracking} />}
                     <button
                       className="btn sm"
                       onClick={() => (o.id.startsWith("solo:")
@@ -395,15 +314,6 @@ export default function Achats() {
                 <button className="request-supplier linkish" onClick={() => setRequestFor({ request: r })}>
                   {r.supplier || "Fournisseur non précisé"}
                 </button>
-                <ul className="request-lines">
-                  {r.lines.slice(0, 3).map((l) => (
-                    <li key={l.key}>
-                      <span className="ellipsis">{l.name || "Article"}</span>
-                      <span className="hint num">×{Math.max(1, l.quantity)}</span>
-                    </li>
-                  ))}
-                  {r.lines.length > 3 && <li className="hint">+ {r.lines.length - 3} autre{r.lines.length - 3 > 1 ? "s" : ""}</li>}
-                </ul>
                 <div className="request-foot">
                   <span className="hint">{requestPieces(r)} article{requestPieces(r) > 1 ? "s" : ""}</span>
                   <b className="num">{eur2(requestBudget(r))}</b>
@@ -432,68 +342,12 @@ export default function Achats() {
         )}
       </div>
 
-      {/* ---------- reçu récemment ---------- */}
-      {received.length > 0 && (
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-h">
-            <h3>Reçu récemment</h3>
-            <div className="spacer" />
-            <span className="hint">Entré en stock depuis moins de 30 jours</span>
-          </div>
-          <div className="twrap">
-            <table className="table-compact">
-              <thead>
-                <tr>
-                  <th className="shrink" />
-                  <th>Article</th>
-                  <th>Fournisseur</th>
-                  <th className="r">Coût</th>
-                  <th className="shrink">Règlement</th>
-                  <th>Acheté</th>
-                  <th>Reçu</th>
-                  <th className="shrink">Statut</th>
-                  <th className="r shrink" />
-                </tr>
-              </thead>
-              <tbody>{received.map((i) => row(i, "recu"))}</tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
       {/* ---------- archive ---------- */}
-      {archive.length > 0 && (
-        <div className="card">
-          <button className="card-h archive-toggle" onClick={() => setShowArchive((v) => !v)}>
-            <h3>Archive des achats</h3>
-            <span className="hint">
-              {archive.length} achat{archive.length > 1 ? "s" : ""} plus ancien{archive.length > 1 ? "s" : ""} ·{" "}
-              {eur(archive.reduce((a, i) => a + costOf(i), 0))}
-            </span>
-            <div className="spacer" />
-            <span className="hint">{showArchive ? "Masquer ▲" : "Afficher ▼"}</span>
-          </button>
-          {showArchive && (
-            <div className="twrap">
-              <table className="table-compact">
-                <thead>
-                  <tr>
-                    <th className="shrink" />
-                    <th>Article</th>
-                    <th>Fournisseur</th>
-                    <th className="r">Coût</th>
-                    <th className="shrink">Règlement</th>
-                    <th>Acheté</th>
-                    <th>Reçu</th>
-                    <th className="shrink">Statut</th>
-                    <th className="r shrink" />
-                  </tr>
-                </thead>
-                <tbody>{archive.map((i) => row(i, "recu"))}</tbody>
-              </table>
-            </div>
-          )}
-        </div>
+      {archiveCount > 0 && (
+        <button className="card archive-link" onClick={() => navigate(links.stock())}>
+          <span>Historique des achats</span>
+          <span className="hint">{archiveCount} article{archiveCount > 1 ? "s" : ""} déjà reçus · voir dans le Stock →</span>
+        </button>
       )}
 
       {creating && <OrderModal mode={creating} onClose={() => setCreating(null)} />}
