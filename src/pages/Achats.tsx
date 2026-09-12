@@ -5,7 +5,7 @@ import { Empty, Photo, Segmented } from "../components/ui";
 import InlineField from "../components/InlineField";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
-import { costOf, qtyOf } from "../lib/calc";
+import { costOf, qtyOf, revenueOf } from "../lib/calc";
 import { dshort, eur, eur2, num, today } from "../lib/format";
 import { REQUEST_LABEL } from "../lib/constants";
 import { useQueryState } from "../lib/useQueryState";
@@ -44,10 +44,16 @@ export default function Achats() {
     [state.items],
   );
 
-  const archiveCount = useMemo(
-    () => state.items.filter((i) => i.status !== "arrivage").length,
-    [state.items],
-  );
+  /** Balance globale : ce qui est sorti, ce qui est rentré, ce qui dort encore en stock. */
+  const balance = useMemo(() => {
+    let bought = 0, sold = 0, held = 0;
+    for (const i of state.items) {
+      bought += costOf(i);
+      if (i.status === "vendu") sold += revenueOf(i);
+      else held += costOf(i);
+    }
+    return { bought, sold, held };
+  }, [state.items]);
 
   const late = incoming.filter((i) => i.expectedDate && i.expectedDate < now);
   const inTransit = incoming.reduce((a, i) => a + costOf(i), 0);
@@ -63,7 +69,11 @@ export default function Achats() {
   const shownRequests = requestFilter === "toutes" ? requests : openRequests;
   const requestBudget = (r: ProductRequest) =>
     r.lines.reduce((a, l) => a + num(l.targetPrice) * Math.max(1, l.quantity), 0);
-  const requestPieces = (r: ProductRequest) => r.lines.reduce((a, l) => a + Math.max(1, l.quantity), 0);
+  const requestSummary = (r: ProductRequest) => {
+    const first = r.lines[0]?.name?.trim();
+    if (!first) return "Article non précisé";
+    return r.lines.length > 1 ? `${first} + ${r.lines.length - 1} autre${r.lines.length - 1 > 1 ? "s" : ""}` : first;
+  };
 
   const advance = (r: ProductRequest, status: ProductRequest["status"]) => {
     dispatch({ type: "upsertRequest", request: { ...r, status } });
@@ -168,15 +178,15 @@ export default function Achats() {
         />
       </HeaderActions>
 
-      <div className="card" style={{ marginBottom: 16 }}>
+      <div className="achats-board">
+      <div className="card achats-col">
         <div className="card-h">
-          <h3>Prochaines arrivées</h3>
-          <div className="spacer" />
-          <span className="hint">
-            {incoming.length
-              ? `${incomingOrders.length} commande${incomingOrders.length > 1 ? "s" : ""} en route · ${eur(inTransit)} engagés${late.length ? ` · ${late.length} en retard` : ""} — dépliez pour renseigner le suivi`
-              : "Rien en chemin"}
-          </span>
+          <h3>Stock en arrivage</h3>
+        </div>
+        <div className="hint" style={{ padding: "0 16px 10px" }}>
+          {incoming.length
+            ? `${incomingOrders.length} commande${incomingOrders.length > 1 ? "s" : ""} · ${eur(inTransit)} engagés${late.length ? ` · ${late.length} en retard` : ""}`
+            : "Rien en chemin"}
         </div>
         {incomingOrders.length === 0 ? (
           <Empty glyph="⇩" title="Aucune commande en route">
@@ -284,10 +294,11 @@ export default function Achats() {
       </div>
 
       {/* ---------- demandes produit ---------- */}
-      <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card achats-col">
         <div className="card-h">
-          <h3>Demandes produit</h3>
-          <div className="spacer" />
+          <h3>Demande produit</h3>
+        </div>
+        <div style={{ padding: "0 16px 10px", display: "flex", gap: 8, alignItems: "center" }}>
           <Segmented<string>
             value={requestFilter}
             onChange={setRequestFilter}
@@ -296,28 +307,25 @@ export default function Achats() {
               { value: "toutes", label: `Toutes (${requests.length})` },
             ]}
           />
-          <button className="btn" onClick={() => setRequestFor({ request: null })}>+ Nouvelle demande</button>
+          <div className="spacer" />
+          <button className="btn sm" onClick={() => setRequestFor({ request: null })}>+ Nouvelle</button>
         </div>
         {shownRequests.length === 0 ? (
           <Empty glyph="≡" title={requests.length ? "Aucune demande en cours" : "Aucune demande"}>
-            Décrivez ce que vous cherchez et à quel prix ; une fois la demande acceptée, convertissez-la en
-            commande et ses articles entreront en arrivage.
+            Décrivez ce que vous cherchez ; une fois acceptée, convertissez-la en commande.
           </Empty>
         ) : (
-          <div className="request-grid">
+          <div className="request-list">
             {shownRequests.map((r) => (
               <article className={`request-card st-${r.status}`} key={r.id}>
                 <header className="request-head">
                   <span className={`pill req-${r.status}`}>{REQUEST_LABEL[r.status]}</span>
-                  <span className="hint num">{dshort(r.date)}</span>
-                </header>
-                <button className="request-supplier linkish" onClick={() => setRequestFor({ request: r })}>
-                  {r.supplier || "Fournisseur non précisé"}
-                </button>
-                <div className="request-foot">
-                  <span className="hint">{requestPieces(r)} article{requestPieces(r) > 1 ? "s" : ""}</span>
                   <b className="num">{eur2(requestBudget(r))}</b>
-                </div>
+                </header>
+                <button className="request-supplier linkish ellipsis" onClick={() => setRequestFor({ request: r })}>
+                  {requestSummary(r)}
+                </button>
+                <div className="hint ellipsis">{r.supplier || "Fournisseur non précisé"}</div>
                 <div className="request-actions">
                   {r.status === "brouillon" && (
                     <button className="btn sm" onClick={() => advance(r, "envoyee")}>Marquer envoyée</button>
@@ -342,13 +350,27 @@ export default function Achats() {
         )}
       </div>
 
-      {/* ---------- archive ---------- */}
-      {archiveCount > 0 && (
-        <button className="card archive-link" onClick={() => navigate(links.stock())}>
-          <span>Historique des achats</span>
-          <span className="hint">{archiveCount} article{archiveCount > 1 ? "s" : ""} déjà reçus · voir dans le Stock →</span>
-        </button>
-      )}
+      {/* ---------- balance ---------- */}
+      <div className="card achats-col">
+        <div className="card-h">
+          <h3>Balance</h3>
+        </div>
+        <div style={{ padding: "0 16px 16px" }}>
+          <button className="totrow linked" onClick={() => navigate(links.stock())}>
+            <span>Achats</span>
+            <b className="num">{eur2(balance.bought)}</b>
+          </button>
+          <button className="totrow linked" onClick={() => navigate(links.ventes())}>
+            <span>Ventes</span>
+            <b className="num">{eur2(balance.sold)}</b>
+          </button>
+          <button className="totrow big linked" onClick={() => navigate(links.stock())}>
+            <span>Argent immobilisé</span>
+            <b className="num">{eur2(balance.held)}</b>
+          </button>
+        </div>
+      </div>
+      </div>
 
       {creating && <OrderModal mode={creating} onClose={() => setCreating(null)} />}
       {newItem && <ItemModal item={null} onClose={() => setNewItem(false)} />}
