@@ -2,7 +2,9 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState,
   type ReactNode,
 } from "react";
-import type { AppState, ClientRecord, DocKind, Expense, Item, ProductRequest, SalesDoc, Settings, SupplierRecord, Todo } from "../types";
+import type {
+  AppState, ClientRecord, DocKind, Expense, Item, PersonalLitige, ProductRequest, ReturnCase, SalesDoc, Settings, SupplierRecord, Todo,
+} from "../types";
 import { EMPTY_STATE, DEFAULT_SETTINGS, DEMO_STATE } from "./defaults";
 import { getSyncInfo, initSync, push, subscribeSyncInfo, type SyncInfo } from "./sync";
 import { deletePhoto } from "./photos";
@@ -25,6 +27,12 @@ type Action =
   | { type: "addDoc"; doc: SalesDoc; seqKey: string }
   | { type: "patchDoc"; id: string; patch: Partial<SalesDoc> }
   | { type: "removeDoc"; id: string }
+  | { type: "upsertReturn"; returnCase: ReturnCase }
+  | { type: "patchReturn"; id: string; patch: Partial<ReturnCase> }
+  | { type: "removeReturn"; id: string }
+  | { type: "upsertPersonalLitige"; litige: PersonalLitige }
+  | { type: "patchPersonalLitige"; id: string; patch: Partial<PersonalLitige> }
+  | { type: "removePersonalLitige"; id: string }
   | { type: "addExpense"; expense: Expense }
   | { type: "patchExpense"; id: string; patch: Partial<Expense> }
   | { type: "removeExpense"; id: string }
@@ -84,6 +92,38 @@ function reducer(state: AppState, action: Action): AppState {
       });
     case "removeDoc":
       return stamp({ ...state, docs: state.docs.filter((d) => d.id !== action.id) });
+    case "upsertReturn": {
+      const exists = state.returns.some((r) => r.id === action.returnCase.id);
+      return stamp({
+        ...state,
+        returns: exists
+          ? state.returns.map((r) => (r.id === action.returnCase.id ? action.returnCase : r))
+          : [action.returnCase, ...state.returns],
+      });
+    }
+    case "patchReturn":
+      return stamp({
+        ...state,
+        returns: state.returns.map((r) => (r.id === action.id ? { ...r, ...action.patch } : r)),
+      });
+    case "removeReturn":
+      return stamp({ ...state, returns: state.returns.filter((r) => r.id !== action.id) });
+    case "upsertPersonalLitige": {
+      const exists = state.personalLitiges.some((l) => l.id === action.litige.id);
+      return stamp({
+        ...state,
+        personalLitiges: exists
+          ? state.personalLitiges.map((l) => (l.id === action.litige.id ? action.litige : l))
+          : [action.litige, ...state.personalLitiges],
+      });
+    }
+    case "patchPersonalLitige":
+      return stamp({
+        ...state,
+        personalLitiges: state.personalLitiges.map((l) => (l.id === action.id ? { ...l, ...action.patch } : l)),
+      });
+    case "removePersonalLitige":
+      return stamp({ ...state, personalLitiges: state.personalLitiges.filter((l) => l.id !== action.id) });
     case "addExpense":
       return stamp({ ...state, expenses: [action.expense, ...state.expenses] });
     case "patchExpense":
@@ -148,10 +188,13 @@ const withLogistics = (i: Item): Item => ({
   tracking: i.tracking ?? "",
   expectedDate: i.expectedDate ?? "",
   shipDate: i.shipDate ?? "",
+  shippingVideo: i.shippingVideo ?? "",
+  shippingVideoName: i.shippingVideoName ?? "",
   platform: i.platform ?? "",
   buyer: i.buyer ?? "",
   buyerUrl: i.buyerUrl ?? "",
   saleFees: i.saleFees ?? 0,
+  packagingCost: i.packagingCost ?? 0,
   shippingCost: i.shippingCost ?? 0,
   shippingPaid: i.shippingPaid ?? 0,
 });
@@ -173,11 +216,14 @@ function loadLocal(): AppState {
         ...(parsed.settings ?? {}),
         platformFees: { ...DEFAULT_SETTINGS.platformFees, ...(parsed.settings?.platformFees ?? {}) },
         trackingUrls: { ...DEFAULT_SETTINGS.trackingUrls, ...(parsed.settings?.trackingUrls ?? {}) },
+        enabledModules: { ...DEFAULT_SETTINGS.enabledModules, ...(parsed.settings?.enabledModules ?? {}) },
         nonSuppliers: parsed.settings?.nonSuppliers ?? [],
       },
       items: loadedItems.map(withLogistics),
       todos: parsed.todos ?? [],
       docs: parsed.docs ?? [],
+      returns: parsed.returns ?? [],
+      personalLitiges: parsed.personalLitiges ?? [],
       expenses: parsed.expenses ?? [],
       suppliers: parsed.suppliers ?? [],
       clients: parsed.clients ?? DEMO_STATE.clients,
@@ -230,9 +276,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               ...remote.settings,
               platformFees: { ...DEFAULT_SETTINGS.platformFees, ...(remote.settings?.platformFees ?? {}) },
               trackingUrls: { ...DEFAULT_SETTINGS.trackingUrls, ...(remote.settings?.trackingUrls ?? {}) },
+              enabledModules: { ...DEFAULT_SETTINGS.enabledModules, ...(remote.settings?.enabledModules ?? {}) },
               nonSuppliers: remote.settings?.nonSuppliers ?? [],
             },
             items: (remote.items ?? []).map(withLogistics),
+            returns: remote.returns ?? [],
+            personalLitiges: remote.personalLitiges ?? [],
             expenses: remote.expenses ?? [],
             suppliers: remote.suppliers ?? [],
             requests: remote.requests ?? [],

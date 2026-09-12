@@ -51,8 +51,8 @@ export default function Todo() {
 
   /** Où se règle réellement la tâche. */
   const autoTarget = (t: TodoItem) =>
-    t.auto === "ship" ? links.livraison({ tab: "faire" })
-    : t.auto === "receive" ? links.livraison({ tab: "recevoir" })
+    t.auto === "ship" ? links.livraison()
+    : t.auto === "receive" ? links.arrivage()
     : links.facturation({ state: "unpaid" });
 
   const completeAuto = (t: TodoItem) => {

@@ -220,7 +220,7 @@ export default function Clients() {
                           <div className="client-detail">
                             {/* --- COMPTE / FICHE CLIENT --- */}
                             {c.record && (
-                              <div style={{ background: "var(--card-bg-2)", padding: 10, borderRadius: 8, display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
+                              <div style={{ background: "var(--surface-2)", padding: 10, borderRadius: 8, display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                                   <b style={{ fontSize: 13 }}>👤 Fiche Client ({c.record.name})</b>
                                   <button
@@ -278,7 +278,7 @@ export default function Clients() {
                                 (t) => (t.clientName || "").toLowerCase() === c.name.toLowerCase()
                               );
                               return (
-                                <div className="client-tasks-section" style={{ margin: "10px 0", background: "var(--card-bg-2)", padding: 12, borderRadius: 10, border: "1px solid var(--line)" }}>
+                                <div className="client-tasks-section" style={{ margin: "10px 0", background: "var(--surface-2)", padding: 12, borderRadius: 10, border: "1px solid var(--line)" }}>
                                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                                     <b style={{ fontSize: 13 }}>📋 Tâches pour {c.name} ({clientTodos.length})</b>
                                   </div>

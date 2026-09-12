@@ -4,7 +4,7 @@ import { DEFAULT_TRACKING_URLS } from "../lib/carriers";
 export const DEFAULT_SETTINGS: Settings = {
   business: "",
   vatEnabled: false,
-  legalStatus: "particulier",
+  legalStatus: "rien",
   country: "FR",
   vatNumber: "",
   vatRate: 20,
@@ -16,6 +16,11 @@ export const DEFAULT_SETTINGS: Settings = {
   iban: "",
   footer: "",
   paymentTerms: 14,
+  enabledModules: {
+    clients: true,
+    sav: true,
+    facturation: true,
+  },
   // Ordres de grandeur usuels ; chaque taux reste modifiable dans Facturation.
   platformFees: {
     Vinted: 0,
@@ -38,6 +43,8 @@ export const EMPTY_STATE: AppState = {
   items: [],
   todos: [],
   docs: [],
+  returns: [],
+  personalLitiges: [],
   expenses: [],
   suppliers: [],
   clients: [],
@@ -524,6 +531,8 @@ export const DEMO_STATE: AppState = {
     },
   ],
   docs: [],
+  returns: [],
+  personalLitiges: [],
   expenses: [
     {
       id: "exp-demo-1",
@@ -627,4 +636,3 @@ export const DEMO_STATE: AppState = {
   seq: {},
   updatedAt: Date.now(),
 };
-

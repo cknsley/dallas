@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
 import {
   Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
@@ -10,7 +9,7 @@ import { usePref } from "../lib/usePref";
 import {
   caOfYear, costOf, monthlySeries, periodRange, revenueOf, soldItems,
 } from "../lib/calc";
-import { eur, eur2, num, pct } from "../lib/format";
+import { eur, num, pct } from "../lib/format";
 import { links } from "../lib/links";
 import type { Period } from "../types";
 
@@ -66,7 +65,30 @@ export default function PerformancePage() {
     });
     return Array.from(map.values()).sort((a, b) => b.ca - a.ca);
   }, [list]);
-  const bestPlatform = byPlatform[0];
+
+  const salesBreakdown = useMemo(() => {
+    const topBy = (getKey: (item: (typeof list)[number]) => string) => {
+      const grouped = new Map<string, { label: string; qty: number; ca: number }>();
+      list.forEach((item) => {
+        const label = getKey(item).trim() || "Non renseigné";
+        const current = grouped.get(label) ?? { label, qty: 0, ca: 0 };
+        current.qty += Math.max(1, num(item.quantity));
+        current.ca += revenueOf(item);
+        grouped.set(label, current);
+      });
+      return [...grouped.values()]
+        .sort((a, b) => b.qty - a.qty || b.ca - a.ca)
+        .slice(0, 4);
+    };
+
+    return [
+      { key: "brand", title: "Marques", icon: "◆", rows: topBy((item) => item.brand) },
+      { key: "size", title: "Tailles", icon: "↔", rows: topBy((item) => item.size) },
+      { key: "type", title: "Types", icon: "▦", rows: topBy((item) => item.type) },
+      { key: "platform", title: "Canaux", icon: "↗", rows: topBy((item) => item.platform || "Direct") },
+    ];
+  }, [list]);
+  const soldQuantity = list.reduce((total, item) => total + Math.max(1, num(item.quantity)), 0);
 
   // Graphique d'évolution mensuelle
   const year = new Date().getFullYear();
@@ -186,62 +208,45 @@ export default function PerformancePage() {
           </div>
         </section>
 
-        {/* Card 2 : Cockpit d'Activité Ventes */}
+        {/* Card 2 : ce qui se vend le plus */}
         <section className="card col-2">
           <div className="card-h">
-            <h3>Cockpit d'Activité Ventes</h3>
+            <h3>Produits les plus vendus</h3>
             <div className="spacer" />
-            <span className="hint">Vue synthétique</span>
+            <span className="hint">{soldQuantity} article{soldQuantity > 1 ? "s" : ""} · {range.label}</span>
           </div>
-          <div className="card-b">
-            <div className="fgrid">
-              <div className="cockpit-row">
-                <div className="cockpit-label">
-                  <span>⇄ Livraisons sortantes</span>
-                  <Link to={links.livraison({ tab: "faire" })} className="hint-link">Voir →</Link>
-                </div>
-                <div className="cockpit-val">
-                  <b>{toShipCount} commande{toShipCount > 1 ? "s" : ""} à expédier</b>
-                </div>
-                <span className="hint">{eur(sleepingMoney)} à préserver</span>
-              </div>
-
-              <div className="cockpit-row">
-                <div className="cockpit-label">
-                  <span>§ Règlements & Impayés</span>
-                  <Link to={links.ventes({ delivery: "non_payee" })} className="hint-link">Voir →</Link>
-                </div>
-                <div className="cockpit-val">
-                  <b>{eur(awaitingTotal)} en attente ({awaitingCount})</b>
-                </div>
-                <span className="hint">{awaitingCount > 0 ? "Ventes non réglées" : "Tous les règlements sont reçus"}</span>
-              </div>
-
-              <div className="cockpit-row">
-                <div className="cockpit-label">
-                  <span>🚀 Meilleur Canal</span>
-                  {bestPlatform && (
-                    <Link to={links.ventes({ platform: bestPlatform.key })} className="hint-link">Filtrer →</Link>
-                  )}
-                </div>
-                <div className="cockpit-val">
-                  <b>{bestPlatform ? bestPlatform.key : "Aucun"}</b> ({eur(bestPlatform ? bestPlatform.ca : 0)})
-                </div>
-                <span className="hint">{bestPlatform ? `${bestPlatform.qty} vente${bestPlatform.qty > 1 ? "s" : ""} effectuée${bestPlatform.qty > 1 ? "s" : ""}` : "Pas encore de ventes"}</span>
-              </div>
-
-              <div className="cockpit-row">
-                <div className="cockpit-label">
-                  <span>📊 Moyenne par Vente</span>
-                  <span className="hint-link" style={{ background: "transparent", border: 0, padding: 0 }}>Moyennes</span>
-                </div>
-                <div className="cockpit-val">
-                  Marge <b>{eur2(avgMargin)} / vente</b>
-                </div>
-                <span className="hint">Panier moyen : {eur2(avgBasket)}</span>
-              </div>
+          {list.length === 0 ? (
+            <Empty glyph="▥" title="Aucune donnée">Les tendances apparaîtront après les premières ventes.</Empty>
+          ) : (
+            <div className="card-b sales-insight-grid">
+              {salesBreakdown.map((group) => {
+                const max = group.rows[0]?.qty || 1;
+                return (
+                  <div className="sales-insight" key={group.key}>
+                    <div className="sales-insight-head">
+                      <span className="sales-insight-icon">{group.icon}</span>
+                      <strong>{group.title}</strong>
+                      <span className="hint">Top {group.rows.length}</span>
+                    </div>
+                    <div className="sales-insight-bars">
+                      {group.rows.map((row, index) => (
+                        <div className="sales-insight-row" key={row.label}>
+                          <div className="sales-insight-label">
+                            <span>{index + 1}</span>
+                            <strong title={row.label}>{row.label}</strong>
+                            <b className="num">{row.qty}</b>
+                          </div>
+                          <div className="sales-insight-track">
+                            <i style={{ width: `${(row.qty / max) * 100}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          </div>
+          )}
         </section>
       </div>
 

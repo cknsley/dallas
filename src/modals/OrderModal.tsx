@@ -196,7 +196,8 @@ export default function OrderModal({
         <span className="glyph">⇩</span>
         <div>
           Les articles entrent en <b>Arrivage</b> et rejoignent le stock normal dès que vous réceptionnez la
-          commande, depuis Livraison → À recevoir. Les frais de port se répartissent automatiquement entre elles.
+          commande, depuis Arrivage. Port, douane / taxe d'import et autres frais se répartissent automatiquement
+          entre toutes les lignes, même en commande groupée.
         </div>
       </div>
 
@@ -226,7 +227,7 @@ export default function OrderModal({
         <Field label={eurLabel("Frais de port")}>
           <input type="number" step="0.01" value={shipping} placeholder="0,00" onChange={(e) => setShipping(e.target.value)} />
         </Field>
-        <Field label={eurLabel("Douane")}>
+        <Field label={eurLabel("Douane / taxe d'import")}>
           <input type="number" step="0.01" value={customs} placeholder="0,00" onChange={(e) => setCustoms(e.target.value)} />
         </Field>
         <Field label={eurLabel("Autres frais de livraison")}>

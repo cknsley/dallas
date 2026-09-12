@@ -1,12 +1,13 @@
 import { Modal } from "../components/ui";
 import { useStore } from "../store/StoreContext";
 import { dfrLong, eur2 } from "../lib/format";
+import { docKindLabel } from "../lib/vat";
 import type { SalesDoc } from "../types";
 
 export default function DocPreview({ doc, onClose }: { doc: SalesDoc; onClose: () => void }) {
   const { state, dispatch } = useStore();
   const s = state.settings;
-  const title = doc.kind === "facture" ? "Facture" : "Reçu";
+  const title = docKindLabel(doc.kind, s.legalStatus);
 
   return (
     <Modal

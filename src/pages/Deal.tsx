@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { HeaderActions } from "../components/Layout";
-import { Empty, Kpi } from "../components/ui";
+import { Empty } from "../components/ui";
+import RentabilitePanel from "../components/RentabilitePanel";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { caOfYear, costOf, revenueOf, saleCostsOf } from "../lib/calc";
-import { eur, eur2, num, pct } from "../lib/format";
+import { eur2, num, pct } from "../lib/format";
 import { STATUS_LABEL } from "../lib/constants";
 import { HINT, LABEL } from "../lib/lexicon";
 import { vatDue, vatRegime } from "../lib/vat";
@@ -14,6 +15,82 @@ import SellModal from "../modals/SellModal";
 import type { Item } from "../types";
 
 const deducted = (v: number) => (v > 0 ? `−${eur2(v)}` : eur2(0));
+
+/* ============================ VERDICT (avantages / inconvénients) ============================ */
+
+type Payment = "cash" | "virement" | "crypto";
+const PAYMENT_OPTIONS: { value: Payment; label: string }[] = [
+  { value: "cash", label: "💵 Cash" },
+  { value: "virement", label: "🏦 Virement" },
+  { value: "crypto", label: "◈ Crypto" },
+];
+const PAYMENT_NOTE: Record<Payment, { pro: string; con: string }> = {
+  cash: { pro: "Cash : encaissement immédiat, zéro frais", con: "Cash : aucune preuve en cas de litige" },
+  virement: { pro: "Virement : traçable et sécurisé", con: "Virement : délai de réception possible" },
+  crypto: { pro: "Crypto : rapide, frais réseau faibles", con: "Crypto : cours volatil, valeur incertaine" },
+};
+const FILLER_PROS = [
+  "Négociation encore possible avant validation",
+  "Aucun engagement tant que rien n'est validé",
+  "Simulation sans impact sur le stock réel",
+];
+const FILLER_CONS = [
+  "Chiffres à confirmer une fois l'article en main",
+  "Frais annexes possibles non saisis ici",
+  "Les montants restent des estimations",
+];
+
+/** Heuristique simple : marge, ROI, poids des frais et mode de paiement → 3 avantages, 3 inconvénients. */
+function buildVerdict(opts: { margin: number; roi: number; feesRatio: number; payment: Payment; hasData: boolean }) {
+  const { margin, roi, feesRatio, payment, hasData } = opts;
+  const pros: string[] = [];
+  const cons: string[] = [];
+  if (hasData) {
+    if (margin > 0) pros.push(`Marge positive : ${eur2(margin)}`);
+    else cons.push(`Marge négative : ${eur2(margin)}`);
+    if (roi >= 20) pros.push(`ROI attractif (${pct(roi)})`);
+    else if (roi < 10) cons.push(`ROI faible (${pct(roi)})`);
+    if (feesRatio <= 10) pros.push(`Frais maîtrisés (${pct(feesRatio)} du prix)`);
+    else if (feesRatio > 20) cons.push(`Frais élevés (${pct(feesRatio)} du prix)`);
+  }
+  pros.push(PAYMENT_NOTE[payment].pro);
+  cons.push(PAYMENT_NOTE[payment].con);
+  let fillerIdx = 0;
+  while (pros.length < 3) pros.push(FILLER_PROS[fillerIdx++] || "—");
+  fillerIdx = 0;
+  while (cons.length < 3) cons.push(FILLER_CONS[fillerIdx++] || "—");
+  return { pros: pros.slice(0, 3), cons: cons.slice(0, 3) };
+}
+
+function VerdictPanel({ margin, roi, feesRatio, payment, onPayment, hasData }: {
+  margin: number; roi: number; feesRatio: number; payment: Payment; onPayment: (p: Payment) => void; hasData: boolean;
+}) {
+  const { pros, cons } = buildVerdict({ margin, roi, feesRatio, payment, hasData });
+  return (
+    <div className="deal-verdict">
+      <div className="deal-verdict-cols">
+        <div className="deal-verdict-col good">
+          <b>+ Avantages</b>
+          <ul>{pros.map((p) => <li key={p}>{p}</li>)}</ul>
+        </div>
+        <div className="deal-verdict-col bad">
+          <b>− Inconvénients</b>
+          <ul>{cons.map((c) => <li key={c}>{c}</li>)}</ul>
+        </div>
+      </div>
+      <div className="deal-verdict-payment">
+        <span className="hint">Mode de paiement</span>
+        <div className="seg sm">
+          {PAYMENT_OPTIONS.map((o) => (
+            <button key={o.value} type="button" className={payment === o.value ? "on" : ""} onClick={() => onPayment(o.value)}>
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ============================ ACHAT ============================ */
 
@@ -25,6 +102,7 @@ const newBuyLine = (): BuyLine => ({ id: uid(), label: "", price: "", fees: "", 
 function BuyCalculator({ onConvert }: { onConvert: (lines: OrderPresetLine[]) => void }) {
   const [lines, setLines] = useState<BuyLine[]>([newBuyLine()]);
   const [targetMargin, setTargetMargin] = useState("30");
+  const [payment, setPayment] = useState<Payment>("virement");
   const patch = (id: string, p: Partial<BuyLine>) => setLines((l) => l.map((x) => (x.id === id ? { ...x, ...p } : x)));
 
   const totals = useMemo(() => {
@@ -129,6 +207,18 @@ function BuyCalculator({ onConvert }: { onConvert: (lines: OrderPresetLine[]) =>
               %
             </label>
           </div>
+          <div className="deal-steps">
+            {[10, 20, 30, 40, 50].map((m) => (
+              <button
+                key={m}
+                type="button"
+                className={`btn sm${target === m ? " primary" : ""}`}
+                onClick={() => setTargetMargin(String(m))}
+              >
+                {m} %
+              </button>
+            ))}
+          </div>
           <div className="totrow"><span>Prix d'achat maximum</span><b className="num">{eur2(Math.max(0, maxBuy))}</b></div>
           <div className="totrow">
             <span>{headroom >= 0 ? "Marge de négociation restante" : "Au-dessus du prix maximum"}</span>
@@ -140,6 +230,17 @@ function BuyCalculator({ onConvert }: { onConvert: (lines: OrderPresetLine[]) =>
               : `Il faut négocier ${eur2(Math.abs(headroom))} de moins pour tenir ${target} % de marge.`}
           </div>
         </div>
+      )}
+
+      {totals.estimate > 0 && (
+        <VerdictPanel
+          margin={totals.margin}
+          roi={totals.engaged ? (totals.margin / totals.engaged) * 100 : 0}
+          feesRatio={totals.price ? (totals.fees / totals.price) * 100 : 0}
+          payment={payment}
+          onPayment={setPayment}
+          hasData={totals.price > 0}
+        />
       )}
     </div>
   );
@@ -157,6 +258,7 @@ function SellCalculator({ onSellItem }: { onSellItem: (item: Item, targetPrice: 
   const [lines, setLines] = useState<SellLine[]>([]);
   const [query, setQuery] = useState("");
   const [discount, setDiscount] = useState(0);
+  const [payment, setPayment] = useState<Payment>("virement");
 
   const regime = useMemo(
     () => vatRegime(state.settings, caOfYear(state.items, new Date().getFullYear())),
@@ -177,11 +279,13 @@ function SellCalculator({ onSellItem }: { onSellItem: (item: Item, targetPrice: 
     const picked = state.items.filter((i) => selected.has(i.id));
     let gross = picked.reduce((a, i) => a + revenueOf(i), 0);
     let cost = picked.reduce((a, i) => a + costOf(i) + saleCostsOf(i), 0);
+    let fees = picked.reduce((a, i) => a + saleCostsOf(i), 0);
     for (const l of lines) {
       gross += num(l.price) + num(l.shippingPaid);
       cost += num(l.cost) + num(l.saleFees) + num(l.shippingCost);
+      fees += num(l.saleFees) + num(l.shippingCost);
     }
-    return { gross, cost, count: picked.length + lines.length };
+    return { gross, cost, fees, count: picked.length + lines.length };
   }, [state.items, selected, lines]);
 
   const asked = lot.gross * (1 - discount / 100);
@@ -324,6 +428,15 @@ function SellCalculator({ onSellItem }: { onSellItem: (item: Item, targetPrice: 
               {discount > 0 && ` · remise ${eur2(lot.gross - asked)}`}
             </div>
 
+            <VerdictPanel
+              margin={net}
+              roi={lot.cost ? (net / lot.cost) * 100 : 0}
+              feesRatio={asked ? (lot.fees / asked) * 100 : 0}
+              payment={payment}
+              onPayment={setPayment}
+              hasData={lot.gross > 0}
+            />
+
             {pickedItems.length > 0 && (
               <button className="btn primary sm" style={{ width: "100%", justifyContent: "center" }} onClick={handleStartSale}>
                 € Enregistrer la vente du lot ({eur2(asked)})
@@ -345,29 +458,11 @@ export default function Deal() {
   const [convertingOrder, setConvertingOrder] = useState<OrderPresetLine[] | null>(null);
   const [sellingPreset, setSellingPreset] = useState<{ item: Item; price: number } | null>(null);
 
-  const inStock = state.items.filter((i) => i.status !== "vendu");
-  const stockCost = inStock.reduce((a, i) => a + costOf(i), 0);
-  const stockValue = inStock.reduce((a, i) => a + revenueOf(i), 0);
-  const potential = stockValue - stockCost;
-  const roi = stockCost > 0 ? (potential / stockCost) * 100 : 0;
-
   return (
     <>
       <HeaderActions>
         <span className="hint">Les deux côtés de la négociation, côte à côte</span>
       </HeaderActions>
-
-      <div className="kpi-grid">
-        <Kpi label="Stock disponible" value={String(inStock.length)} meta={`${eur(stockCost)} de coût total`} tone="info" />
-        <Kpi label="Valeur estimée" value={eur(stockValue)} meta="Aux prix de revente espérés" />
-        <Kpi label="Marge potentielle" value={eur(potential)} meta="Si tout part au prix estimé" tone={potential >= 0 ? "ok" : "warn"} />
-        <Kpi
-          label="ROI potentiel"
-          value={pct(roi)}
-          meta="Ce que le stock rendrait sur ce qu'il a coûté"
-          tone={roi >= 0 ? "ok" : "warn"}
-        />
-      </div>
 
       <div className="cols two">
         <div className="card">
@@ -388,6 +483,8 @@ export default function Deal() {
           <SellCalculator onSellItem={(item, price) => setSellingPreset({ item, price })} />
         </div>
       </div>
+
+      <RentabilitePanel state={state} />
 
       {convertingOrder && (
         <OrderModal

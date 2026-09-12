@@ -15,6 +15,7 @@ import Fournisseurs from "./pages/Fournisseurs";
 import Charges from "./pages/Charges";
 import Todo from "./pages/Todo";
 import Facturation from "./pages/Facturation";
+import Reglages from "./pages/Reglages";
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="ventes" element={<Ventes />} />
         <Route path="livraison" element={<Livraison />} />
         <Route path="sav" element={<Sav />} />
+        <Route path="retours" element={<Navigate to="/sav?tab=retours" replace />} />
         <Route path="colis" element={<Navigate to="/livraison" replace />} />
         <Route path="bilan" element={<Bilan />} />
         <Route path="deal" element={<Deal />} />
@@ -37,6 +39,7 @@ export default function App() {
         <Route path="charges" element={<Charges />} />
         <Route path="todo" element={<Todo />} />
         <Route path="facturation" element={<Facturation />} />
+        <Route path="reglages" element={<Reglages />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

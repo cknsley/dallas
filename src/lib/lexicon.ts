@@ -26,7 +26,7 @@ export const LABEL = {
 
 /** Précisions affichées sous les champs, elles aussi uniques. */
 export const HINT = {
-  fees: "Livraison reçue, nettoyage, retouche",
+  fees: "Livraison, douane, nettoyage, retouche — souvent connu qu'à la réception, modifiable à tout moment",
   estimate: "À combien vous pensez la revendre",
 } as const;
 

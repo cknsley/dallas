@@ -12,6 +12,12 @@ export interface NavRoute {
   end?: boolean;
 }
 
+const MODULE_BY_PATH = {
+  "/clients": "clients",
+  "/sav": "sav",
+  "/facturation": "facturation",
+} as const;
+
 /** La navigation est groupée : piloter, acheter, vendre, compter. */
 export const NAV_GROUPS: { label: string; routes: NavRoute[] }[] = [
   {
@@ -25,8 +31,8 @@ export const NAV_GROUPS: { label: string; routes: NavRoute[] }[] = [
   {
     label: "Achat",
     routes: [
-      { path: "/achats", label: "Sourcing", icon: "⇩", subtitle: "Du colis commandé jusqu'à l'entrée en stock" },
-      { path: "/arrivage", label: "Arrivage", icon: "📥", subtitle: "Sortie de colis & déballage express" },
+      { path: "/achats", label: "Sourcing", icon: "⇩", subtitle: "Commandes, demandes produit et balance des achats" },
+      { path: "/arrivage", label: "Arrivage", icon: "📥", subtitle: "Colis attendus, déballage et entrée en stock" },
       { path: "/stock", label: "Stock", icon: "▦", subtitle: "Ce que vous possédez : vos articles en stock" },
       { path: "/deal", label: "Deal", icon: "⚖", subtitle: "Négocier un achat ou une vente, remise comprise" },
     ],
@@ -35,8 +41,8 @@ export const NAV_GROUPS: { label: string; routes: NavRoute[] }[] = [
     label: "Vente",
     routes: [
       { path: "/ventes", label: "Ventes", icon: "↗", subtitle: "Historique et suivi des livraisons" },
-      { path: "/livraison", label: "Livraison", icon: "⇄", subtitle: "Ce qu'il reste à envoyer et à recevoir" },
-      { path: "/sav", label: "SAV", icon: "🛠", subtitle: "Validation des réceptions et service après-vente" },
+      { path: "/livraison", label: "Livraison", icon: "⇄", subtitle: "Ce qu'il reste à expédier, jusqu'à la livraison confirmée" },
+      { path: "/sav", label: "SAV", icon: "🛠", subtitle: "Litiges, retours clients et remboursements fournisseurs" },
       { path: "/clients", label: "Clients", icon: "☻", subtitle: "Acheteurs et historique d'achat" },
     ],
   },
@@ -47,6 +53,7 @@ export const NAV_GROUPS: { label: string; routes: NavRoute[] }[] = [
       { path: "/charges", label: "Charges", icon: "◈", subtitle: "Matériel, emballages et abonnements de l'activité" },
       { path: "/bilan", label: "Bilan", icon: "%", subtitle: "Ce que vous possédez et ce que l'activité dégage" },
       { path: "/facturation", label: "Facturation", icon: "§", subtitle: "Factures, reçus et régime de TVA" },
+      { path: "/reglages", label: "Réglages", icon: "⚙", subtitle: "Statut, modules et paramètres de l'application" },
     ],
   },
 ];
@@ -65,17 +72,27 @@ export default function Layout() {
   const theme = useTheme();
   const { pathname } = useLocation();
   const current = ROUTES.find((r) => (r.end ? pathname === r.path : pathname.startsWith(r.path))) ?? ROUTES[0];
+  const routeIsEnabled = (route: NavRoute) => {
+    const module = MODULE_BY_PATH[route.path as keyof typeof MODULE_BY_PATH];
+    return !module || state.settings.enabledModules[module];
+  };
+  const visibleGroups = NAV_GROUPS
+    .map((group) => ({ ...group, routes: group.routes.filter(routeIsEnabled) }))
+    .filter((group) => group.routes.length > 0);
+  const visibleRoutes = ROUTES.filter(routeIsEnabled);
 
   const badges: Record<string, number> = {
     "/stock": state.items.filter((i) => i.status !== "vendu").length,
     "/ventes": state.items.filter((i) => i.status === "vendu" && i.delivery === "commandee").length,
-    "/achats": state.items.filter((i) => i.status === "arrivage").length,
+    "/achats": state.requests.filter((r) => r.status === "en_cours").length,
     "/arrivage": state.items.filter((i) => i.status === "arrivage").length,
-    "/livraison":
-      state.items.filter((i) => i.status === "arrivage").length +
-      state.items.filter((i) => i.status === "vendu" && i.delivery === "commandee").length,
+    "/livraison": state.items.filter((i) => i.status === "vendu" && i.delivery === "commandee").length,
     "/todo": state.todos.filter((t) => t.col !== "termine").length,
     "/facturation": state.docs.filter((d) => !d.paid).length,
+    "/sav":
+      state.items.filter((i) => i.litigeState === "en_cours" || i.litigeState === "attente").length +
+      state.personalLitiges.filter((l) => l.status !== "resolu").length +
+      state.returns.filter((r) => !["rembourse", "clos"].includes(r.status)).length,
   };
 
   return (
@@ -86,7 +103,7 @@ export default function Layout() {
           <span>Achat · Revente</span>
         </div>
         <nav className="nav">
-          {NAV_GROUPS.map((group) => (
+          {visibleGroups.map((group) => (
             <div className="nav-group" key={group.label}>
               <div className="nav-group-label">{group.label}</div>
               {group.routes.map((r) => (
@@ -128,7 +145,7 @@ export default function Layout() {
 
       <div className="main">
         <nav className="mobnav">
-          {ROUTES.map((r) => (
+          {visibleRoutes.map((r) => (
             <NavLink key={r.path} to={r.path} end={r.end}>
               <span className="ic" style={{ marginRight: 4 }}>{r.icon}</span>
               {r.label}

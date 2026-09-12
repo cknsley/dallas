@@ -1,4 +1,4 @@
-import type { Settings } from "../types";
+import type { DocKind, LegalStatus, Settings } from "../types";
 import { eur, pct } from "./format";
 
 export const VAT_BY_COUNTRY: Record<string, number> = {
@@ -12,6 +12,9 @@ export const COUNTRIES: [string, string][] = [
   ["PT", "Portugal"], ["GB", "Royaume-Uni"], ["CA", "Canada"], ["US", "États-Unis"],
   ["OTHER", "Autre"],
 ];
+
+/** SARL, SAS et SASU partagent le même traitement : assujetties dès le premier euro. */
+export const isSociete = (status: LegalStatus) => status === "sarl" || status === "sas" || status === "sasu";
 
 export interface VatAlert {
   level: "warn" | "bad";
@@ -51,29 +54,29 @@ export function vatRegime(settings: Settings, caYear: number): VatRegime {
     return {
       ...base,
       subject: false,
-      canInvoice: settings.legalStatus !== "particulier",
+      canInvoice: settings.legalStatus !== "rien",
       label: "Mode TVA désactivé",
       mention: "TVA non applicable.",
     };
   }
 
-  if (settings.legalStatus === "particulier") {
+  if (settings.legalStatus === "rien") {
     return {
       ...base,
       subject: false,
       canInvoice: false,
-      label: "Particulier — hors champ de la TVA",
+      label: "Aucun statut — hors champ de la TVA",
       mention:
-        "Vente entre particuliers — TVA non applicable. Ce document est un reçu, il ne constitue pas une facture commerciale.",
+        "Vente entre particuliers — TVA non applicable. Ce document est une preuve de vente, il ne constitue pas une facture commerciale.",
     };
   }
 
-  if (settings.legalStatus === "micro") {
+  if (settings.legalStatus === "auto") {
     if (threshold > 0 && caYear > threshold) {
       return {
         ...base,
         subject: true,
-        label: "Micro-entreprise — seuil dépassé, TVA due",
+        label: "Auto-entrepreneur — seuil dépassé, TVA due",
         mention:
           scheme === "marge"
             ? `TVA sur la marge bénéficiaire — art. 297 A du CGI. Taux ${rate} %.`
@@ -89,7 +92,7 @@ export function vatRegime(settings: Settings, caYear: number): VatRegime {
     return {
       ...base,
       subject: false,
-      label: "Micro-entreprise — franchise en base",
+      label: "Auto-entrepreneur — franchise en base",
       mention: "TVA non applicable, art. 293 B du CGI.",
       alert:
         threshold > 0 && ratio >= 80
@@ -102,15 +105,22 @@ export function vatRegime(settings: Settings, caYear: number): VatRegime {
     };
   }
 
+  const societeLabel = settings.legalStatus === "sasu" ? "SASU" : settings.legalStatus === "sas" ? "SAS" : "SARL";
   return {
     ...base,
     subject: true,
-    label: "Société — assujettie à la TVA",
+    label: `${societeLabel} — assujettie à la TVA`,
     mention:
       scheme === "marge"
         ? `TVA sur la marge bénéficiaire — art. 297 A du CGI (biens d'occasion). TVA non récupérable par l'acquéreur.`
         : `TVA au taux de ${rate} % sur le prix de vente.`,
   };
+}
+
+/** Libellé du document : une facture reste une facture, un reçu devient "preuve de vente" pour un statut particulier. */
+export function docKindLabel(kind: DocKind, legalStatus: LegalStatus): string {
+  if (kind === "facture") return "Facture";
+  return legalStatus === "rien" ? "Preuve de vente" : "Reçu";
 }
 
 /** TVA due, calculée en dedans (les montants saisis sont TTC). */

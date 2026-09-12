@@ -21,14 +21,14 @@ const monthName = (ym: string) => {
   return new Date(y, m - 1, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
 };
 
-type ChargesTab = "cockpit" | "graph" | "all";
+type ChargesTab = "apercu" | "graph" | "all";
 type KindFilter = "all" | "achat" | "vente" | "activite";
 
 export default function Charges() {
   const { state, dispatch } = useStore();
   const toast = useToast();
   const [period, setPeriod] = usePref<Period>("chargePeriod", "month");
-  const [chargesTab, setChargesTab] = usePref<ChargesTab>("chargesTab", "cockpit");
+  const [chargesTab, setChargesTab] = usePref<ChargesTab>("chargesTab", "apercu");
   const [kindFilter, setKindFilter] = usePref<KindFilter>("kindFilter", "all");
   const [category, setCategory] = useQueryState("cat");
   const [editing, setEditing] = useState<{ expense: Expense | null } | null>(null);
@@ -138,7 +138,7 @@ export default function Charges() {
           value={chargesTab}
           onChange={setChargesTab}
           options={[
-            { value: "cockpit", label: "⚡ Cockpit & Synthèse" },
+            { value: "apercu", label: "⚡ Aperçu" },
             { value: "graph", label: "📊 Répartition & Évolution" },
             { value: "all", label: "❖ Tout afficher" },
           ]}
@@ -157,11 +157,11 @@ export default function Charges() {
         </div>
       </div>
 
-      {/* Onglet 1 ou 3 : Cockpit & Pipeline Charges (Version light identique aux screenshots 1 & 2) */}
-      {(chargesTab === "cockpit" || chargesTab === "all") && (
+      {/* Onglet 1 ou 3 : pipeline des charges + balance des achats */}
+      {(chargesTab === "apercu" || chargesTab === "all") && (
         <div className="dash-grid" style={{ marginTop: 0, marginBottom: 16 }}>
-          {/* Carte 1 : Performance Charges (Style exact de la photo 2) */}
-          <section className="card col-1">
+          {/* Carte 1 : Performance Charges */}
+          <section className="card col-2">
             <div className="card-h">
               <h3>Performance Charges</h3>
               <div className="spacer" />
@@ -260,54 +260,6 @@ export default function Charges() {
               <div className="totrow" style={{ marginTop: -6 }}>
                 <span>Ventes</span>
                 <b className="num pos">{eur(ventesTotal)}</b>
-              </div>
-            </div>
-          </section>
-
-          {/* Carte 3 : Cockpit Synthétique Charges */}
-          <section className="card col-1">
-            <div className="card-h">
-              <h3>Cockpit Synthétique</h3>
-              <div className="spacer" />
-              <span className="hint">Vue synthétique</span>
-            </div>
-            <div className="card-b">
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {/* Achats */}
-                <div className="cockpit-card c-sourcing" onClick={() => setKindFilter(kindFilter === "achat" ? "all" : "achat")} style={{ cursor: "pointer" }}>
-                  <div className="cockpit-card-h">
-                    <span>📦 Frais d'Achat</span>
-                    <span className="hint-link">Filtrer →</span>
-                  </div>
-                  <div className="cockpit-card-val">
-                    <b>{eur(byKind.achat.total)}</b> ({byKind.achat.count} frais)
-                  </div>
-                  <span className="hint">Approvisionnement & Stock</span>
-                </div>
-
-                {/* Ventes */}
-                <div className="cockpit-card c-shipping" onClick={() => setKindFilter(kindFilter === "vente" ? "all" : "vente")} style={{ cursor: "pointer" }}>
-                  <div className="cockpit-card-h">
-                    <span>🏷️ Frais de Vente</span>
-                    <span className="hint-link">Filtrer →</span>
-                  </div>
-                  <div className="cockpit-card-val">
-                    <b>{eur(byKind.vente.total)}</b> ({byKind.vente.count} frais)
-                  </div>
-                  <span className="hint">Commissions & Port sortant</span>
-                </div>
-
-                {/* Activité */}
-                <div className="cockpit-card c-charges" onClick={() => setKindFilter(kindFilter === "activite" ? "all" : "activite")} style={{ cursor: "pointer" }}>
-                  <div className="cockpit-card-h">
-                    <span>💼 Frais Général & Structure</span>
-                    <span className="hint-link">Filtrer →</span>
-                  </div>
-                  <div className="cockpit-card-val">
-                    <b>{eur(byKind.activite.total)}</b> ({byKind.activite.count} frais)
-                  </div>
-                  <span className="hint">Abonnements, matériel & local</span>
-                </div>
               </div>
             </div>
           </section>

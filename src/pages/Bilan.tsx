@@ -190,7 +190,7 @@ export default function Bilan() {
             amount={sleeping}
             open={openRow}
             onToggle={setOpenRow}
-            to={links.livraison({ tab: "faire" })}
+            to={links.livraison()}
             linkLabel="Ouvrir les livraisons"
             lines={pendingItems.map((i) => ({
               key: i.id,
@@ -235,7 +235,7 @@ export default function Bilan() {
             ? `${sleepingCount} vente${sleepingCount > 1 ? "s" : ""} payée${sleepingCount > 1 ? "s" : ""} mais pas encore livrée${sleepingCount > 1 ? "s" : ""}`
             : "Toutes les ventes payées sont livrées"}
           tone={sleepingCount ? "warn" : "ok"}
-          to={links.livraison({ tab: "faire" })}
+          to={links.livraison()}
           hint="Livraison"
         />
         <Kpi
@@ -304,7 +304,7 @@ export default function Bilan() {
             <ResultRow
               label={LABEL.shippingCost}
               value={deducted(detail.portPaye)}
-              to={links.livraison({ tab: "faire" })}
+              to={links.livraison()}
             />
             <div className="totrow big" style={{ fontSize: 15 }}>
               <span>Marge réalisée</span><b className={`num ${stats.marge >= 0 ? "pos" : "neg"}`}>{eur2(stats.marge)}</b>

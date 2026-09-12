@@ -7,8 +7,8 @@ export const qtyOf = (i: Item): number => Math.max(1, num(i.quantity) || 1);
 /** Coût d'acquisition de la ligne : (prix payé + frais d'achat) × quantité. */
 export const costOf = (i: Item): number => (num(i.cost) + num(i.fees)) * qtyOf(i);
 
-/** Frais supportés lors de la vente : commission et port valent pour l'envoi entier. */
-export const saleCostsOf = (i: Item): number => num(i.saleFees) + num(i.shippingCost);
+/** Frais supportés lors de la vente : commission, emballage et port valent pour l'envoi entier. */
+export const saleCostsOf = (i: Item): number => num(i.saleFees) + num(i.packagingCost) + num(i.shippingCost);
 
 /** Encaissé pour la ligne : prix de vente × quantité, plus le port refacturé. */
 export const revenueOf = (i: Item): number => num(i.price) * qtyOf(i) + num(i.shippingPaid);
@@ -343,4 +343,17 @@ export function cashFlow(state: AppState, r: Range): CashFlow {
   const out = purchases + saleFees + charges;
 
   return { in: cashedIn, out, net: cashedIn - out, purchases, saleFees, charges, pending };
+}
+
+/**
+ * Fenêtre d'ouverture d'un litige : tant que la vente n'est pas bouclée, ou
+ * jusqu'à 14 jours après réception confirmée par l'acheteur.
+ */
+export function canFileLitige(i: Item): boolean {
+  if (i.status !== "vendu") return false;
+  if (!(i.delivery === "livree" && i.shipping === "recu")) return true;
+  const dateStr = i.validationDate || i.shipDate || i.saleDate;
+  if (!dateStr) return true;
+  const diffDays = (Date.now() - new Date(dateStr + "T12:00:00").getTime()) / (1000 * 60 * 60 * 24);
+  return diffDays <= 14;
 }

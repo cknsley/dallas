@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
 import { Confirm, Empty, Kpi, Photo, Segmented } from "../components/ui";
 import { useToast } from "../components/Toast";
@@ -8,7 +8,7 @@ import { usePref } from "../lib/usePref";
 import { useClearQuery, useQueryState } from "../lib/useQueryState";
 import { links } from "../lib/links";
 import { LABEL } from "../lib/lexicon";
-import { costOf, marginOf, monthlySeries, periodRange, qtyOf, revenueOf, saleCostsOf, soldItems } from "../lib/calc";
+import { canFileLitige, costOf, marginOf, periodRange, qtyOf, revenueOf, saleCostsOf, soldItems } from "../lib/calc";
 import { dshort, eur, eur2, pct, today } from "../lib/format";
 import { DELIVERY_LABEL, DELIVERY_ORDER } from "../lib/constants";
 import { downloadText, itemsToCSV } from "../lib/csv";
@@ -25,14 +25,11 @@ const isDirectOrSocialPlatform = (plat: string | undefined): boolean => {
   return directKeywords.some((k) => p.includes(k));
 };
 
-type VentesBottomTab = "performance" | "graph" | "all";
-
 export default function Ventes() {
   const { state, dispatch, deleteItem } = useStore();
   const toast = useToast();
   const navigate = useNavigate();
   const [period, setPeriod] = usePref<Period>("period", "month");
-  const [ventesTab, setVentesTab] = usePref<VentesBottomTab>("ventesTab", "performance");
   const [deliveryParam, setDelivery] = useQueryState("delivery", "all");
   const [platform, setPlatform] = useQueryState("platform");
   const [brand, setBrand] = useQueryState("brand");
@@ -77,33 +74,20 @@ export default function Ventes() {
   const engaged = buy + fees;
   const roi = engaged > 0 ? (marge / engaged) * 100 : 0;
 
-  const paidCount = list.filter((i) => i.delivery === "livree").length;
-  const paidTotal = list.filter((i) => i.delivery === "livree").reduce((a, i) => a + revenueOf(i), 0);
-  const toShipList = list.filter((i) => i.delivery === "commandee");
-  const toShipCount = toShipList.length;
-  const sleepingMoney = toShipList.reduce((a, i) => a + revenueOf(i), 0);
-  const awaitingTotal = awaiting;
-
-  const avgCaPerSale = list.length > 0 ? ca / list.length : 0;
-  const avgMargePerSale = list.length > 0 ? marge / list.length : 0;
-
-  const topPlatform = useMemo(() => {
-    const map = new Map<string, { count: number; ca: number }>();
-    list.forEach((i) => {
-      const p = i.platform?.trim() || "Direct / Autre";
-      const cur = map.get(p) || { count: 0, ca: 0 };
-      cur.count += qtyOf(i);
-      cur.ca += i.price * qtyOf(i);
-      map.set(p, cur);
-    });
-    const sorted = Array.from(map.entries()).sort((a, b) => b[1].ca - a[1].ca);
-    return sorted[0] ? { name: sorted[0][0], ...sorted[0][1] } : null;
-  }, [list]);
-
-  const months = useMemo(() => monthlySeries(state.items), [state.items]);
-  const maxMonth = Math.max(...months.map((m) => m.ca), 0);
-
   const docFor = (item: Item) => state.docs.find((d) => d.itemIds.includes(item.id));
+
+  const openLitige = (item: Item) => {
+    dispatch({
+      type: "patchItem",
+      id: item.id,
+      patch: {
+        litigeState: "en_cours",
+        litigeCategory: item.litigeCategory || "Vente",
+        notes: [item.notes, "Litige signalé depuis Ventes"].filter(Boolean).join("\n"),
+      },
+    });
+    toast("Litige ouvert", { label: "Voir SAV", onClick: () => navigate(links.sav()) });
+  };
 
   return (
     <>
@@ -293,7 +277,7 @@ export default function Ventes() {
                                       ? `« ${i.name || "Sans nom"} » passe en livraison`
                                       : `Livraison : ${DELIVERY_LABEL[d]}`,
                                     d === "commandee"
-                                      ? { label: "Voir", onClick: () => navigate(links.livraison({ tab: "faire" })) }
+                                      ? { label: "Voir", onClick: () => navigate(links.livraison()) }
                                       : undefined,
                                   );
                                 }}
@@ -320,6 +304,9 @@ export default function Ventes() {
                         </td>
                         <td className="r">
                           <div className="rowact">
+                            {canFileLitige(i) && (
+                              <button className="btn sm ghost" onClick={() => openLitige(i)}>Litige</button>
+                            )}
                             <button className="iconbtn" title="Modifier la vente" onClick={() => setReselling(i)}>€</button>
                             <button className="iconbtn" title="Éditer la fiche" onClick={() => setEditing(i)}>✎</button>
                             <button className="iconbtn del" title="Supprimer" onClick={() => setConfirming(i)}>✕</button>
@@ -335,169 +322,13 @@ export default function Ventes() {
         </div>
       )}
 
-      {/* Barre d'onglets pour le bas de la page Ventes */}
-      <div style={{ margin: "24px 0 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-        <Segmented<VentesBottomTab>
-          value={ventesTab}
-          onChange={setVentesTab}
-          options={[
-            { value: "performance", label: "📊 Performance" },
-            { value: "graph", label: "📈 Évolution mensuelle" },
-            { value: "all", label: "❖ Tout afficher" },
-          ]}
-        />
+      <div className="note info" style={{ marginTop: 16 }}>
+        <span className="glyph">📊</span>
+        <div>
+          Pipeline, classements et évolution mensuelle des ventes sont dans{" "}
+          <a href={`#${links.performance()}`}>Performance</a>.
+        </div>
       </div>
-
-      {/* Onglet Performance & Cockpit Ventes */}
-      {(ventesTab === "performance" || ventesTab === "all") && (
-        <div className="dash-grid" style={{ marginTop: 0 }}>
-          {/* Pipeline / Synthèse des Ventes */}
-          <section className="card col-1">
-            <div className="card-h">
-              <h3>Performance Ventes</h3>
-              <div className="spacer" />
-              <span className="hint">{range.label}</span>
-            </div>
-            <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <div className="pipe-row">
-                <div className="pipe-head">
-                  <span className="pill ok">Livrées & Payées</span>
-                  <span className="spacer" />
-                  <b className="num">{paidCount}</b>
-                </div>
-                <div className="bar-track">
-                  <div className="bar-fill" style={{ width: `${list.length ? (paidCount / list.length) * 100 : 0}%`, background: "var(--ok)" }} />
-                </div>
-                <div className="hint num">{eur(paidTotal)} encaissés</div>
-              </div>
-
-              <div className="pipe-row">
-                <div className="pipe-head">
-                  <span className="pill warn">À expédier / En cours</span>
-                  <span className="spacer" />
-                  <b className="num">{toShipCount}</b>
-                </div>
-                <div className="bar-track">
-                  <div className="bar-fill" style={{ width: `${list.length ? (toShipCount / list.length) * 100 : 0}%`, background: "var(--warn)" }} />
-                </div>
-                <div className="hint num">{eur(sleepingMoney)} en attente d'envoi</div>
-              </div>
-
-              <div className="pipe-row">
-                <div className="pipe-head">
-                  <span className="pill bad">Non payées / Impayés</span>
-                  <span className="spacer" />
-                  <b className="num">{awaitingCount}</b>
-                </div>
-                <div className="bar-track">
-                  <div className="bar-fill" style={{ width: `${list.length ? (awaitingCount / list.length) * 100 : 0}%`, background: "var(--bad)" }} />
-                </div>
-                <div className="hint num">{eur(awaitingTotal)} non encaissés</div>
-              </div>
-
-              <hr className="sep" />
-              <div className="totrow"><span>Chiffre d'Affaires Brut</span><b className="num">{eur(ca)}</b></div>
-              <div className="totrow" style={{ marginTop: -10 }}>
-                <span>Coût d'achat & Frais</span>
-                <b className="num">{eur(engaged)}</b>
-              </div>
-              <div className="totrow" style={{ marginTop: -10 }}>
-                <span>Marge Nette Réalisée</span>
-                <b className={`num ${marge >= 0 ? "pos" : "neg"}`}>{eur(marge)}</b>
-              </div>
-            </div>
-          </section>
-
-          {/* Cockpit d'Activité Ventes */}
-          <section className="card col-2">
-            <div className="card-h">
-              <h3>Cockpit d'Activité Ventes</h3>
-              <div className="spacer" />
-              <span className="hint">Vue synthétique</span>
-            </div>
-            <div className="card-b">
-              <div className="cockpit-grid">
-                {/* Expéditions */}
-                <div className="cockpit-card c-shipping">
-                  <div className="cockpit-card-h">
-                    <span>⇄ Livraisons sortantes</span>
-                    <Link to={links.livraison({ tab: "faire" })} className="hint-link">Voir →</Link>
-                  </div>
-                  <div className="cockpit-card-val">
-                    <b>{toShipCount}</b> commande{toShipCount > 1 ? "s" : ""} à expédier
-                  </div>
-                  <span className="hint">{toShipCount > 0 ? `${eur(sleepingMoney)} à préserver` : "Aucun colis en attente"}</span>
-                </div>
-
-                {/* Règlements */}
-                <div className="cockpit-card c-finance">
-                  <div className="cockpit-card-h">
-                    <span>§ Règlements & Impayés</span>
-                    <Link to={links.ventes({ delivery: "non_payee" })} className="hint-link">Voir →</Link>
-                  </div>
-                  <div className="cockpit-card-val">
-                    <b>{eur(awaitingTotal)}</b> en attente ({awaitingCount})
-                  </div>
-                  <span className="hint">{awaitingCount > 0 ? "Ventes non réglées" : "Tous les règlements sont reçus"}</span>
-                </div>
-
-                {/* Canal Top 1 */}
-                <div className="cockpit-card c-sourcing">
-                  <div className="cockpit-card-h">
-                    <span>🚀 Meilleur Canal</span>
-                    <button className="hint-link" style={{ background: "none", border: 0, cursor: "pointer", font: "inherit" }} onClick={() => topPlatform && setPlatform(topPlatform.name)}>Filtrer →</button>
-                  </div>
-                  <div className="cockpit-card-val">
-                    <b>{topPlatform ? topPlatform.name : "—"}</b> ({eur(topPlatform ? topPlatform.ca : 0)})
-                  </div>
-                  <span className="hint">{topPlatform ? `${topPlatform.count} vente${topPlatform.count > 1 ? "s" : ""} effectuée${topPlatform.count > 1 ? "s" : ""}` : "Aucune vente"}</span>
-                </div>
-
-                {/* Panier & Marge Moyenne */}
-                <div className="cockpit-card c-charges">
-                  <div className="cockpit-card-h">
-                    <span>📊 Moyenne par Vente</span>
-                    <span className="hint">Moyennes</span>
-                  </div>
-                  <div className="cockpit-card-val">
-                    Marge <b>{eur(avgMargePerSale)}</b> / vente
-                  </div>
-                  <span className="hint">Panier moyen : {eur(avgCaPerSale)}</span>
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
-      )}
-
-      {/* Onglet 2 ou 3 : Graphique d'évolution mensuelle */}
-      {(ventesTab === "graph" || ventesTab === "all") && maxMonth > 0 && (
-        <div className="card" style={{ marginTop: 16 }}>
-          <div className="card-h">
-            <h3>Progression mensuelle</h3>
-            <div className="spacer" />
-            <span className="hint">CA et marge des 12 derniers mois</span>
-          </div>
-          <div className="card-b">
-            <div className="month-bars tall">
-              {months.map((m) => (
-                <div className="month-bar" key={m.key} title={`${m.label} — ${eur(m.ca)} de CA, ${eur(m.marge)} de marge`}>
-                  <div className="mb-track">
-                    <div className="mb-fill" style={{ height: `${Math.max(2, (m.ca / maxMonth) * 100)}%` }} />
-                    <div className="mb-fill marge" style={{ height: `${Math.max(0, (Math.max(0, m.marge) / maxMonth) * 100)}%` }} />
-                  </div>
-                  <div className="mb-label">{m.label}</div>
-                </div>
-              ))}
-            </div>
-            <div className="mb-legend">
-              <span><i className="dot-ca" /> Chiffre d'affaires</span>
-              <span><i className="dot-marge" /> Marge</span>
-            </div>
-          </div>
-        </div>
-      )}
-
 
       {addingExpense && (
         <ExpenseModal

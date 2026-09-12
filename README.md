@@ -22,6 +22,7 @@ L'app est servie sur http://localhost:5180.
 | **Stock** | Statuts Arrivage → En stock → Livraison, fiche complète par pièce, filtres + recherche, tri sur toutes les colonnes, vue tableau ou grille photo, actions Vendre / Réceptionner / Éditer / Supprimer, export CSV |
 | **Ventes** | Historique complet : canal, acheteur, encaissé (port compris), frais détaillés, coût d'achat, marge nette et ROI, livraison et suivi modifiables en ligne, lien vers le document associé, filtres par livraison / canal / marque |
 | **Livraison** | Deux volets : *À faire* (ventes à expédier puis à marquer livrées) et *À recevoir* (transporteur, n° de suivi, arrivée prévue, alerte retard, réception en un clic) |
+| **Retours** | Dossiers retours / refunds séparés du SAV : retours clients, remboursements fournisseurs, tracking, frais perdus, remise en stock ou clôture |
 | **Marge** | Capital engagé, coût des ventes, marge réalisée, marge nette après TVA, répartition par marque, calculatrice « et si » (sélection libre de pièces + lignes manuelles, total en direct) |
 | **Todo** | Kanban glisser-déposer ou liste — À acheter / À faire / À envoyer / Terminé, plus les tâches automatiques déduites des colis et des factures |
 | **Facturation** | Statut juridique, pays, n° de TVA, moteur de TVA automatique avec alerte de seuil, génération de facture ou de reçu, suivi payé/impayé, numérotation séquentielle, aperçu et impression/PDF |
@@ -56,10 +57,10 @@ Rien n'est saisi deux fois : une action quelque part met à jour partout ailleur
 
 `src/lib/vat.ts` déduit le régime applicable du statut juridique, du pays et du CA de l'année :
 
-- **Particulier** — hors champ de la TVA, la facture est bloquée, seul le reçu est émis.
-- **Micro-entreprise** — franchise en base (mention art. 293 B du CGI) tant que le CA reste sous le seuil ;
+- **Aucun statut** — hors champ de la TVA, la facture est bloquée, seule la preuve de vente est émise.
+- **Auto-entrepreneur** — franchise en base (mention art. 293 B du CGI) tant que le CA reste sous le seuil ;
   alerte dès 80 % du seuil, bascule automatique en TVA due au-delà.
-- **Société** — assujettie dès le premier euro.
+- **SARL / SAS** — assujetties dès le premier euro.
 
 Le **régime de la marge** (art. 297 A du CGI, biens d'occasion) est activé par défaut : la TVA porte sur la
 marge et non sur le prix de vente. Il se désactive dans les réglages de l'onglet Facturation.
@@ -89,7 +90,7 @@ src/
   lib/        calculs, formats, moteur TVA, export CSV, constantes, helpers réutilisables
   store/      état global (reducer + contexte), persistance, synchro, photos IndexedDB
   components/ layout, briques d'interface, thème, toasts, modals réutilisables
-  pages/      Dashboard, Stock, Ventes, Livraison, Marge, Todo, Facturation, Charges, etc.
+  pages/      Dashboard, Stock, Ventes, Livraison, Retours, Marge, Todo, Facturation, Charges, etc.
   modals/     fiche pièce, vente, création de document, aperçu, clients, dépenses, todo-link
 ```
 

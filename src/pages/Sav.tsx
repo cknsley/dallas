@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
-import { Empty, Field, Kpi, Photo, Segmented } from "../components/ui";
+import { Empty, Field, Kpi, Modal, Photo, Segmented } from "../components/ui";
 import TrackingLink from "../components/TrackingLink";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
@@ -11,20 +11,35 @@ import { revenueOf } from "../lib/calc";
 import { dfr, eur, eur2, today } from "../lib/format";
 import ItemModal from "../modals/ItemModal";
 import SellModal from "../modals/SellModal";
-import type { Item } from "../types";
+import ReturnModal, { emptyReturn } from "../modals/ReturnModal";
+import RetoursTab from "./sav/RetoursTab";
+import type { Item, LitigeStatus, PersonalLitige } from "../types";
 
-type SavTab = "avalider" | "litiges" | "all";
+type SavTab = "litiges" | "retours";
+
+const blankPersonalLitige = (): PersonalLitige => ({
+  id: `pl-${Date.now()}`,
+  title: "",
+  counterparty: "",
+  category: "Perso",
+  status: "en_cours",
+  openedDate: today(),
+  notes: "",
+  createdAt: Date.now(),
+});
 
 export default function Sav() {
   const { state, dispatch } = useStore();
   const toast = useToast();
   const navigate = useNavigate();
-  const [tabParam, setTab] = useQueryState("tab", "avalider");
+  const [tabParam, setTab] = useQueryState("tab", "litiges");
   const tab = tabParam as SavTab;
-
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<Item | null>(null);
   const [selling, setSelling] = useState<Item | null>(null);
+  const [convertingReturn, setConvertingReturn] = useState<Item | null>(null);
+  const [personalOpen, setPersonalOpen] = useState(true);
+  const [editingPersonal, setEditingPersonal] = useState<PersonalLitige | null>(null);
 
   // Formulaire Litige
   const [litigeItem, setLitigeItem] = useState<Item | null>(null);
@@ -49,12 +64,6 @@ export default function Sav() {
     [state.items]
   );
 
-  // Commandes à valider (pas encore entièrement clôturées)
-  const aValider = useMemo(
-    () => soldItems.filter((i) => !(i.delivery === "livree" && i.shipping === "recu")),
-    [soldItems]
-  );
-
   // Commandes avec litige / notes SAV actifs
   const litiges = useMemo(
     () =>
@@ -68,8 +77,9 @@ export default function Sav() {
     [soldItems]
   );
 
+  /** Les ventes récentes : le point d'entrée pour ouvrir un dossier. */
   const displayedList = useMemo(() => {
-    let list = tab === "avalider" ? aValider : tab === "litiges" ? litiges : soldItems;
+    let list = soldItems;
     if (query.trim()) {
       const q = query.toLowerCase().trim();
       list = list.filter(
@@ -82,24 +92,9 @@ export default function Sav() {
       );
     }
     return list;
-  }, [tab, aValider, litiges, soldItems, query]);
+  }, [soldItems, query]);
 
   const patch = (id: string, p: Partial<Item>) => dispatch({ type: "patchItem", id, patch: p });
-
-  /** Valider la vente -> transfert direct vers Ventes & démarrage du compte à rebours 14j */
-  const validateSale = (i: Item) => {
-    const nowIso = today();
-    patch(i.id, {
-      delivery: "livree",
-      shipping: "recu",
-      validationDate: nowIso,
-      shipDate: i.shipDate || nowIso,
-    });
-    toast(`✓ Vente « ${i.name || "Article"} » validée ! Transférée vers Ventes (disparaît du SAV dans 14 jours).`, {
-      label: "Voir dans Ventes",
-      onClick: () => navigate(links.ventes()),
-    });
-  };
 
   /** Ouvrir le formulaire de litige pour un article */
   const openLitigeSection = (i: Item) => {
@@ -175,50 +170,132 @@ export default function Sav() {
     reader.readAsDataURL(file);
   };
 
-  const totalAValider = aValider.reduce((a, i) => a + revenueOf(i), 0);
+  const openPersonalLitiges = state.personalLitiges.filter((l) => l.status !== "resolu");
+
+  const openReturns = state.returns.filter((r) => !["rembourse", "clos"].includes(r.status)).length;
 
   return (
     <>
       <HeaderActions>
-        <Segmented<string>
+        <Segmented<SavTab>
           value={tab}
           onChange={setTab}
           options={[
-            { value: "avalider", label: `À valider (${aValider.length})` },
             { value: "litiges", label: `Litiges (${litiges.length})` },
-            { value: "all", label: `Toutes les ventes (${soldItems.length})` },
+            { value: "retours", label: `Retours & refunds (${openReturns})` },
           ]}
         />
+        {tab === "litiges" && (
+          <button className="btn primary" onClick={() => setEditingPersonal(blankPersonalLitige())}>+ Litige perso</button>
+        )}
       </HeaderActions>
+
+      {tab === "retours" && <RetoursTab />}
+
+      {tab === "litiges" && (
+      <>
+      <div className="card" style={{ marginBottom: 18 }}>
+        <div className="card-h">
+          <h3>Mes litiges ouverts ({openPersonalLitiges.length})</h3>
+          <div className="spacer" />
+          <button className="btn sm ghost" onClick={() => setPersonalOpen((v) => !v)}>
+            {personalOpen ? "Masquer" : "Afficher"}
+          </button>
+          <button className="btn sm primary" onClick={() => setEditingPersonal(blankPersonalLitige())}>
+            + Litige perso
+          </button>
+        </div>
+        {personalOpen && (
+          <div className="card-b">
+            {openPersonalLitiges.length === 0 ? (
+              <Empty glyph="!" title="Aucun litige perso ouvert">
+                Ajoutez un dossier perso pour suivre un souci non lié à une vente.
+              </Empty>
+            ) : (
+              <div className="twrap">
+                <table className="table-compact">
+                  <thead>
+                    <tr>
+                      <th>Litige</th>
+                      <th>Contact</th>
+                      <th>Catégorie</th>
+                      <th>Ouvert</th>
+                      <th>Statut</th>
+                      <th className="r">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {openPersonalLitiges.map((l) => (
+                      <tr key={l.id}>
+                        <td>
+                          <button className="linkish" style={{ fontWeight: 700 }} onClick={() => setEditingPersonal(l)}>
+                            {l.title || "Litige sans titre"}
+                          </button>
+                          {l.notes && <div className="hint ellipsis">{l.notes}</div>}
+                        </td>
+                        <td>{l.counterparty || "—"}</td>
+                        <td>{l.category || "Perso"}</td>
+                        <td>{dfr(l.openedDate)}</td>
+                        <td>
+                          <select
+                            value={l.status}
+                            onChange={(e) => dispatch({
+                              type: "patchPersonalLitige",
+                              id: l.id,
+                              patch: { status: e.target.value as LitigeStatus },
+                            })}
+                          >
+                            <option value="en_cours">En cours</option>
+                            <option value="attente">En attente</option>
+                            <option value="resolu">Résolu</option>
+                          </select>
+                        </td>
+                        <td className="r">
+                          <div className="rowact">
+                            <button className="btn sm" onClick={() => setEditingPersonal(l)}>Éditer</button>
+                            <button
+                              className="btn sm ghost"
+                              onClick={() => dispatch({ type: "patchPersonalLitige", id: l.id, patch: { status: "resolu" } })}
+                            >
+                              Clore
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="kpi-grid">
         <Kpi
-          label="Commandes reçues & à valider"
-          value={String(aValider.length)}
-          meta={`${eur(totalAValider)} encaissés en attente de clôture`}
-          tone="info"
-          hint="À valider"
-        />
-        <Kpi
-          label="Ventes validées (< 14j)"
-          value={String(soldItems.filter((i) => i.delivery === "livree" && i.shipping === "recu").length)}
-          meta="Nettoyage automatique après 14 jours"
-          tone="ok"
-          to={links.ventes({ delivery: "livree" })}
-          hint="Voir Ventes"
-        />
-        <Kpi
-          label="Dossiers Litiges / SAV"
+          label="Dossiers litiges ouverts"
           value={String(litiges.length)}
-          meta={litiges.length ? `${litiges.length} dossier${litiges.length > 1 ? "s" : ""} actif${litiges.length > 1 ? "s" : ""}` : "Aucun litige actif"}
+          meta={litiges.length ? `${eur(litiges.reduce((a, i) => a + revenueOf(i), 0))} concernés` : "Aucun litige actif"}
           tone={litiges.length ? "warn" : "ok"}
-          hint="Litiges"
+        />
+        <Kpi
+          label="Litiges perso"
+          value={String(openPersonalLitiges.length)}
+          meta={openPersonalLitiges.length ? "Dossiers hors ventes" : "Aucun dossier perso"}
+          tone={openPersonalLitiges.length ? "warn" : "ok"}
+        />
+        <Kpi
+          label="Ventes suivies"
+          value={String(soldItems.length)}
+          meta="Livrées depuis moins de 14 jours, ou encore ouvertes"
+          to={links.ventes()}
+          hint="Voir Ventes"
         />
       </div>
 
       <div className="card">
         <div className="card-h" style={{ gap: 12 }}>
-          <h3>Service Après-Vente & Validation Réception</h3>
+          <h3>Ventes suivies — ouvrir un dossier</h3>
           <div className="spacer" />
           <input
             type="search"
@@ -230,10 +307,9 @@ export default function Sav() {
         </div>
 
         {displayedList.length === 0 ? (
-          <Empty glyph="🛠" title="Aucune commande dans cette sélection">
-            {tab === "avalider"
-              ? "Toutes les commandes reçues sont validées ! Elles basculent vers Ventes et s'effacent automatiquement au bout de 14 jours."
-              : "Aucun dossier de litige en cours."}
+          <Empty glyph="🛠" title="Aucune vente suivie">
+            Les ventes apparaissent ici jusqu'à 14 jours après leur livraison — le temps qu'un litige
+            puisse encore être ouvert.
           </Empty>
         ) : (
           <div className="twrap">
@@ -245,7 +321,6 @@ export default function Sav() {
                   <th>Lien de suivi</th>
                   <th>Date Vente</th>
                   <th className="r">Prix Vente</th>
-                  <th>Statut Réception</th>
                   <th className="r">Actions SAV</th>
                 </tr>
               </thead>
@@ -334,59 +409,12 @@ export default function Sav() {
                         {eur2(revenueOf(i))}
                       </td>
 
-                      <td style={{ verticalAlign: "middle" }}>
-                        <select
-                          value={i.shipping === "recu" || i.delivery === "livree" ? "recu" : "a_deposer"}
-                          style={{
-                            padding: "6px 10px",
-                            fontSize: 12,
-                            fontWeight: 600,
-                            borderRadius: "var(--r-sm)",
-                            background: "var(--surface-solid)",
-                            border: "1px solid var(--line-2)",
-                            color: "var(--ink)",
-                            cursor: "pointer",
-                          }}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val === "recu") {
-                              patch(i.id, { shipping: "recu" });
-                            } else {
-                              patch(i.id, { shipping: "a_deposer" });
-                            }
-                          }}
-                        >
-                          <option value="a_deposer">🚚 À aller chercher</option>
-                          <option value="recu">📦 Reçu</option>
-                        </select>
-                      </td>
-
                       <td className="r" style={{ verticalAlign: "middle" }}>
                         <div style={{ display: "inline-flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
-                          {isValidated ? (
+                          {isValidated && (
                             <span className="pill ok" style={{ fontSize: 11, padding: "5px 10px" }}>
-                              ✓ Validé (effacé dans {daysLeft}j)
+                              ✓ Livré (effacé dans {daysLeft}j)
                             </span>
-                          ) : (
-                            <button
-                              type="button"
-                              className="btn primary"
-                              style={{
-                                padding: "7px 16px",
-                                fontSize: 12,
-                                fontWeight: 700,
-                                whiteSpace: "nowrap",
-                                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                                color: "#ffffff",
-                                border: "1px solid rgba(16, 185, 129, 0.5)",
-                                borderRadius: "var(--r-sm)",
-                                boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
-                                cursor: "pointer",
-                              }}
-                              onClick={() => validateSale(i)}
-                            >
-                              ✓ Valider
-                            </button>
                           )}
 
                           <button
@@ -502,7 +530,7 @@ export default function Sav() {
 
                     {/* Toggle avec État du litige */}
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div className="segmented" style={{ background: "rgba(0,0,0,0.3)" }}>
+                      <div className="seg">
                         <button
                           type="button"
                           className={curState === "en_cours" ? "on" : ""}
@@ -556,6 +584,14 @@ export default function Sav() {
                         onClick={() => openLitigeSection(item)}
                       >
                         + Ajouter une note / fichier
+                      </button>
+
+                      <button
+                        className="btn sm ghost"
+                        title="Ouvrir un dossier retour : remboursement, avoir ou remise en stock"
+                        onClick={() => setConvertingReturn(item)}
+                      >
+                        ↩ Retour / remboursement
                       </button>
                     </div>
                   </div>
@@ -703,8 +739,116 @@ export default function Sav() {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {editing && <ItemModal item={editing} onClose={() => setEditing(null)} onSell={(i) => setSelling(i)} />}
+      {convertingReturn && (
+        <ReturnModal
+          initial={emptyReturn("client", convertingReturn)}
+          candidates={soldItems}
+          isEditing={false}
+          onClose={() => setConvertingReturn(null)}
+        />
+      )}
+      {editingPersonal && (
+        <Modal
+          title={state.personalLitiges.some((l) => l.id === editingPersonal.id) ? "Litige perso" : "Nouveau litige perso"}
+          onClose={() => setEditingPersonal(null)}
+          footer={
+            <>
+              {state.personalLitiges.some((l) => l.id === editingPersonal.id) && (
+                <button
+                  className="btn danger"
+                  onClick={() => {
+                    dispatch({ type: "removePersonalLitige", id: editingPersonal.id });
+                    toast("Litige perso supprimé");
+                    setEditingPersonal(null);
+                  }}
+                >
+                  Supprimer
+                </button>
+              )}
+              <div className="spacer" />
+              <button className="btn" onClick={() => setEditingPersonal(null)}>Annuler</button>
+              <button
+                className="btn primary"
+                onClick={() => {
+                  const title = editingPersonal.title.trim();
+                  if (!title) {
+                    toast("Ajoutez un titre au litige");
+                    return;
+                  }
+                  dispatch({
+                    type: "upsertPersonalLitige",
+                    litige: {
+                      ...editingPersonal,
+                      title,
+                      counterparty: editingPersonal.counterparty.trim(),
+                      category: editingPersonal.category.trim() || "Perso",
+                      notes: editingPersonal.notes.trim(),
+                    },
+                  });
+                  toast("Litige perso enregistré");
+                  setEditingPersonal(null);
+                }}
+              >
+                Enregistrer
+              </button>
+            </>
+          }
+        >
+          <div className="form-grid">
+            <Field label="Titre" span>
+              <input
+                value={editingPersonal.title}
+                placeholder="Ex. Litige fournisseur, remboursement perso, colis perdu..."
+                onChange={(e) => setEditingPersonal({ ...editingPersonal, title: e.target.value })}
+                autoFocus
+              />
+            </Field>
+            <Field label="Contact">
+              <input
+                value={editingPersonal.counterparty}
+                placeholder="Plateforme, fournisseur, transporteur..."
+                onChange={(e) => setEditingPersonal({ ...editingPersonal, counterparty: e.target.value })}
+              />
+            </Field>
+            <Field label="Catégorie">
+              <input
+                value={editingPersonal.category}
+                placeholder="Perso, fournisseur, transport..."
+                onChange={(e) => setEditingPersonal({ ...editingPersonal, category: e.target.value })}
+              />
+            </Field>
+            <Field label="Ouvert le">
+              <input
+                type="date"
+                value={editingPersonal.openedDate}
+                onChange={(e) => setEditingPersonal({ ...editingPersonal, openedDate: e.target.value })}
+              />
+            </Field>
+            <Field label="Statut">
+              <select
+                value={editingPersonal.status}
+                onChange={(e) => setEditingPersonal({ ...editingPersonal, status: e.target.value as LitigeStatus })}
+              >
+                <option value="en_cours">En cours</option>
+                <option value="attente">En attente</option>
+                <option value="resolu">Résolu</option>
+              </select>
+            </Field>
+            <Field label="Notes" span>
+              <textarea
+                rows={4}
+                value={editingPersonal.notes}
+                placeholder="Détail, prochaines actions, pièces à demander..."
+                onChange={(e) => setEditingPersonal({ ...editingPersonal, notes: e.target.value })}
+              />
+            </Field>
+          </div>
+        </Modal>
+      )}
       {selling && (
         <SellModal
           item={selling}

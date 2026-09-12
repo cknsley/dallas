@@ -1,15 +1,9 @@
-import { Modal } from "../components/ui";
 import { eur, pct } from "../lib/format";
 import { chargesInRange, costOf, marginOf, qtyOf, saleCostsOf } from "../lib/calc";
 import type { AppState } from "../types";
 
-export default function RentabiliteModal({
-  state,
-  onClose,
-}: {
-  state: AppState;
-  onClose: () => void;
-}) {
+/** Bilan de rentabilité globale : d'où vient le chiffre d'affaires, marque par marque. */
+export default function RentabilitePanel({ state }: { state: AppState }) {
   const soldItems = state.items.filter((i) => i.status === "vendu");
   const totalCa = soldItems.reduce((a, i) => a + i.price * qtyOf(i), 0);
   const totalMarge = soldItems.reduce((a, i) => a + marginOf(i), 0);
@@ -25,7 +19,6 @@ export default function RentabiliteModal({
   const shippingPct = totalCa > 0 ? (totalShippingPaid / totalCa) * 100 : 0;
   const avgMargePerSale = soldItems.length > 0 ? totalMarge / soldItems.length : 0;
 
-  // Répartition par marque
   const brandStats = Array.from(
     soldItems.reduce((map, item) => {
       const b = item.brand.trim() || "Sans marque";
@@ -38,6 +31,8 @@ export default function RentabiliteModal({
     }, new Map<string, { brand: string; qty: number; ca: number; marge: number }>()).values()
   ).sort((a, b) => b.marge - a.marge);
 
+  if (soldItems.length === 0) return null;
+
   let healthBadge = { text: "Excellente rentabilité", class: "ok", icon: "🚀" };
   let adviceText = "Votre stratégie d'achat et votre pricing sont très performants. Continuez à cibler ces références à forte marge.";
   if (globalMargePct < 15) {
@@ -49,9 +44,13 @@ export default function RentabiliteModal({
   }
 
   return (
-    <Modal wide title="📈 Indice de Rentabilité sur le Chiffre d'Affaires" onClose={onClose}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        {/* Résumé de santé */}
+    <div className="card" style={{ marginTop: 16 }}>
+      <div className="card-h">
+        <h3>📈 Rentabilité globale</h3>
+        <div className="spacer" />
+        <span className="hint">Toutes ventes confondues</span>
+      </div>
+      <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         <div
           className={`note ${healthBadge.class}`}
           style={{ display: "flex", alignItems: "center", gap: 12, padding: 14, borderRadius: "var(--r-sm)" }}
@@ -65,7 +64,6 @@ export default function RentabiliteModal({
           </div>
         </div>
 
-        {/* Grille des KPIs clés */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12 }}>
           <div className="card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 4 }}>
             <div style={{ fontSize: 11.5, color: "var(--ink-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.03em" }}>Chiffre d'affaires</div>
@@ -94,7 +92,6 @@ export default function RentabiliteModal({
           </div>
         </div>
 
-        {/* Décomposition du Chiffre d'Affaires */}
         <div className="card" style={{ padding: 16 }}>
           <h4 style={{ margin: "0 0 12px", fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--ink-3)" }}>
             Décomposition du Chiffre d'Affaires (100 %)
@@ -127,48 +124,43 @@ export default function RentabiliteModal({
           </div>
         </div>
 
-        {/* Classement des marques par rentabilité */}
         <div className="card" style={{ padding: 16 }}>
           <h4 style={{ margin: "0 0 12px", fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--ink-3)" }}>
             Classement de la rentabilité par Marque
           </h4>
-          {brandStats.length === 0 ? (
-            <div className="hint">Aucune vente enregistrée.</div>
-          ) : (
-            <div className="twrap">
-              <table style={{ fontSize: 12.5 }}>
-                <thead>
-                  <tr>
-                    <th>Marque</th>
-                    <th className="r">Qté</th>
-                    <th className="r">Chiffre d'Affaires</th>
-                    <th className="r">Marge réalisée</th>
-                    <th className="r">Taux de marge</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {brandStats.map((b) => {
-                    const mPct = b.ca > 0 ? (b.marge / b.ca) * 100 : 0;
-                    return (
-                      <tr key={b.brand}>
-                        <td><b>{b.brand}</b></td>
-                        <td className="r num">{b.qty}</td>
-                        <td className="r num">{eur(b.ca)}</td>
-                        <td className={`r num ${b.marge >= 0 ? "pos" : "neg"}`}>{eur(b.marge)}</td>
-                        <td className="r num">
-                          <span className={`pill ${mPct >= 35 ? "ok" : mPct >= 20 ? "neutral" : "warn"}`}>
-                            {pct(mPct)}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <div className="twrap">
+            <table style={{ fontSize: 12.5 }}>
+              <thead>
+                <tr>
+                  <th>Marque</th>
+                  <th className="r">Qté</th>
+                  <th className="r">Chiffre d'Affaires</th>
+                  <th className="r">Marge réalisée</th>
+                  <th className="r">Taux de marge</th>
+                </tr>
+              </thead>
+              <tbody>
+                {brandStats.map((b) => {
+                  const mPct = b.ca > 0 ? (b.marge / b.ca) * 100 : 0;
+                  return (
+                    <tr key={b.brand}>
+                      <td><b>{b.brand}</b></td>
+                      <td className="r num">{b.qty}</td>
+                      <td className="r num">{eur(b.ca)}</td>
+                      <td className={`r num ${b.marge >= 0 ? "pos" : "neg"}`}>{eur(b.marge)}</td>
+                      <td className="r num">
+                        <span className={`pill ${mPct >= 35 ? "ok" : mPct >= 20 ? "neutral" : "warn"}`}>
+                          {pct(mPct)}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-    </Modal>
+    </div>
   );
 }

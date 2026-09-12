@@ -1,27 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
-import { Confirm, Empty, Field, Kpi, Segmented } from "../components/ui";
+import { Confirm, Empty, Kpi, Segmented } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { caOfYear } from "../lib/calc";
-import { dfr, eur, eur2, num, pct } from "../lib/format";
-import { COUNTRIES, VAT_BY_COUNTRY, vatRegime } from "../lib/vat";
+import { dfr, eur, eur2, pct } from "../lib/format";
+import { docKindLabel, isSociete, vatRegime } from "../lib/vat";
 import { useQueryState } from "../lib/useQueryState";
 import { links } from "../lib/links";
 import DocModal from "../modals/DocModal";
 import DocPreview from "../modals/DocPreview";
-import type { LegalStatus, SalesDoc } from "../types";
-
-const LEGAL: { value: LegalStatus; label: string }[] = [
-  { value: "particulier", label: "Particulier" },
-  { value: "micro", label: "Micro-entreprise" },
-  { value: "societe", label: "Société (SARL / SAS)" },
-];
+import type { SalesDoc } from "../types";
 
 export default function Facturation() {
   const { state, dispatch } = useStore();
   const toast = useToast();
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [creating, setCreating] = useState<string[] | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -60,12 +55,10 @@ export default function Facturation() {
     .filter((d) => docFilter === "all" || (docFilter === "paid" ? d.paid : !d.paid))
     .sort((a, b) => b.createdAt - a.createdAt);
 
-  const setSetting = <K extends keyof typeof s>(k: K, v: (typeof s)[K]) =>
-    dispatch({ type: "settings", patch: { [k]: v } as Partial<typeof s> });
-
   return (
     <>
       <HeaderActions>
+        <button className="btn ghost" onClick={() => navigate(links.reglages())}>⚙ Réglages</button>
         <button className="btn primary" onClick={() => setCreating([])}>+ Nouveau document</button>
       </HeaderActions>
 
@@ -73,11 +66,11 @@ export default function Facturation() {
         <Kpi label={`CA ${year}`} value={eur(caYear)} meta={regime.label} to={links.ventes()} hint="Ventes" />
         <Kpi
           label={s.vatEnabled ? "Seuil de franchise" : "Facture pro"}
-          value={!s.vatEnabled ? "Désactivé" : s.legalStatus === "societe" ? "—" : eur(regime.threshold)}
+          value={!s.vatEnabled ? "Désactivé" : isSociete(s.legalStatus) ? "—" : eur(regime.threshold)}
           meta={
             !s.vatEnabled
               ? "Activez-la ci-dessous si vous facturez avec TVA"
-              : s.legalStatus === "societe"
+              : isSociete(s.legalStatus)
               ? "Société assujettie dès le 1er euro"
               : regime.threshold
                 ? `${pct((caYear / regime.threshold) * 100)} atteint`
@@ -109,106 +102,7 @@ export default function Facturation() {
         </div>
       )}
 
-      <div className="cols two">
-        <div className="card">
-          <div className="card-h"><h3>Compte et facturation</h3></div>
-          <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <label className={`mode-switch${s.vatEnabled ? " on" : ""}`}>
-              <input
-                type="checkbox"
-                checked={s.vatEnabled}
-                onChange={(e) => setSetting("vatEnabled", e.target.checked)}
-              />
-              <div>
-                <b>Facture pro</b>
-                <div className="hint">
-                  {s.vatEnabled
-                    ? "TVA calculée sur les ventes, le bilan et les documents émis."
-                    : "Éteint : reçus simples, aucune TVA nulle part dans l'app."}
-                </div>
-              </div>
-            </label>
-
-            <div className="fgrid">
-              <Field label="Nom / raison sociale" span>
-                <input type="text" value={s.business} placeholder="Votre nom commercial" onChange={(e) => setSetting("business", e.target.value)} />
-              </Field>
-              <Field label="Statut juridique">
-                <select value={s.legalStatus} onChange={(e) => setSetting("legalStatus", e.target.value as LegalStatus)}>
-                  {LEGAL.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-                </select>
-              </Field>
-              <Field label="Pays">
-                <select
-                  value={s.country}
-                  onChange={(e) => {
-                    setSetting("country", e.target.value);
-                    setSetting("vatRate", VAT_BY_COUNTRY[e.target.value] ?? 20);
-                  }}
-                >
-                  {COUNTRIES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
-                </select>
-              </Field>
-              {s.vatEnabled && (
-                <>
-                  <Field label="N° de TVA intracommunautaire">
-                    <input type="text" value={s.vatNumber} placeholder="FR00123456789" onChange={(e) => setSetting("vatNumber", e.target.value)} />
-                  </Field>
-                  <Field label="Taux de TVA (%)">
-                    <input type="number" step="0.1" value={s.vatRate} onChange={(e) => setSetting("vatRate", num(e.target.value))} />
-                  </Field>
-                  <Field label="Seuil de franchise (€)">
-                    <input
-                      type="number"
-                      step="100"
-                      value={s.threshold}
-                      disabled={s.legalStatus === "societe"}
-                      onChange={(e) => setSetting("threshold", num(e.target.value))}
-                    />
-                  </Field>
-                </>
-              )}
-              <Field label="Délai de paiement (jours)">
-                <input type="number" step="1" value={s.paymentTerms} onChange={(e) => setSetting("paymentTerms", num(e.target.value))} />
-              </Field>
-            </div>
-            {s.vatEnabled && (
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={s.marginScheme}
-                  onChange={(e) => setSetting("marginScheme", e.target.checked)}
-                />
-                Régime de la marge (biens d'occasion) — la TVA porte sur la marge, pas sur le prix de vente
-              </label>
-            )}
-            {s.vatEnabled && (
-              <div className={`note ${regime.subject ? "info" : "ok"}`}>
-                <span className="glyph">§</span>
-                <div><b>{regime.label}</b><br />{regime.mention}</div>
-              </div>
-            )}
-            <hr className="sep" />
-            <div className="fgrid">
-              <Field label="Adresse" span>
-                <textarea rows={2} value={s.address} onChange={(e) => setSetting("address", e.target.value)} />
-              </Field>
-              <Field label="E-mail">
-                <input type="email" value={s.email} onChange={(e) => setSetting("email", e.target.value)} />
-              </Field>
-              <Field label="Téléphone">
-                <input type="text" value={s.phone} onChange={(e) => setSetting("phone", e.target.value)} />
-              </Field>
-              <Field label="IBAN" span>
-                <input type="text" value={s.iban} onChange={(e) => setSetting("iban", e.target.value)} />
-              </Field>
-              <Field label="Pied de page des documents" span>
-                <textarea rows={2} value={s.footer} placeholder="Mentions légales, conditions de retour…" onChange={(e) => setSetting("footer", e.target.value)} />
-              </Field>
-            </div>
-          </div>
-        </div>
-
+      <div className="cols">
         <div className="card">
           <div className="card-h">
             <h3>Documents émis</h3>
@@ -252,7 +146,7 @@ export default function Facturation() {
                       <td>
                         <a href="#" className="num" onClick={(e) => { e.preventDefault(); setPreviewId(d.id); }}>{d.number}</a>
                       </td>
-                      <td>{d.kind === "facture" ? "Facture" : "Reçu"}</td>
+                      <td>{docKindLabel(d.kind, s.legalStatus)}</td>
                       <td>
                         <div className="ellipsis">{d.clientName}</div>
                         {d.itemIds.length > 0 && (
@@ -292,65 +186,6 @@ export default function Facturation() {
               </table>
             </div>
           )}
-        </div>
-      </div>
-
-      <div className="cols two" style={{ marginTop: 16 }}>
-        <div className="card">
-          <div className="card-h">
-            <h3>Commissions par plateforme</h3>
-            <div className="spacer" />
-            <span className="hint">Appliquées automatiquement à la vente</span>
-          </div>
-          <div className="card-b rate-list">
-            {Object.entries(s.platformFees).map(([name, rate]) => (
-              <label className="rate-row" key={name}>
-                <span>{name}</span>
-                <span className="rate-input">
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    value={rate}
-                    onChange={(e) =>
-                      setSetting("platformFees", { ...s.platformFees, [name]: num(e.target.value) })
-                    }
-                  />
-                  %
-                </span>
-              </label>
-            ))}
-            <div className="hint">
-              Ces taux sont des ordres de grandeur : vérifiez-les auprès de chaque plateforme.
-            </div>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-h">
-            <h3>Suivi des transporteurs</h3>
-            <div className="spacer" />
-            <span className="hint">« {"{code}"} » est remplacé par le numéro</span>
-          </div>
-          <div className="card-b rate-list">
-            {Object.entries(s.trackingUrls).map(([name, url]) => (
-              <label className="rate-row wide" key={name}>
-                <span>{name}</span>
-                <input
-                  type="url"
-                  value={url}
-                  placeholder="https://…/suivi?code={code}"
-                  onChange={(e) =>
-                    setSetting("trackingUrls", { ...s.trackingUrls, [name]: e.target.value })
-                  }
-                />
-              </label>
-            ))}
-            <div className="hint">
-              Aucune API n'est appelée : le numéro de suivi devient un lien vers la page publique du
-              transporteur. Si une adresse change, corrigez-la ici.
-            </div>
-          </div>
         </div>
       </div>
 

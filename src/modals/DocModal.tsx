@@ -5,7 +5,7 @@ import { useStore } from "../store/StoreContext";
 import { caOfYear, costOf } from "../lib/calc";
 import { addDays, eur2, num, today } from "../lib/format";
 import { uid } from "../lib/id";
-import { vatDue, vatRegime } from "../lib/vat";
+import { docKindLabel, vatDue, vatRegime } from "../lib/vat";
 import type { DocKind, DocLine, SalesDoc } from "../types";
 
 interface ManualLine extends DocLine { id: string; }
@@ -97,7 +97,7 @@ export default function DocModal({
       createdAt: Date.now(),
     };
     dispatch({ type: "addDoc", doc, seqKey: numbering.seqKey });
-    toast(`${kind === "facture" ? "Facture" : "Reçu"} ${doc.number} créé`);
+    toast(`${docKindLabel(kind, state.settings.legalStatus)} ${doc.number} créé`);
     onClose();
     onCreated(doc);
   };
@@ -118,8 +118,8 @@ export default function DocModal({
         <div className="note warn">
           <span className="glyph">⚠</span>
           <div>
-            <b>Statut particulier</b> — la facture est réservée aux vendeurs professionnels. Seul un reçu peut être
-            émis. Changez de statut juridique dans les réglages si vous êtes immatriculé.
+            <b>Aucun statut professionnel</b> — la facture est réservée aux vendeurs professionnels. Seule une preuve de vente peut être
+            émise. Changez de statut juridique dans les réglages si vous êtes immatriculé.
           </div>
         </div>
       )}
@@ -130,7 +130,7 @@ export default function DocModal({
             <option value="facture" disabled={!regime.canInvoice}>
               Facture{!regime.canInvoice ? " — indisponible" : ""}
             </option>
-            <option value="recu">Reçu</option>
+            <option value="recu">{docKindLabel("recu", state.settings.legalStatus)}</option>
           </select>
         </Field>
         <Field label="Numéro">

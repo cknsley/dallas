@@ -14,25 +14,26 @@ export const blankItem = (): Item => ({
   id: uid(),
   sku: "",
   condition: "Neuf avec étiquette",
-  name: "", brand: "", type: "", size: "", packaging: "boite", source: "",
+  name: "", brand: "", type: "", size: "", gender: "", packaging: "boite", source: "",
   quantity: 1, cost: 0, fees: 0, price: 0, estimatedPrice: 0,
-  platform: "", buyer: "", buyerUrl: "", saleFees: 0, shippingCost: 0, shippingPaid: 0,
+  platform: "", buyer: "", buyerUrl: "", saleFees: 0, packagingCost: 0, shippingCost: 0, shippingPaid: 0,
   status: "arrivage",
   buyDate: today(), receiveDate: "", saleDate: "",
   delivery: "commandee", shipping: "en_preparation", orderId: "", purchasePaid: true, lotTag: "", autoReceive: false,
   notes: "", photoId: null,
   createdAt: Date.now(),
-  carrier: "", tracking: "", expectedDate: "", shipDate: "",
+  carrier: "", tracking: "", expectedDate: "", shipDate: "", shippingVideo: "", shippingVideoName: "",
 });
 
 /** Les montants restent des chaînes le temps de la saisie. */
-type MoneyKey = "cost" | "fees" | "price" | "estimatedPrice" | "saleFees" | "shippingPaid" | "shippingCost";
+type MoneyKey = "cost" | "fees" | "price" | "estimatedPrice" | "saleFees" | "packagingCost" | "shippingPaid" | "shippingCost";
 type Draft = Omit<Item, MoneyKey | "quantity"> & Record<MoneyKey, string> & { quantity: string };
 
 const toDraft = (i: Item): Draft => ({
   ...i,
   sku: i.sku || "",
   condition: i.condition || "Neuf avec étiquette",
+  gender: i.gender || "",
   packaging: i.packaging || "boite",
   quantity: String(Math.max(1, i.quantity || 1)),
   cost: i.cost ? String(i.cost) : "",
@@ -40,6 +41,7 @@ const toDraft = (i: Item): Draft => ({
   price: i.price ? String(i.price) : "",
   estimatedPrice: i.estimatedPrice ? String(i.estimatedPrice) : (i.price ? String(i.price) : ""),
   saleFees: i.saleFees ? String(i.saleFees) : "",
+  packagingCost: i.packagingCost ? String(i.packagingCost) : "",
   shippingPaid: i.shippingPaid ? String(i.shippingPaid) : "",
   shippingCost: i.shippingCost ? String(i.shippingCost) : "",
 });
@@ -90,7 +92,7 @@ export default function ItemModal({
   const qty = Math.max(1, Math.round(num(draft.quantity)) || 1);
   const totalCost = (num(draft.cost) + num(draft.fees)) * qty;
   const price = num(draft.price) || num(draft.estimatedPrice);
-  const saleCosts = isSold ? num(draft.saleFees) + num(draft.shippingCost) : 0;
+  const saleCosts = isSold ? num(draft.saleFees) + num(draft.packagingCost) + num(draft.shippingCost) : 0;
   const cashIn = (isSold ? price + num(draft.shippingPaid) / qty : price) * qty;
   const outflow = totalCost + saleCosts;
   const marge = cashIn - outflow;
@@ -196,6 +198,7 @@ export default function ItemModal({
           brand: draft.brand.trim(),
           type: draft.type.trim(),
           size: sizeVal,
+          gender: draft.gender || "",
           packaging: draft.packaging || "boite",
           source: draft.source.trim(),
           notes: draft.notes.trim(),
@@ -205,6 +208,7 @@ export default function ItemModal({
           price: num(draft.price),
           estimatedPrice: num(draft.estimatedPrice) || num(draft.price),
           saleFees: num(draft.saleFees),
+          packagingCost: num(draft.packagingCost),
           shippingPaid: num(draft.shippingPaid),
           shippingCost: num(draft.shippingCost),
           photoId,
@@ -226,6 +230,7 @@ export default function ItemModal({
       brand: draft.brand.trim(),
       type: draft.type.trim(),
       size: sizes[0] || draft.size.trim(),
+      gender: draft.gender || "",
       packaging: draft.packaging || "boite",
       source: draft.source.trim(),
       notes: draft.notes.trim(),
@@ -235,6 +240,7 @@ export default function ItemModal({
       price: num(draft.price),
       estimatedPrice: num(draft.estimatedPrice) || num(draft.price),
       saleFees: num(draft.saleFees),
+      packagingCost: num(draft.packagingCost),
       shippingPaid: num(draft.shippingPaid),
       shippingCost: num(draft.shippingCost),
       photoId,
@@ -322,6 +328,15 @@ export default function ItemModal({
               ✨ {parseSizes(draft.size).length} fiches distinctes seront créées automatiquement !
             </span>
           )}
+        </Field>
+        <Field label="Sexe">
+          <select value={draft.gender || ""} onChange={(e) => set("gender", e.target.value as Item["gender"])}>
+            <option value="">Non précisé</option>
+            <option value="homme">Homme</option>
+            <option value="femme">Femme</option>
+            <option value="mixte">Mixte</option>
+            <option value="enfant">Enfant</option>
+          </select>
         </Field>
         <Field label="Source">
           <input type="text" list="dl-source" value={draft.source} placeholder="Ex. Vinted, friperie, grossiste" onChange={(e) => set("source", e.target.value)} />
@@ -444,7 +459,7 @@ export default function ItemModal({
         <Field label={eurLabel(LABEL.fees)}>
           <input type="number" step="0.01" value={draft.fees} placeholder={HINT.fees} onChange={(e) => set("fees", e.target.value)} />
         </Field>
-        <Field label={eurLabel(isSold ? LABEL.price : "Prix estimé (€)")}>
+        <Field label={eurLabel(isSold ? LABEL.price : "Prix estimé")}>
           <input
             type="number"
             step="0.01"
@@ -546,4 +561,3 @@ export default function ItemModal({
     </Modal>
   );
 }
-

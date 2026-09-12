@@ -113,6 +113,12 @@ export default function Dashboard() {
 
       <StockValueCard state={state} />
 
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", margin: "14px 0 18px" }}>
+        <button className="btn primary" onClick={() => setCreating("order")}>+ Nouvelle commande</button>
+        <button className="btn" onClick={() => navigate(links.ventes())}>+ Vente</button>
+        <button className="btn" onClick={() => navigate(links.deal())}>⚖ Deal</button>
+      </div>
+
       <div className="kpi-grid">
         <Kpi
           label="Chiffre d'affaires"
@@ -258,7 +264,7 @@ export default function Dashboard() {
       {creating === "order" && (
         <OrderModal
           onClose={() => setCreating(null)}
-          onCreated={() => navigate(links.livraison({ tab: "recevoir" }))}
+          onCreated={() => navigate(links.arrivage())}
         />
       )}
     </>

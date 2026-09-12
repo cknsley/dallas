@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
 import { Empty, Kpi, Photo, Segmented } from "../components/ui";
 import { useToast } from "../components/Toast";
@@ -29,6 +30,7 @@ const SORTS: { value: Sort; label: string }[] = [
 export default function Fournisseurs() {
   const { state, dispatch } = useStore();
   const toast = useToast();
+  const navigate = useNavigate();
   const [period, setPeriod] = usePref<Period>("period", "month");
   const [sort, setSort] = usePref<Sort>("supplierSort", "purchases");
   const [q, setQ] = useQueryState("q");
@@ -181,10 +183,10 @@ export default function Fournisseurs() {
             <span>Déjà réceptionnés</span>
             <b className="num">{receivedPieces}</b>
           </div>
-          <div className="totrow">
+          <button className="totrow linked" onClick={() => navigate(links.arrivage())}>
             <span>Encore en route</span>
             <b className={`num ${waitingPieces ? "warn-text" : ""}`}>{waitingPieces}</b>
-          </div>
+          </button>
           <hr className="sep" />
           <div className="totrow"><span>Montant commandé</span><b className="num">{eur2(purchases)}</b></div>
           <div className="totrow"><span>Déjà réglé</span><b className="num pos">{eur2(paidTotal)}</b></div>
@@ -322,7 +324,7 @@ export default function Fournisseurs() {
                   {isOpen && (
                     <div className="supplier-detail">
                       {s.record && (s.record.email || s.record.phone || s.record.url || s.record.notes || s.record.address) && (
-                        <div className="supplier-contact" style={{ display: "flex", flexDirection: "column", gap: 4, background: "var(--card-bg-2)", padding: 10, borderRadius: 8 }}>
+                        <div className="supplier-contact" style={{ display: "flex", flexDirection: "column", gap: 4, background: "var(--surface-2)", padding: 10, borderRadius: 8 }}>
                           <b style={{ fontSize: 13 }}>👤 Compte & Contact Fournisseur</b>
                           {s.record.contact && <div><b>Contact :</b> {s.record.contact}</div>}
                           {s.record.email && <div><b>Email :</b> <a href={`mailto:${s.record.email}`}>{s.record.email}</a></div>}
@@ -347,7 +349,7 @@ export default function Fournisseurs() {
                           (t) => (t.supplierName || "").toLowerCase() === s.name.toLowerCase()
                         );
                         return (
-                          <div className="supplier-tasks-section" style={{ margin: "8px 0", background: "var(--card-bg-2)", padding: 12, borderRadius: 10, border: "1px solid var(--line)" }}>
+                          <div className="supplier-tasks-section" style={{ margin: "8px 0", background: "var(--surface-2)", padding: 12, borderRadius: 10, border: "1px solid var(--line)" }}>
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                               <b style={{ fontSize: 13 }}>📋 Tâches pour {s.name} ({supplierTodos.length})</b>
                             </div>

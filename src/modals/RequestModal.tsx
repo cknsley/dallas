@@ -11,6 +11,10 @@ export const blankRequest = (): ProductRequest => ({
   for: "stock",
   client: "",
   name: "",
+  brand: "",
+  size: "",
+  gender: "",
+  quantity: 1,
   budget: 0,
   notes: "",
   status: "en_cours",
@@ -32,20 +36,36 @@ export default function RequestModal({
   const { dispatch } = useStore();
   const toast = useToast();
   const isNew = request === null;
-  const [d, setD] = useState<ProductRequest>(request ?? blankRequest());
+  const [d, setD] = useState<ProductRequest>({ ...blankRequest(), ...(request ?? {}) });
   const set = <K extends keyof ProductRequest>(k: K, v: ProductRequest[K]) => setD((x) => ({ ...x, [k]: v }));
 
   const submit = () => {
     const cleanName = d.name.trim();
     const cleanClient = d.client.trim();
+    const cleanBrand = d.brand.trim();
+    const cleanSize = d.size.trim();
     if (!cleanName) {
       toast("Décrivez ce que vous cherchez");
       return;
     }
-    dispatch({ type: "upsertRequest", request: { ...d, name: cleanName, client: cleanClient } });
+    const requestToSave = {
+      ...d,
+      name: cleanName,
+      client: cleanClient,
+      brand: cleanBrand,
+      size: cleanSize,
+      quantity: Math.max(1, Math.round(num(d.quantity)) || 1),
+    };
+    dispatch({ type: "upsertRequest", request: requestToSave });
 
     if (isNew) {
-      const taskText = `Rechercher : ${cleanName}${d.budget > 0 ? ` (Budget max: ${d.budget} €)` : ""}`;
+      const details = [
+        cleanBrand,
+        cleanSize && `taille ${cleanSize}`,
+        d.gender,
+        requestToSave.quantity > 1 && `x${requestToSave.quantity}`,
+      ].filter(Boolean).join(" · ");
+      const taskText = `Rechercher : ${cleanName}${details ? ` (${details})` : ""}${d.budget > 0 ? ` · Budget max: ${d.budget} €` : ""}`;
       dispatch({
         type: "addTodo",
         todo: {
@@ -117,6 +137,42 @@ export default function RequestModal({
           autoFocus
         />
       </Field>
+      <div className="form-grid">
+        <Field label="Marque">
+          <input
+            type="text"
+            value={d.brand}
+            placeholder="Nike, Stüssy, Louis Vuitton..."
+            onChange={(e) => set("brand", e.target.value)}
+          />
+        </Field>
+        <Field label="Taille">
+          <input
+            type="text"
+            value={d.size}
+            placeholder="42, M, 90, OS..."
+            onChange={(e) => set("size", e.target.value)}
+          />
+        </Field>
+        <Field label="Sexe">
+          <select value={d.gender} onChange={(e) => set("gender", e.target.value as ProductRequest["gender"])}>
+            <option value="">Non précisé</option>
+            <option value="homme">Homme</option>
+            <option value="femme">Femme</option>
+            <option value="mixte">Mixte</option>
+            <option value="enfant">Enfant</option>
+          </select>
+        </Field>
+        <Field label="Quantité">
+          <input
+            type="number"
+            min="1"
+            step="1"
+            value={d.quantity || 1}
+            onChange={(e) => set("quantity", Math.max(1, Math.round(num(e.target.value)) || 1))}
+          />
+        </Field>
+      </div>
       <Field label="Budget">
         <input
           type="number"

@@ -34,9 +34,9 @@ export default function TrackingLink({ carrier, code }: { carrier: string; code:
       href={url}
       target="_blank"
       rel="noreferrer noopener"
-      title="Ouvrir le lien de suivi direct"
+      title="Ouvrir le suivi"
     >
-      🔗 Lien direct ↗
+      🔗 Lien ↗
     </a>
   );
 }
