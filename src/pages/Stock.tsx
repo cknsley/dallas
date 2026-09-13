@@ -126,9 +126,14 @@ export default function Stock() {
 
   const [view, setView] = usePref<"table" | "grid">("stockView", "table");
   const [catRaw, setCatRaw] = useQueryState("cat", "total");
-  const categoryTab = (catRaw as StockCategoryTab) || "total";
-  const setCategoryTab = (val: StockCategoryTab) => setCatRaw(val);
   const secteur = useSecteur();
+  // Dans l'espace TCG tout est déjà une carte : les catégories vêtement n'ont plus lieu
+  // d'être, et l'onglet TCG disparaît symétriquement de l'espace Vêtements.
+  const visibleTabs =
+    secteur.domain === "tcg" ? [] : STOCK_TABS.filter((t) => secteur.domain === "all" || t.key !== "tcg");
+  const categoryTab: StockCategoryTab =
+    secteur.domain === "tcg" ? "total" : ((catRaw as StockCategoryTab) || "total");
+  const setCategoryTab = (val: StockCategoryTab) => setCatRaw(val);
   const [q, setQ] = useQueryState("q");
   const [brand, setBrand] = useQueryState("brand");
   const [type, setType] = useQueryState("type");
@@ -284,8 +289,9 @@ export default function Stock() {
       </HeaderActions>
 
       {/* Onglets de catégories du Stock */}
+      {visibleTabs.length > 0 && (
       <div className="stock-tabs-bar" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-        {STOCK_TABS.map((tab) => {
+        {visibleTabs.map((tab) => {
           const active = categoryTab === tab.key;
           const count = tabCounts[tab.key];
           return (
@@ -321,6 +327,7 @@ export default function Stock() {
           );
         })}
       </div>
+      )}
 
       <div className="toolbar">
         <select value={brand} onChange={(e) => setBrand(e.target.value)} style={{ width: "auto", minWidth: 130 }}>

@@ -31,7 +31,8 @@ export default function SecteurHub() {
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
     routes: group.routes.filter((r) => {
-      if (r.path === "/") return false;
+      if (r.path === "/dashboard") return false;
+      if (r.path === "/tcg" && secteur === "fashion") return false;
       const module = MODULE_BY_PATH[r.path as keyof typeof MODULE_BY_PATH];
       return !module || state.settings.enabledModules[module];
     }),

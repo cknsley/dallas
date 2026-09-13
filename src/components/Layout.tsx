@@ -20,6 +20,7 @@ import {
   Search,
   Menu,
   X,
+  Home,
   LucideIcon,
 } from "lucide-react";
 import { useStore } from "../store/StoreContext";
@@ -114,6 +115,8 @@ export default function Layout() {
       : ROUTES.find((r) => (r.end ? pathname === r.path : pathname.startsWith(r.path))) ?? ROUTES[0];
 
   const routeIsEnabled = (route: NavRoute) => {
+    // La section cartes n'a rien à faire dans l'espace Vêtements.
+    if (route.path === "/tcg" && activeSecteur === "fashion") return false;
     const module = MODULE_BY_PATH[route.path as keyof typeof MODULE_BY_PATH];
     return !module || state.settings.enabledModules[module];
   };
@@ -152,6 +155,7 @@ export default function Layout() {
               <b>RESELL</b>
               <span>Cockpit ERP</span>
             </div>
+            <Home size={16} className="brand-back" />
           </Link>
           <button className="mob-close" onClick={() => setMobOpen(false)}>
             <X size={18} />

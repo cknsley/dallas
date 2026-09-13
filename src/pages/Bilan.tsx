@@ -62,10 +62,11 @@ export default function Bilan() {
   const [domain, setDomain] = usePref<"all" | "fashion" | "tcg">("bilanDomain", "all");
   const [searchParams] = useSearchParams();
 
-  // Arrivée depuis le hub d'un secteur (?secteur=tcg|fashion) : on pré-sélectionne ce domaine.
+  // Le domaine suit l'URL : un secteur le pré-sélectionne, son absence rétablit la vue
+  // d'ensemble — sinon la préférence mémorisée filtrerait encore une vue dite générale.
   useEffect(() => {
     const secteur = searchParams.get("secteur");
-    if (secteur === "tcg" || secteur === "fashion") setDomain(secteur);
+    setDomain(secteur === "tcg" || secteur === "fashion" ? secteur : "all");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
