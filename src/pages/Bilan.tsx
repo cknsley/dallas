@@ -8,14 +8,14 @@ import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
 import {
   caOfYear, chargesInRange, chargesByKind, computeStats, costOf, expenseMonthlyShare,
-  groupBy, pendingDeliveryValue, periodRange, qtyOf, remainingToAmortize, revenueOf,
+  filterItemsByDomain, groupBy, pendingDeliveryValue, periodRange, qtyOf, remainingToAmortize, revenueOf,
   soldItems,
 } from "../lib/calc";
 import { dshort, eur, eur2, num, pct } from "../lib/format";
 import { STATUS_LABEL } from "../lib/constants";
 import { vatDue, vatRegime } from "../lib/vat";
 import { links } from "../lib/links";
-import type { Period } from "../types";
+import type { Item, Period } from "../types";
 
 
 
@@ -59,34 +59,35 @@ function BalanceRow({
 export default function Bilan() {
   const { state } = useStore();
   const [period, setPeriod] = usePref<Period>("period", "month");
+  const [domain, setDomain] = usePref<"all" | "fashion" | "tcg">("bilanDomain", "all");
 
-
+  const domainItems = useMemo(() => filterItemsByDomain(state.items, domain), [state.items, domain]);
   const range = useMemo(() => periodRange(period), [period]);
-  const stats = useMemo(() => computeStats(state, range), [state, range]);
+  const stats = useMemo(() => computeStats(state, range, domain), [state, range, domain]);
   const regime = useMemo(
-    () => vatRegime(state.settings, caOfYear(state.items, new Date().getFullYear())),
-    [state.settings, state.items],
+    () => vatRegime(state.settings, caOfYear(domainItems, new Date().getFullYear())),
+    [state.settings, domainItems],
   );
-  const byBrand = useMemo(() => groupBy(soldItems(state.items, range), "brand"), [state.items, range]);
-  const byType = useMemo(() => groupBy(soldItems(state.items, range), "type"), [state.items, range]);
-  const sold = useMemo(() => soldItems(state.items, range), [state.items, range]);
+  const byBrand = useMemo(() => groupBy(soldItems(domainItems, range), "brand"), [domainItems, range]);
+  const byType = useMemo(() => groupBy(soldItems(domainItems, range), "type"), [domainItems, range]);
+  const sold = useMemo(() => soldItems(domainItems, range), [domainItems, range]);
 
   const tva = vatDue(regime, stats.ca, stats.marge);
   const charges = useMemo(() => chargesInRange(state.expenses, range), [state.expenses, range]);
   const chargesKinds = useMemo(() => chargesByKind(state.expenses, range), [state.expenses, range]);
-  const sleeping = useMemo(() => pendingDeliveryValue(state.items), [state.items]);
+  const sleeping = useMemo(() => pendingDeliveryValue(domainItems), [domainItems]);
   const immo = useMemo(() => remainingToAmortize(state.expenses), [state.expenses]);
   const [openRow, setOpenRow] = useState("");
 
   const heldItems = useMemo(
-    () => state.items.filter((i) => i.status !== "vendu").sort((a, b) => costOf(b) - costOf(a)),
-    [state.items],
+    () => domainItems.filter((i: Item) => i.status !== "vendu").sort((a: Item, b: Item) => costOf(b) - costOf(a)),
+    [domainItems],
   );
   const pendingItems = useMemo(
-    () => state.items
-      .filter((i) => i.status === "vendu" && i.delivery === "commandee")
-      .sort((a, b) => revenueOf(b) - revenueOf(a)),
-    [state.items],
+    () => domainItems
+      .filter((i: Item) => i.status === "vendu" && i.delivery === "commandee")
+      .sort((a: Item, b: Item) => revenueOf(b) - revenueOf(a)),
+    [domainItems],
   );
   const remainingByExpense = useMemo(
     () => state.expenses
@@ -101,31 +102,31 @@ export default function Bilan() {
     [state.expenses],
   );
 
-  const sleepingCount = state.items.filter((i) => i.status === "vendu" && i.delivery === "commandee").length;
+  const sleepingCount = domainItems.filter((i: Item) => i.status === "vendu" && i.delivery === "commandee").length;
   const net = stats.marge - tva - charges;
 
   // Achats côté bilan
   const detail = useMemo(() => {
-    const achat = sold.reduce((a, i) => a + num(i.cost), 0);
-    const fraisAchat = sold.reduce((a, i) => a + num(i.fees), 0);
-    const commissions = sold.reduce((a, i) => a + num(i.saleFees), 0);
-    const portPaye = sold.reduce((a, i) => a + num(i.shippingCost), 0);
-    const portRecu = sold.reduce((a, i) => a + num(i.shippingPaid), 0);
+    const achat = sold.reduce((a: number, i: Item) => a + num(i.cost), 0);
+    const fraisAchat = sold.reduce((a: number, i: Item) => a + num(i.fees), 0);
+    const commissions = sold.reduce((a: number, i: Item) => a + num(i.saleFees), 0);
+    const portPaye = sold.reduce((a: number, i: Item) => a + num(i.shippingCost), 0);
+    const portRecu = sold.reduce((a: number, i: Item) => a + num(i.shippingPaid), 0);
     return { achat, fraisAchat, commissions, portPaye, portRecu, charges };
   }, [sold, charges]);
 
   // Total achats (stock + arrivage) — côté balance achats
-  const stockItems = state.items.filter((i) => i.status !== "vendu");
-  const totalAchats = stockItems.reduce((a, i) => a + costOf(i), 0);
-  const arrivageItems = state.items.filter((i) => i.status === "arrivage");
-  const arrivageVal = arrivageItems.reduce((a, i) => a + costOf(i), 0);
-  const stockSeulVal = state.items.filter((i) => i.status === "stock").reduce((a, i) => a + costOf(i), 0);
+  const stockItems = domainItems.filter((i: Item) => i.status !== "vendu");
+  const totalAchats = stockItems.reduce((a: number, i: Item) => a + costOf(i), 0);
+  const arrivageItems = domainItems.filter((i: Item) => i.status === "arrivage");
+  const arrivageVal = arrivageItems.reduce((a: number, i: Item) => a + costOf(i), 0);
+  const stockSeulVal = domainItems.filter((i: Item) => i.status === "stock").reduce((a: number, i: Item) => a + costOf(i), 0);
 
   // Balance ventes
-  const allSold = soldItems(state.items); // toutes périodes
-  const totalCA = allSold.reduce((a, i) => a + revenueOf(i), 0);
-  const totalCost = allSold.reduce((a, i) => a + costOf(i), 0);
-  const totalSaleCosts = allSold.reduce((a, i) => a + num(i.saleFees) + num(i.shippingCost) - num(i.shippingPaid), 0);
+  const allSold = soldItems(domainItems); // toutes périodes
+  const totalCA = allSold.reduce((a: number, i: Item) => a + revenueOf(i), 0);
+  const totalCost = allSold.reduce((a: number, i: Item) => a + costOf(i), 0);
+  const totalSaleCosts = allSold.reduce((a: number, i: Item) => a + num(i.saleFees) + num(i.shippingCost) - num(i.shippingPaid), 0);
   const totalMargeGlobale = totalCA - totalCost - Math.max(0, totalSaleCosts);
   const roiGlobal = totalCost > 0 ? (totalMargeGlobale / totalCost) * 100 : 0;
 
@@ -133,6 +134,15 @@ export default function Bilan() {
   return (
     <>
       <HeaderActions>
+        <Segmented<"all" | "fashion" | "tcg">
+          value={domain}
+          onChange={setDomain}
+          options={[
+            { value: "all", label: "🌐 Tout" },
+            { value: "fashion", label: "👕 Vêtements & Fashion" },
+            { value: "tcg", label: "🃏 TCG & Cartes" },
+          ]}
+        />
         <Segmented<Period>
           value={period}
           onChange={setPeriod}
@@ -338,10 +348,10 @@ export default function Bilan() {
             onToggle={setOpenRow}
             to={links.stock({ status: "stock" })}
             linkLabel="Ouvrir le stock"
-            lines={heldItems.map((i) => ({
+            lines={heldItems.map((i: Item) => ({
               key: i.id,
               label: i.name || "Sans nom",
-              note: `${i.brand || "—"}${i.size ? ` · ${i.size}` : ""}${qtyOf(i) > 1 ? ` · ×${qtyOf(i)}` : ""} · ${STATUS_LABEL[i.status]}`,
+              note: `${i.brand || "—"}${i.size ? ` · ${i.size}` : ""}${qtyOf(i) > 1 ? ` · ×${qtyOf(i)}` : ""} · ${STATUS_LABEL[i.status as keyof typeof STATUS_LABEL] || i.status}`,
               amount: costOf(i),
             }))}
             emptyNote="Aucun article en stock."
@@ -355,7 +365,7 @@ export default function Bilan() {
             onToggle={setOpenRow}
             to={links.livraison()}
             linkLabel="Ouvrir les livraisons"
-            lines={pendingItems.map((i) => ({
+            lines={pendingItems.map((i: Item) => ({
               key: i.id,
               label: i.name || "Sans nom",
               note: `${i.buyer || "Acheteur non renseigné"}${i.platform ? ` · ${i.platform}` : ""} · vendu le ${dshort(i.saleDate)}`,

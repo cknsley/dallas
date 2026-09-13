@@ -85,6 +85,15 @@ export default function OrderModal({
   const [notes, setNotes] = useState("");
   const [purchasePaid, setPurchasePaid] = useState(true);
   const [autoReceive, setAutoReceive] = useState(false);
+
+  /* Support TCG & Cartes */
+  const [isTcgOrder, setIsTcgOrder] = useState(false);
+  const [tcgGameOrder, setTcgGameOrder] = useState("Pokémon");
+  const [tcgCategoryOrder, setTcgCategoryOrder] = useState<"raw" | "graded" | "sealed" | "grading">("raw");
+  const [tcgSetOrder, setTcgSetOrder] = useState("");
+  const [tcgGradeOrder, setTcgGradeOrder] = useState("PSA 10 Gem Mint");
+  const [gradingCompanyOrder, setGradingCompanyOrder] = useState("PSA");
+
   const [lines, setLines] = useState<Line[]>(() => {
     if (initialLines && initialLines.length > 0) {
       return initialLines.map((l) => ({
@@ -223,6 +232,18 @@ export default function OrderModal({
         purchasePaid: isProMode ? purchasePaid : true,
         lotTag: tag,
         autoReceive: isProMode ? autoReceive : false,
+        isTcg: isTcgOrder,
+        tcgGame: isTcgOrder ? tcgGameOrder : undefined,
+        tcgSet: isTcgOrder ? tcgSetOrder : undefined,
+        tcgCategory: isTcgOrder ? tcgCategoryOrder : undefined,
+        tcgGrade: isTcgOrder
+          ? (tcgCategoryOrder === "grading"
+            ? "En gradation (Note à découvrir ✨)"
+            : tcgCategoryOrder === "raw"
+            ? "Raw (Near Mint)"
+            : tcgGradeOrder)
+          : undefined,
+        gradingCompany: isTcgOrder && (tcgCategoryOrder === "grading" || tcgCategoryOrder === "graded") ? gradingCompanyOrder : undefined,
       };
       dispatch({ type: "upsertItem", item });
     });
@@ -451,6 +472,92 @@ export default function OrderModal({
           </Field>
         </div>
       )}
+
+      {/* Bloc Achat / Import Lot TCG & Cartes */}
+      <div
+        style={{
+          marginTop: 12,
+          marginBottom: 12,
+          padding: 12,
+          borderRadius: 10,
+          background: isTcgOrder ? "rgba(234, 179, 8, 0.08)" : "var(--surface-sub)",
+          border: isTcgOrder ? "1px solid rgba(234, 179, 8, 0.3)" : "1px solid var(--border)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
+            <input
+              type="checkbox"
+              checked={isTcgOrder}
+              onChange={(e) => setIsTcgOrder(e.target.checked)}
+            />
+            <span>🃏 Il s'agit d'un Achat / Lot TCG (Cartes, Boosters, Gradations)</span>
+          </label>
+          {isTcgOrder && (
+            <span style={{ background: "#eab308", color: "#000", fontSize: 10, fontWeight: 800, padding: "2px 8px", borderRadius: 12 }}>
+              MODE TCG ACTIF
+            </span>
+          )}
+        </div>
+
+        {isTcgOrder && (
+          <div className="fgrid" style={{ marginTop: 10, gridTemplateColumns: "1fr 1fr 1fr" }}>
+            <Field label="Licence TCG">
+              <select value={tcgGameOrder} onChange={(e) => setTcgGameOrder(e.target.value)}>
+                <option value="Pokémon">⚡ Pokémon</option>
+                <option value="One Piece">🏴‍☠️ One Piece</option>
+                <option value="Yu-Gi-Oh!">👁️ Yu-Gi-Oh!</option>
+                <option value="Magic">🔮 Magic</option>
+                <option value="Lorcana">✨ Lorcana</option>
+                <option value="Dragon Ball">🐉 Dragon Ball</option>
+              </select>
+            </Field>
+
+            <Field label="Extension / Set">
+              <input
+                type="text"
+                value={tcgSetOrder}
+                placeholder="Ex. 151, EV05, OP-05..."
+                onChange={(e) => setTcgSetOrder(e.target.value)}
+              />
+            </Field>
+
+            <Field label="Statut / Catégorie">
+              <select
+                value={tcgCategoryOrder}
+                onChange={(e) => setTcgCategoryOrder(e.target.value as any)}
+              >
+                <option value="raw">🃏 Cartes Raw / Brut</option>
+                <option value="grading">⏳ En gradation chez PSA/BGS (Note à découvrir ✨)</option>
+                <option value="graded">🏆 Cartes Gradées (Note connue)</option>
+                <option value="sealed">📦 Coffrets / Display scellés</option>
+              </select>
+            </Field>
+
+            {(tcgCategoryOrder === "grading" || tcgCategoryOrder === "graded") && (
+              <Field label={tcgCategoryOrder === "grading" ? "Société de gradation" : "Grade attribué"}>
+                {tcgCategoryOrder === "grading" ? (
+                  <select value={gradingCompanyOrder} onChange={(e) => setGradingCompanyOrder(e.target.value)}>
+                    <option value="PSA">PSA</option>
+                    <option value="BGS">BGS</option>
+                    <option value="PCA">PCA</option>
+                    <option value="CGC">CGC</option>
+                    <option value="SGS">SGS</option>
+                  </select>
+                ) : (
+                  <select value={tcgGradeOrder} onChange={(e) => setTcgGradeOrder(e.target.value)}>
+                    <option value="PSA 10 Gem Mint">PSA 10 Gem Mint</option>
+                    <option value="PSA 9 Mint">PSA 9 Mint</option>
+                    <option value="BGS 10 Pristine">BGS 10 Pristine</option>
+                    <option value="PCA 10 Gem Mint">PCA 10 Gem Mint</option>
+                    <option value="Autre">Autre grade</option>
+                  </select>
+                )}
+              </Field>
+            )}
+          </div>
+        )}
+      </div>
 
       {isProMode && (
         <div className="fgrid" style={{ marginTop: 10, paddingTop: 10, borderTop: "1px dashed var(--border)" }}>

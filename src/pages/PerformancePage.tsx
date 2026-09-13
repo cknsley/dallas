@@ -17,6 +17,7 @@ import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
 import {
   costOf,
+  filterItemsByDomain,
   marginOf,
   periodRange,
   qtyOf,
@@ -36,23 +37,25 @@ export default function PerformancePage() {
   const { state } = useStore();
   const navigate = useNavigate();
   const [period, setPeriod] = usePref<Period>("perf_period", "month");
+  const [domain, setDomain] = usePref<"all" | "fashion" | "tcg">("perfDomain", "all");
   const [activeTab, setActiveTab] = useState<PerfTab>("sales_list");
   const [selectedDim, setSelectedDim] = useState<Dimension>("brand");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortKey, setSortKey] = useState<SalesSortKey>("saleDate");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
+  const domainItems = useMemo(() => filterItemsByDomain(state.items, domain), [state.items, domain]);
   const range = useMemo(() => periodRange(period), [period]);
-  const list = useMemo(() => soldItems(state.items, range), [state.items, range]);
+  const list = useMemo(() => soldItems(domainItems, range), [domainItems, range]);
 
   // Overall Stock Sell-Through Metrics
   const totalStockCount = useMemo(
-    () => state.items.reduce((a, i) => a + qtyOf(i), 0),
-    [state.items]
+    () => domainItems.reduce((a, i) => a + qtyOf(i), 0),
+    [domainItems]
   );
   const totalSoldAllTime = useMemo(
-    () => state.items.filter((i) => i.status === "vendu").reduce((a, i) => a + qtyOf(i), 0),
-    [state.items]
+    () => domainItems.filter((i) => i.status === "vendu").reduce((a, i) => a + qtyOf(i), 0),
+    [domainItems]
   );
   const sellThroughRate = totalStockCount > 0 ? (totalSoldAllTime / totalStockCount) * 100 : 0;
 
@@ -230,6 +233,15 @@ export default function PerformancePage() {
   return (
     <>
       <HeaderActions>
+        <Segmented<"all" | "fashion" | "tcg">
+          value={domain}
+          onChange={setDomain}
+          options={[
+            { value: "all", label: "🌐 Tout" },
+            { value: "fashion", label: "👕 Vêtements & Fashion" },
+            { value: "tcg", label: "🃏 TCG & Cartes" },
+          ]}
+        />
         <Segmented<Period>
           value={period}
           onChange={setPeriod}

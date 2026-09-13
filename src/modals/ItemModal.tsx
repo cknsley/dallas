@@ -442,6 +442,117 @@ export default function ItemModal({
         </Field>
       </div>
 
+      {/* Section TCG / Cartes à collectionner */}
+      <div
+        style={{
+          marginTop: 14,
+          padding: 14,
+          borderRadius: 12,
+          background: draft.isTcg ? "rgba(234, 179, 8, 0.06)" : "var(--surface-sub)",
+          border: draft.isTcg ? "1px solid rgba(234, 179, 8, 0.3)" : "1px solid var(--line-2)",
+          transition: "all 0.2s ease",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
+            <input
+              type="checkbox"
+              checked={Boolean(draft.isTcg)}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setDraft((d) => ({
+                  ...d,
+                  isTcg: checked,
+                  tcgGame: checked ? d.tcgGame || "Pokémon" : d.tcgGame,
+                  tcgCategory: checked ? d.tcgCategory || "raw" : d.tcgCategory,
+                }));
+              }}
+            />
+            <span>🃏 Article / Carte TCG (Trading Card Game)</span>
+          </label>
+          {draft.isTcg && (
+            <span className="pill" style={{ background: "#eab308", color: "#000", fontWeight: 800, fontSize: 10 }}>
+              MODE TCG ACTIF
+            </span>
+          )}
+        </div>
+
+        {draft.isTcg && (
+          <div className="fgrid" style={{ marginTop: 12, gridTemplateColumns: "1fr 1fr 1fr" }}>
+            <Field label="Licence / Jeu TCG">
+              <select value={draft.tcgGame || "Pokémon"} onChange={(e) => set("tcgGame", e.target.value)}>
+                <option value="Pokémon">⚡ Pokémon</option>
+                <option value="One Piece">🏴‍☠️ One Piece</option>
+                <option value="Yu-Gi-Oh!">👁️ Yu-Gi-Oh!</option>
+                <option value="Magic">🔮 Magic: The Gathering</option>
+                <option value="Lorcana">✨ Lorcana</option>
+                <option value="Dragon Ball">🐉 Dragon Ball</option>
+                <option value="Autre">🃏 Autre TCG</option>
+              </select>
+            </Field>
+
+            <Field label="Extension / Set">
+              <input
+                type="text"
+                value={draft.tcgSet || ""}
+                placeholder="Ex. 151, EV05, OP-05..."
+                onChange={(e) => set("tcgSet", e.target.value)}
+              />
+            </Field>
+
+            <Field label="Format & Statut">
+              <select
+                value={draft.tcgCategory || "raw"}
+                onChange={(e) => {
+                  const cat = e.target.value as any;
+                  setDraft((d) => ({
+                    ...d,
+                    tcgCategory: cat,
+                    tcgGrade:
+                      cat === "grading"
+                        ? "En gradation (Note à découvrir ✨)"
+                        : cat === "raw"
+                        ? "Raw (Near Mint)"
+                        : d.tcgGrade || "PSA 10 Gem Mint",
+                  }));
+                }}
+              >
+                <option value="raw">🃏 Carte Raw / Brut</option>
+                <option value="grading">⏳ En gradation chez PSA/BGS (Note à découvrir ✨)</option>
+                <option value="graded">🏆 Carte Gradée (Note connue)</option>
+                <option value="sealed">📦 Coffret / Booster / Display scellé</option>
+              </select>
+            </Field>
+
+            {(draft.tcgCategory === "graded" || draft.tcgCategory === "grading") && (
+              <Field label={draft.tcgCategory === "grading" ? "Société de gradation" : "Note / Grade"}>
+                {draft.tcgCategory === "grading" ? (
+                  <select value={draft.gradingCompany || "PSA"} onChange={(e) => set("gradingCompany", e.target.value)}>
+                    <option value="PSA">PSA (Professional Sports Authenticator)</option>
+                    <option value="BGS">BGS (Beckett Grading Services)</option>
+                    <option value="PCA">PCA (PCA France)</option>
+                    <option value="CGC">CGC Cards</option>
+                    <option value="SGS">SGS / SGC</option>
+                  </select>
+                ) : (
+                  <select value={draft.tcgGrade || "PSA 10 Gem Mint"} onChange={(e) => set("tcgGrade", e.target.value)}>
+                    <option value="PSA 10 Gem Mint">PSA 10 Gem Mint</option>
+                    <option value="PSA 9 Mint">PSA 9 Mint</option>
+                    <option value="PSA 8 Near Mint">PSA 8 Near Mint</option>
+                    <option value="BGS 10 Pristine">BGS 10 Pristine</option>
+                    <option value="BGS 9.5 Gem Mint">BGS 9.5 Gem Mint</option>
+                    <option value="PCA 10 Gem Mint">PCA 10 Gem Mint</option>
+                    <option value="PCA 9.5">PCA 9.5</option>
+                    <option value="CGC 10 Pristine">CGC 10 Pristine</option>
+                    <option value="Autre">Autre grade</option>
+                  </select>
+                )}
+              </Field>
+            )}
+          </div>
+        )}
+      </div>
+
       <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 14 }}>
         {/* État / Condition de l'article - Boutons carrés interactifs SANS champ texte qui répète */}
         <Field label="État / Condition de l'article">

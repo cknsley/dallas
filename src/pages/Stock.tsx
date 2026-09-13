@@ -14,6 +14,7 @@ import { downloadText, itemsToCSV, stockFilename } from "../lib/csv";
 import { Download, Plus, Pencil, Trash2 } from "lucide-react";
 import ItemModal from "../modals/ItemModal";
 import SellModal from "../modals/SellModal";
+import GradeRevealModal from "../modals/GradeRevealModal";
 import type { Item } from "../types";
 
 export type StockCategoryTab = "vetements" | "chaussures" | "sacs" | "accessoires" | "tcg" | "emballages" | "total";
@@ -137,6 +138,7 @@ export default function Stock() {
   const [editing, setEditing] = useState<{ item: Item | null } | null>(null);
   const [selling, setSelling] = useState<Item | null>(null);
   const [confirming, setConfirming] = useState<Item | null>(null);
+  const [revealingItem, setRevealingItem] = useState<Item | null>(null);
 
   const held = useMemo(() => state.items.filter((i) => i.status === "stock"), [state.items]);
 
@@ -205,16 +207,37 @@ export default function Stock() {
   // Le capital immobilisé ne compte que les pièces encore en stock pour l'onglet actif.
   const heldCost = list.reduce((a, i) => a + costOf(i), 0);
 
-  const actions = (i: Item) => (
-    <div className={`rowact${view === "grid" ? " always" : ""}`}>
-      <button className="iconbtn" title="Éditer" onClick={() => setEditing({ item: i })}>
-        <Pencil size={14} />
-      </button>
-      <button className="iconbtn del" title="Supprimer" onClick={() => setConfirming(i)}>
-        <Trash2 size={14} />
-      </button>
-    </div>
-  );
+  const actions = (i: Item) => {
+    const isGrading = i.tcgCategory === "grading" || (i.tcgGrade && i.tcgGrade.toLowerCase().includes("gradation"));
+    return (
+      <div className={`rowact${view === "grid" ? " always" : ""}`}>
+        {isGrading && (
+          <button
+            type="button"
+            className="btn sm"
+            onClick={() => setRevealingItem(i)}
+            style={{
+              background: "linear-gradient(135deg, #eab308 0%, #ca8a04 100%)",
+              color: "#fff",
+              borderColor: "#ca8a04",
+              fontWeight: 800,
+              fontSize: 11,
+              padding: "2px 8px",
+            }}
+            title="Révéler la note attribuée par PSA/BGS"
+          >
+            ✨ Révéler note
+          </button>
+        )}
+        <button className="iconbtn" title="Éditer" onClick={() => setEditing({ item: i })}>
+          <Pencil size={14} />
+        </button>
+        <button className="iconbtn del" title="Supprimer" onClick={() => setConfirming(i)}>
+          <Trash2 size={14} />
+        </button>
+      </div>
+    );
+  };
 
   /** Toggle de statut : « Vendu » ouvre la vente. */
   const statusToggle = (i: Item) => (
@@ -437,6 +460,12 @@ export default function Stock() {
             navigate(links.ventes({ platform: i.platform || undefined }));
           }}
           onInvoice={(i) => navigate(links.newDoc(i.id))}
+        />
+      )}
+      {revealingItem && (
+        <GradeRevealModal
+          item={revealingItem}
+          onClose={() => setRevealingItem(null)}
         />
       )}
       {confirming && (

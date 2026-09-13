@@ -16,6 +16,7 @@ import { useToast } from "../components/Toast";
 import type { Item } from "../types";
 import ItemModal from "../modals/ItemModal";
 import SellModal from "../modals/SellModal";
+import GradeRevealModal from "../modals/GradeRevealModal";
 
 const TCG_GAMES = [
   { id: "all", label: "🔥 Tous les jeux" },
@@ -46,16 +47,17 @@ export default function TcgPage() {
   const toast = useToast();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<"inventory" | "sealed" | "sales">("inventory");
+  const [activeTab, setActiveTab] = useState<"inventory" | "grading" | "sealed" | "sales">("inventory");
   const [selectedGame, setSelectedGame] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [sellingItem, setSellingItem] = useState<Item | null>(null);
+  const [revealingItem, setRevealingItem] = useState<Item | null>(null);
 
   // New TCG item form state
   const [game, setGame] = useState("Pokémon");
-  const [category, setCategory] = useState<"graded" | "raw" | "sealed">("graded");
+  const [category, setCategory] = useState<"graded" | "raw" | "sealed" | "grading">("graded");
   const [cardName, setCardName] = useState("");
   const [setName, setSetName] = useState("");
   const [cardNumber, setCardNumber] = useState("");
@@ -109,6 +111,7 @@ export default function TcgPage() {
   }, [tcgItems, selectedGame, searchQuery]);
 
   const stockItems = useMemo(() => filteredItems.filter((i) => i.status === "stock" || i.status === "arrivage"), [filteredItems]);
+  const gradingItems = useMemo(() => stockItems.filter((i) => i.tcgCategory === "grading" || (i.tcgGrade && i.tcgGrade.toLowerCase().includes("gradation"))), [stockItems]);
   const gradedStock = useMemo(() => stockItems.filter((i) => i.tcgCategory === "graded" || (i.tcgGrade && i.tcgGrade.includes("PSA"))), [stockItems]);
   const sealedStock = useMemo(() => stockItems.filter((i) => i.tcgCategory === "sealed" || (i.type && i.type.match(/(display|etb|booster|coffret)/i))), [stockItems]);
   const soldItems = useMemo(() => filteredItems.filter((i) => i.status === "vendu"), [filteredItems]);
@@ -270,11 +273,12 @@ export default function TcgPage() {
             alignItems: "center",
           }}
         >
-          <Segmented<"inventory" | "sealed" | "sales">
+          <Segmented<"inventory" | "grading" | "sealed" | "sales">
             value={activeTab}
             onChange={setActiveTab}
             options={[
-              { value: "inventory", label: `🃏 Cartes (${stockItems.length})` },
+              { value: "inventory", label: `🃏 Toutes les Cartes (${stockItems.length})` },
+              { value: "grading", label: `⏳ En Gradation (${gradingItems.length})` },
               { value: "sealed", label: `📦 Displays & Scellé (${sealedStock.length})` },
               { value: "sales", label: `🏷️ Historique Ventes (${soldItems.length})` },
             ]}
@@ -394,6 +398,73 @@ export default function TcgPage() {
                         </tr>
                       );
                     })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB GRADATION: EN COURS DE GRADATION & NOTES À DÉCOUVRIR */}
+        {activeTab === "grading" && (
+          <div className="card-b">
+            {gradingItems.length === 0 ? (
+              <Empty glyph="⏳" title="Aucune carte actuellement en gradation">
+                Toutes vos cartes soumises chez PSA, BGS ou PCA ont reçu leur note ou n'ont pas encore été envoyées.
+              </Empty>
+            ) : (
+              <div className="twrap">
+                <table className="table-compact">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 44 }}>Photo</th>
+                      <th>Carte Envoyée</th>
+                      <th>Licence & Set</th>
+                      <th>Organisme</th>
+                      <th>Statut / Note</th>
+                      <th className="r">Coût d'Achat</th>
+                      <th className="r">Est. Revente</th>
+                      <th className="r">Action Reveal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {gradingItems.map((item) => (
+                      <tr key={item.id}>
+                        <td className="shrink"><Photo id={item.photoId} /></td>
+                        <td>
+                          <div style={{ fontWeight: 700 }}>{item.name}</div>
+                          {item.notes && <div className="hint" style={{ fontSize: 11 }}>{item.notes}</div>}
+                        </td>
+                        <td>
+                          <div>{item.tcgGame || item.brand || "TCG"}</div>
+                          <div className="hint" style={{ fontSize: 11 }}>{item.tcgSet || "—"}</div>
+                        </td>
+                        <td><span className="pill info" style={{ fontSize: 11 }}>{item.gradingCompany || "PSA / BGS"}</span></td>
+                        <td>
+                          <span className="pill" style={{ background: "rgba(234, 179, 8, 0.2)", color: "#eab308", border: "1px solid rgba(234, 179, 8, 0.4)", fontWeight: 700, fontSize: 11 }}>
+                            ⏳ Note à découvrir
+                          </span>
+                        </td>
+                        <td className="r num">{eur2(costOf(item))}</td>
+                        <td className="r num" style={{ fontWeight: 700, color: "var(--accent)" }}>{eur(item.price || item.estimatedPrice || 0)}</td>
+                        <td className="r">
+                          <button
+                            type="button"
+                            className="btn sm"
+                            onClick={() => setRevealingItem(item)}
+                            style={{
+                              background: "linear-gradient(135deg, #eab308 0%, #ca8a04 100%)",
+                              color: "#fff",
+                              borderColor: "#ca8a04",
+                              fontWeight: 800,
+                              fontSize: 11,
+                            }}
+                          >
+                            ✨ Révéler la note
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -536,6 +607,7 @@ export default function TcgPage() {
                 <span>Format du Produit *</span>
                 <select value={category} onChange={(e) => setCategory(e.target.value as any)}>
                   <option value="graded">🏆 Carte Gradée (PSA, BGS, PCA)</option>
+                  <option value="grading">⏳ En gradation chez PSA/BGS (Note à découvrir ✨)</option>
                   <option value="raw">🃏 Carte Raw / À l'unité</option>
                   <option value="sealed">📦 Display / ETB / Scellé</option>
                 </select>
@@ -663,6 +735,13 @@ export default function TcgPage() {
             navigate(links.ventes());
           }}
           onInvoice={(i) => navigate(links.newDoc(i.id))}
+        />
+      )}
+
+      {revealingItem && (
+        <GradeRevealModal
+          item={revealingItem}
+          onClose={() => setRevealingItem(null)}
         />
       )}
     </>

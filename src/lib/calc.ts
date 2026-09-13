@@ -89,18 +89,37 @@ export interface Stats {
   engaged: number;
 }
 
-export function computeStats(state: AppState, r: Range): Stats {
-  const sold = soldItems(state.items, r);
+export function isTcgItem(i: Item): boolean {
+  if (i.isTcg) return true;
+  const t = (i.type || "").toLowerCase().trim();
+  const c = ((i as any).category || "").toLowerCase().trim();
+
+  return (
+    c === "tcg" || t.includes("tcg") || t.includes("carte") || t.includes("booster") ||
+    t.includes("display") || t.includes("etb") || t.includes("pokemon") ||
+    t.includes("pokémon") || t.includes("lorcana") || t.includes("yugioh") ||
+    t.includes("magic") || t.includes("one piece")
+  );
+}
+
+export function filterItemsByDomain(items: Item[], domain: "all" | "fashion" | "tcg"): Item[] {
+  if (domain === "all") return items;
+  if (domain === "tcg") return items.filter((i) => isTcgItem(i));
+  return items.filter((i) => !isTcgItem(i));
+}
+
+export function computeStats(state: AppState, r: Range, domain: "all" | "fashion" | "tcg" = "all"): Stats {
+  const domainItems = filterItemsByDomain(state.items, domain);
+  const sold = soldItems(domainItems, r);
   const ca = sold.reduce((a, i) => a + num(i.price) * qtyOf(i), 0);
   const shippingIn = sold.reduce((a, i) => a + num(i.shippingPaid), 0);
   const saleCosts = sold.reduce((a, i) => a + saleCostsOf(i), 0);
   const cost = sold.reduce((a, i) => a + costOf(i), 0);
   const marge = ca + shippingIn - cost - saleCosts;
-  const charges = chargesInRange(state.expenses, r);
+  const charges = domain === "all" ? chargesInRange(state.expenses, r) : (domain === "tcg" ? 0 : chargesInRange(state.expenses, r));
   const margeNette = marge - charges;
-  const inStock = state.items.filter((i) => i.status !== "vendu");
+  const inStock = domainItems.filter((i) => i.status !== "vendu");
   const stockValue = inStock.reduce((a, i) => a + costOf(i), 0);
-  // Une pièce sans estimation est comptée à son coût : jamais de valeur inventée.
   const stockEstimate = inStock.reduce((a, i) => a + (num(i.price) ? num(i.price) * qtyOf(i) : costOf(i)), 0);
   const count = sold.length;
   return {
@@ -117,8 +136,8 @@ export function computeStats(state: AppState, r: Range): Stats {
     stockEstimate,
     stockPotential: stockEstimate - stockValue,
     stockCount: inStock.reduce((a, i) => a + qtyOf(i), 0),
-    arrivage: state.items.filter((i) => i.status === "arrivage").length,
-    enStock: state.items.filter((i) => i.status === "stock").length,
+    arrivage: domainItems.filter((i) => i.status === "arrivage").length,
+    enStock: domainItems.filter((i) => i.status === "stock").length,
     engaged: stockValue,
   };
 }

@@ -70,10 +70,11 @@ export interface Item {
   autoReceive: boolean;
   /* TCG & Cartes */
   isTcg?: boolean;
-  tcgGame?: string;       // Pokémon, Yu-Gi-Oh!, Magic, One Piece, Lorcana
-  tcgGrade?: string;      // PSA 10, BGS 9.5, PCA 10, Raw NM, etc.
+  tcgGame?: string;       // Pokémon, Yu-Gi-Oh!, Magic, One Piece, Lorcana, Dragon Ball
+  tcgGrade?: string;      // PSA 10, BGS 9.5, PCA 10, Raw NM, En gradation (À découvrir), etc.
   tcgSet?: string;        // 151, Évolution Céleste, OP-05
-  tcgCategory?: "raw" | "graded" | "sealed"; // Carte seule, Gradée, Booster/ETB/Display
+  tcgCategory?: "raw" | "graded" | "sealed" | "grading"; // Carte seule, Gradée, Booster/ETB, En gradation
+  gradingCompany?: string; // PSA, BGS, PCA, CGC, SGS
   /* SAV & Litiges */
   litigeState?: "en_cours" | "attente" | "resolu";
   litigeCategory?: string;
