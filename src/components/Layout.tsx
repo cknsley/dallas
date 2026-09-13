@@ -23,6 +23,7 @@ import {
   LucideIcon,
 } from "lucide-react";
 import { useStore } from "../store/StoreContext";
+import { computeNavBadges } from "../lib/badges";
 import { CommandPalette } from "./CommandPalette";
 import { SidebarMiniMenu } from "./SidebarMiniMenu";
 
@@ -34,7 +35,7 @@ export interface NavRoute {
   end?: boolean;
 }
 
-const MODULE_BY_PATH = {
+export const MODULE_BY_PATH = {
   "/clients": "clients",
   "/facturation": "facturation",
   "/sav": "sav",
@@ -45,7 +46,7 @@ export const NAV_GROUPS: { label: string; routes: NavRoute[] }[] = [
   {
     label: "Pilotage",
     routes: [
-      { path: "/", label: "Dashboard", icon: LayoutDashboard, subtitle: "Vue d'ensemble de l'activité", end: true },
+      { path: "/", label: "Accueil", icon: LayoutDashboard, subtitle: "Toutes vos sections, accessibles ici", end: true },
       { path: "/todo", label: "Todo", icon: CheckSquare, subtitle: "Tâches, rappels & à faire" },
       { path: "/sourcing", label: "Sourcing", icon: Sparkles, subtitle: "Articles à acheter/trouver, vue kanban & commande" },
       { path: "/deal", label: "Deal", icon: Scale, subtitle: "Négocier un achat ou une vente, simulation de marge" },
@@ -113,21 +114,7 @@ export default function Layout() {
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, []);
 
-  const badges: Record<string, number> = {
-    "/stock": state.items.filter((i) => i.status !== "vendu").length,
-    "/ventes": state.items.filter((i) => i.status === "vendu" && i.delivery === "commandee").length,
-    "/achats":
-      state.requests.filter((r) => r.status === "en_cours").length +
-      state.items.filter((i) => i.status === "arrivage").length,
-    "/livraison": state.items.filter((i) => i.status === "vendu" && i.delivery === "commandee").length,
-    "/todo": state.todos.filter((t) => !t.isSourcing && t.col !== "acheter" && t.col !== "termine").length,
-    "/sourcing": state.todos.filter((t) => (t.isSourcing || t.col === "acheter") && t.col !== "termine").length,
-    "/facturation": state.docs.filter((d) => !d.paid).length,
-    "/sav":
-      state.items.filter((i) => i.litigeState === "en_cours" || i.litigeState === "attente").length +
-      state.personalLitiges.filter((l) => l.status !== "resolu").length +
-      state.returns.filter((r) => !["rembourse", "clos"].includes(r.status)).length,
-  };
+  const badges = computeNavBadges(state);
 
   return (
     <div className="app">
