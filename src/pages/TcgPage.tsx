@@ -118,8 +118,21 @@ export default function TcgPage() {
   const sealedStock = useMemo(() => stockItems.filter((i) => i.tcgCategory === "sealed" || (i.type && i.type.match(/(display|etb|booster|coffret)/i))), [stockItems]);
   const soldItems = useMemo(() => filteredItems.filter((i) => i.status === "vendu"), [filteredItems]);
 
+  const [inputMode, setInputMode] = useState<"unit" | "total">("unit");
+
   // KPIs
-  const totalStockValue = useMemo(() => stockItems.reduce((a, i) => a + costOf(i), 0), [stockItems]);
+  const totalStockCost = useMemo(() => stockItems.reduce((a, i) => a + costOf(i), 0), [stockItems]);
+  const totalStockRealValue = useMemo(() => {
+    return stockItems.reduce((a, i) => {
+      const q = qtyOf(i);
+      const estUnit = num(i.price) || num(i.estimatedPrice) || (num(i.cost) + num(i.fees));
+      return a + estUnit * q;
+    }, 0);
+  }, [stockItems]);
+
+  const totalStockPotentialMarge = totalStockRealValue - totalStockCost;
+  const potentialRoi = totalStockCost > 0 ? (totalStockPotentialMarge / totalStockCost) * 100 : 0;
+
   const totalSalesCa = useMemo(() => soldItems.reduce((a, i) => a + revenueOf(i), 0), [soldItems]);
   const totalSalesMarge = useMemo(() => soldItems.reduce((a, i) => a + marginOf(i), 0), [soldItems]);
 
@@ -130,6 +143,13 @@ export default function TcgPage() {
       return;
     }
 
+    const qtyNum = Math.max(1, quantity);
+    const rawCost = num(cost);
+    const rawPrice = num(price);
+
+    const unitCost = inputMode === "unit" ? rawCost : (qtyNum > 0 ? rawCost / qtyNum : rawCost);
+    const unitPrice = inputMode === "unit" ? rawPrice : (qtyNum > 0 ? rawPrice / qtyNum : rawPrice);
+
     const fullTitle = `${cardName.trim()}${cardNumber ? ` #${cardNumber.trim()}` : ""}${setName ? ` (${setName.trim()})` : ""}`;
     const newItem: Item = {
       id: uid(),
@@ -138,10 +158,11 @@ export default function TcgPage() {
       type: category === "sealed" ? "Display / Scellé TCG" : category === "graded" ? "Carte Gradée" : "Carte Raw",
       size: grade,
       source: source.trim() || "Cardmarket",
-      quantity: Math.max(1, quantity),
-      cost: num(cost),
+      quantity: qtyNum,
+      cost: unitCost,
       fees: num(fees),
-      price: num(price),
+      price: unitPrice,
+      estimatedPrice: unitPrice,
       platform: "",
       buyer: "",
       buyerUrl: "",
@@ -184,6 +205,53 @@ export default function TcgPage() {
     setNotes("");
   };
 
+  const renderPriceInfo = (item: Item) => {
+    const qty = qtyOf(item);
+    const unitCost = num(item.cost) + num(item.fees);
+    const totalCost = costOf(item);
+    const unitEst = num(item.price) || num(item.estimatedPrice) || unitCost;
+    const totalEst = unitEst * qty;
+    const margeEst = totalEst - totalCost;
+    const roi = totalCost > 0 ? (margeEst / totalCost) * 100 : 0;
+
+    return {
+      costCell: (
+        <td className="r num">
+          {qty > 1 ? (
+            <div>
+              <div style={{ fontWeight: 600 }}>{eur2(unitCost)} <span style={{ fontSize: 10, color: "var(--ink-3)" }}>/u</span></div>
+              <div className="hint" style={{ fontSize: 11, fontWeight: 500 }}>({eur(totalCost)} total)</div>
+            </div>
+          ) : (
+            <div style={{ fontWeight: 600 }}>{eur2(totalCost)}</div>
+          )}
+        </td>
+      ),
+      priceCell: (
+        <td className="r num">
+          {qty > 1 ? (
+            <div>
+              <div style={{ fontWeight: 700, color: "var(--accent)" }}>{eur(unitEst)} <span style={{ fontSize: 10, opacity: 0.8 }}>/u</span></div>
+              <div className="hint" style={{ fontSize: 11, fontWeight: 600, color: "var(--accent)" }}>({eur(totalEst)} total)</div>
+            </div>
+          ) : (
+            <div style={{ fontWeight: 700, color: "var(--accent)" }}>{eur(totalEst)}</div>
+          )}
+        </td>
+      ),
+      margeCell: (
+        <td className="r num">
+          <div style={{ fontWeight: 700, color: margeEst >= 0 ? "var(--ok)" : "var(--err)" }}>
+            {margeEst >= 0 ? "+" : ""}{eur(margeEst)}
+          </div>
+          <div className="hint" style={{ fontSize: 11 }}>
+            {roi >= 0 ? "+" : ""}{roi.toFixed(0)}% ROI
+          </div>
+        </td>
+      ),
+    };
+  };
+
   return (
     <>
       <HeaderActions>
@@ -198,36 +266,36 @@ export default function TcgPage() {
         </button>
       </HeaderActions>
 
-      {/* ── HIGH LEVEL TCG KPIS ── */}
+      {/* ── HIGH LEVEL TCG KPIS (MARGE EN PREMIER, VALEUR RÉELLE EN DEUXIÈME) ── */}
       <div className="kpi-grid" style={{ marginBottom: 18 }}>
         <Kpi
+          label="Ventes & Marge TCG"
+          value={eur(totalSalesCa)}
+          meta={`Marge réalisée : ${totalSalesMarge >= 0 ? "+" : ""}${eur(totalSalesMarge)}`}
+          tone={totalSalesMarge >= 0 ? "ok" : "warn"}
+          to={links.ventes()}
+          hint="Ventes"
+        />
+        <Kpi
+          label="Valeur Réelle du Stock"
+          value={eur(totalStockRealValue)}
+          meta={`Marge pot. : ${totalStockPotentialMarge >= 0 ? "+" : ""}${eur(totalStockPotentialMarge)} (${potentialRoi >= 0 ? "+" : ""}${potentialRoi.toFixed(1)}%)`}
+          tone="ok"
+          hint="Revente Estimée"
+        />
+        <Kpi
           label="Stock TCG Engagé"
-          value={eur(totalStockValue)}
+          value={eur(totalStockCost)}
           meta={`${stockItems.reduce((a, i) => a + qtyOf(i), 0)} pièce(s) & cartes en stock`}
           tone="info"
           hint="Stock TCG"
         />
         <Kpi
-          label="Cartes Gradées (PSA / BGS)"
-          value={String(gradedStock.reduce((a, i) => a + qtyOf(i), 0))}
-          meta={`Valeur estimée : ${eur(gradedStock.reduce((a, i) => a + (i.price || i.cost) * qtyOf(i), 0))}`}
-          tone="ok"
-          hint="Gradées"
-        />
-        <Kpi
-          label="Displays & Scellé"
-          value={String(sealedStock.reduce((a, i) => a + qtyOf(i), 0))}
-          meta={`Booster boxes & ETB en stock`}
+          label="Displays, Blisters & Gradées"
+          value={`${sealedStock.reduce((a, i) => a + qtyOf(i), 0)} scellés · ${blisterStock.reduce((a, i) => a + qtyOf(i), 0)} blisters · ${gradedStock.reduce((a, i) => a + qtyOf(i), 0)} gradées`}
+          meta="Cartes, scellés & booster boxes"
           tone="warn"
-          hint="Scellé"
-        />
-        <Kpi
-          label="Ventes & Marge TCG"
-          value={eur(totalSalesCa)}
-          meta={`Marge réalisée : +${eur(totalSalesMarge)}`}
-          tone={totalSalesMarge >= 0 ? "ok" : "warn"}
-          to={links.ventes()}
-          hint="Ventes"
+          hint="Formats"
         />
       </div>
 
@@ -329,13 +397,13 @@ export default function TcgPage() {
                       <th className="r">Qté</th>
                       <th className="r">Prix Achat</th>
                       <th className="r">Prix Estimé</th>
+                      <th className="r">Marge Est.</th>
                       <th className="r">Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {stockItems.map((item) => {
-                      const costVal = costOf(item);
-                      const priceVal = item.price || item.estimatedPrice || costVal;
+                      const p = renderPriceInfo(item);
 
                       return (
                         <tr key={item.id}>
@@ -377,10 +445,9 @@ export default function TcgPage() {
                             </span>
                           </td>
                           <td className="r num">{qtyOf(item)}</td>
-                          <td className="r num">{eur2(costVal)}</td>
-                          <td className="r num" style={{ fontWeight: 700, color: "var(--accent)" }}>
-                            {eur(priceVal)}
-                          </td>
+                          {p.costCell}
+                          {p.priceCell}
+                          {p.margeCell}
                           <td className="r">
                             <div className="rowact always">
                               <button
@@ -428,47 +495,52 @@ export default function TcgPage() {
                       <th>Statut / Note</th>
                       <th className="r">Coût d'Achat</th>
                       <th className="r">Est. Revente</th>
+                      <th className="r">Marge Est.</th>
                       <th className="r">Action Reveal</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {gradingItems.map((item) => (
-                      <tr key={item.id}>
-                        <td className="shrink"><Photo id={item.photoId} /></td>
-                        <td>
-                          <div style={{ fontWeight: 700 }}>{item.name}</div>
-                          {item.notes && <div className="hint" style={{ fontSize: 11 }}>{item.notes}</div>}
-                        </td>
-                        <td>
-                          <div>{item.tcgGame || item.brand || "TCG"}</div>
-                          <div className="hint" style={{ fontSize: 11 }}>{item.tcgSet || "—"}</div>
-                        </td>
-                        <td><span className="pill info" style={{ fontSize: 11 }}>{item.gradingCompany || "PSA / BGS"}</span></td>
-                        <td>
-                          <span className="pill" style={{ background: "rgba(234, 179, 8, 0.2)", color: "#eab308", border: "1px solid rgba(234, 179, 8, 0.4)", fontWeight: 700, fontSize: 11 }}>
-                            ⏳ Note à découvrir
-                          </span>
-                        </td>
-                        <td className="r num">{eur2(costOf(item))}</td>
-                        <td className="r num" style={{ fontWeight: 700, color: "var(--accent)" }}>{eur(item.price || item.estimatedPrice || 0)}</td>
-                        <td className="r">
-                          <button
-                            type="button"
-                            className="btn sm"
-                            onClick={() => setRevealingItem(item)}
-                            style={{
-                              background: "linear-gradient(135deg, #eab308 0%, #ca8a04 100%)",
-                              color: "#fff",
-                              borderColor: "#ca8a04",
-                              fontWeight: 800,
-                              fontSize: 11,
-                            }}
-                          >
-                            ✨ Révéler la note
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {gradingItems.map((item) => {
+                      const p = renderPriceInfo(item);
+                      return (
+                        <tr key={item.id}>
+                          <td className="shrink"><Photo id={item.photoId} /></td>
+                          <td>
+                            <div style={{ fontWeight: 700 }}>{item.name}</div>
+                            {item.notes && <div className="hint" style={{ fontSize: 11 }}>{item.notes}</div>}
+                          </td>
+                          <td>
+                            <div>{item.tcgGame || item.brand || "TCG"}</div>
+                            <div className="hint" style={{ fontSize: 11 }}>{item.tcgSet || "—"}</div>
+                          </td>
+                          <td><span className="pill info" style={{ fontSize: 11 }}>{item.gradingCompany || "PSA / BGS"}</span></td>
+                          <td>
+                            <span className="pill" style={{ background: "rgba(234, 179, 8, 0.2)", color: "#eab308", border: "1px solid rgba(234, 179, 8, 0.4)", fontWeight: 700, fontSize: 11 }}>
+                              ⏳ Note à découvrir
+                            </span>
+                          </td>
+                          {p.costCell}
+                          {p.priceCell}
+                          {p.margeCell}
+                          <td className="r">
+                            <button
+                              type="button"
+                              className="btn sm"
+                              onClick={() => setRevealingItem(item)}
+                              style={{
+                                background: "linear-gradient(135deg, #eab308 0%, #ca8a04 100%)",
+                                color: "#fff",
+                                borderColor: "#ca8a04",
+                                fontWeight: 800,
+                                fontSize: 11,
+                              }}
+                            >
+                              ✨ Révéler la note
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -494,30 +566,35 @@ export default function TcgPage() {
                       <th>Set / Extension</th>
                       <th className="r">Qté</th>
                       <th className="r">Coût d'Achat</th>
-                      <th className="r">Prix Vente / Estimé</th>
+                      <th className="r">Prix Estimé</th>
+                      <th className="r">Marge Est.</th>
                       <th className="r">Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {blisterStock.map((item) => (
-                      <tr key={item.id}>
-                        <td className="shrink"><Photo id={item.photoId} /></td>
-                        <td>
-                          <div style={{ fontWeight: 700 }}>{item.name}</div>
-                          {item.notes && <div className="hint" style={{ fontSize: 11 }}>{item.notes}</div>}
-                        </td>
-                        <td><span className="pill info" style={{ fontSize: 11 }}>{item.tcgGame || item.brand || "TCG"}</span></td>
-                        <td>{item.tcgSet || "—"}</td>
-                        <td className="r num">{qtyOf(item)}</td>
-                        <td className="r num">{eur2(costOf(item))}</td>
-                        <td className="r num" style={{ fontWeight: 700, color: "var(--accent)" }}>{eur(item.price || item.estimatedPrice || costOf(item))}</td>
-                        <td className="r">
-                          <button type="button" className="btn sm ok" onClick={() => setSellingItem(item)}>
-                            Vendre
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {blisterStock.map((item) => {
+                      const p = renderPriceInfo(item);
+                      return (
+                        <tr key={item.id}>
+                          <td className="shrink"><Photo id={item.photoId} /></td>
+                          <td>
+                            <div style={{ fontWeight: 700 }}>{item.name}</div>
+                            {item.notes && <div className="hint" style={{ fontSize: 11 }}>{item.notes}</div>}
+                          </td>
+                          <td><span className="pill info" style={{ fontSize: 11 }}>{item.tcgGame || item.brand || "TCG"}</span></td>
+                          <td>{item.tcgSet || "—"}</td>
+                          <td className="r num">{qtyOf(item)}</td>
+                          {p.costCell}
+                          {p.priceCell}
+                          {p.margeCell}
+                          <td className="r">
+                            <button type="button" className="btn sm ok" onClick={() => setSellingItem(item)}>
+                              Vendre
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -543,32 +620,35 @@ export default function TcgPage() {
                       <th>Source / Provenance</th>
                       <th className="r">Qté</th>
                       <th className="r">Coût d'Achat</th>
-                      <th className="r">Prix Vente / Estimé</th>
+                      <th className="r">Prix Estimé</th>
+                      <th className="r">Marge Est.</th>
                       <th className="r">Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {sealedStock.map((item) => (
-                      <tr key={item.id}>
-                        <td className="shrink"><Photo id={item.photoId} /></td>
-                        <td>
-                          <div style={{ fontWeight: 700 }}>{item.name}</div>
-                          <div className="hint" style={{ fontSize: 11 }}>{item.tcgSet || "Coffret Scellé"}</div>
-                        </td>
-                        <td><span className="pill info" style={{ fontSize: 11 }}>{item.tcgGame || item.brand || "TCG"}</span></td>
-                        <td>{item.source || "Direct"}</td>
-                        <td className="r num">{qtyOf(item)}</td>
-                        <td className="r num">{eur2(costOf(item))}</td>
-                        <td className="r num" style={{ fontWeight: 700, color: "var(--accent)" }}>
-                          {eur(item.price || item.estimatedPrice || costOf(item))}
-                        </td>
-                        <td className="r">
-                          <button type="button" className="btn sm ok" onClick={() => setSellingItem(item)}>
-                            Vendre
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {sealedStock.map((item) => {
+                      const p = renderPriceInfo(item);
+                      return (
+                        <tr key={item.id}>
+                          <td className="shrink"><Photo id={item.photoId} /></td>
+                          <td>
+                            <div style={{ fontWeight: 700 }}>{item.name}</div>
+                            <div className="hint" style={{ fontSize: 11 }}>{item.tcgSet || "Coffret Scellé"}</div>
+                          </td>
+                          <td><span className="pill info" style={{ fontSize: 11 }}>{item.tcgGame || item.brand || "TCG"}</span></td>
+                          <td>{item.source || "Direct"}</td>
+                          <td className="r num">{qtyOf(item)}</td>
+                          {p.costCell}
+                          {p.priceCell}
+                          {p.margeCell}
+                          <td className="r">
+                            <button type="button" className="btn sm ok" onClick={() => setSellingItem(item)}>
+                              Vendre
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -594,30 +674,35 @@ export default function TcgPage() {
                       <th>Set / Extension</th>
                       <th className="r">Qté Cases</th>
                       <th className="r">Coût d'Achat</th>
-                      <th className="r">Prix Vente / Estimé</th>
+                      <th className="r">Prix Estimé</th>
+                      <th className="r">Marge Est.</th>
                       <th className="r">Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {caseStock.map((item) => (
-                      <tr key={item.id}>
-                        <td className="shrink"><Photo id={item.photoId} /></td>
-                        <td>
-                          <div style={{ fontWeight: 700 }}>{item.name}</div>
-                          {item.notes && <div className="hint" style={{ fontSize: 11 }}>{item.notes}</div>}
-                        </td>
-                        <td><span className="pill info" style={{ fontSize: 11 }}>{item.tcgGame || item.brand || "TCG"}</span></td>
-                        <td>{item.tcgSet || "—"}</td>
-                        <td className="r num">{qtyOf(item)}</td>
-                        <td className="r num">{eur2(costOf(item))}</td>
-                        <td className="r num" style={{ fontWeight: 700, color: "var(--accent)" }}>{eur(item.price || item.estimatedPrice || costOf(item))}</td>
-                        <td className="r">
-                          <button type="button" className="btn sm ok" onClick={() => setSellingItem(item)}>
-                            Vendre
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {caseStock.map((item) => {
+                      const p = renderPriceInfo(item);
+                      return (
+                        <tr key={item.id}>
+                          <td className="shrink"><Photo id={item.photoId} /></td>
+                          <td>
+                            <div style={{ fontWeight: 700 }}>{item.name}</div>
+                            {item.notes && <div className="hint" style={{ fontSize: 11 }}>{item.notes}</div>}
+                          </td>
+                          <td><span className="pill info" style={{ fontSize: 11 }}>{item.tcgGame || item.brand || "TCG"}</span></td>
+                          <td>{item.tcgSet || "—"}</td>
+                          <td className="r num">{qtyOf(item)}</td>
+                          {p.costCell}
+                          {p.priceCell}
+                          {p.margeCell}
+                          <td className="r">
+                            <button type="button" className="btn sm ok" onClick={() => setSellingItem(item)}>
+                              Vendre
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -767,8 +852,31 @@ export default function TcgPage() {
                 />
               </label>
 
+              {/* COMMUTATEUR PRIX UNITAIRE VS PRIX TOTAL */}
+              <div style={{ gridColumn: "span 2", display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--surface-sub)", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--line-2)", marginTop: 4 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--ink)" }}>Mode de Saisie des Prix :</span>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    type="button"
+                    className={`btn sm ${inputMode === "unit" ? "primary" : "ghost"}`}
+                    onClick={() => setInputMode("unit")}
+                    style={{ fontSize: 11, padding: "4px 10px" }}
+                  >
+                    💰 Prix Unitaire (par pièce)
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn sm ${inputMode === "total" ? "primary" : "ghost"}`}
+                    onClick={() => setInputMode("total")}
+                    style={{ fontSize: 11, padding: "4px 10px" }}
+                  >
+                    📦 Prix Total (du lot entier)
+                  </button>
+                </div>
+              </div>
+
               <label className="field">
-                <span>Coût d'acquisition (€) *</span>
+                <span>{inputMode === "unit" ? "Coût d'acquisition Unitaire (€/pc) *" : "Coût d'acquisition Total du Lot (€) *"}</span>
                 <input
                   type="number"
                   step="0.01"
@@ -776,10 +884,17 @@ export default function TcgPage() {
                   value={cost}
                   onChange={(e) => setCost(e.target.value)}
                 />
+                {quantity > 1 && num(cost) > 0 && (
+                  <span className="hint" style={{ fontSize: 11, marginTop: 2, display: "block", color: "var(--accent)" }}>
+                    {inputMode === "unit"
+                      ? `Total Lot (x${quantity}) : ${eur(num(cost) * quantity)}`
+                      : `Soit ${eur2(num(cost) / quantity)} / pièce`}
+                  </span>
+                )}
               </label>
 
               <label className="field">
-                <span>Prix de Vente Estimé / Souhaité (€)</span>
+                <span>{inputMode === "unit" ? "Prix Estimé Unitaire (€/pc)" : "Prix Estimé Total du Lot (€)"}</span>
                 <input
                   type="number"
                   step="0.01"
@@ -787,6 +902,13 @@ export default function TcgPage() {
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
                 />
+                {quantity > 1 && num(price) > 0 && (
+                  <span className="hint" style={{ fontSize: 11, marginTop: 2, display: "block", color: "var(--ok)" }}>
+                    {inputMode === "unit"
+                      ? `Total Revente (x${quantity}) : ${eur(num(price) * quantity)}`
+                      : `Soit ${eur2(num(price) / quantity)} / pièce`}
+                  </span>
+                )}
               </label>
 
               <label className="field">
@@ -851,3 +973,4 @@ export default function TcgPage() {
     </>
   );
 }
+

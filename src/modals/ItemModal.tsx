@@ -644,6 +644,11 @@ export default function ItemModal({
       <div className="fgrid">
         <Field label={eurLabel(LABEL.cost)}>
           <input type="number" step="0.01" value={draft.cost} placeholder="0,00" onChange={(e) => set("cost", e.target.value)} />
+          {qty > 1 && num(draft.cost) > 0 && (
+            <span className="hint" style={{ fontSize: 11, marginTop: 2, display: "block" }}>
+              Total Lot (x{qty}) : {eur2(totalCost)}
+            </span>
+          )}
         </Field>
         <Field label={eurLabel(LABEL.fees)}>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -679,6 +684,11 @@ export default function ItemModal({
               set("estimatedPrice", e.target.value);
             }}
           />
+          {qty > 1 && price > 0 && (
+            <span className="hint pos" style={{ fontSize: 11, marginTop: 2, display: "block" }}>
+              Total Revente (x{qty}) : {eur2(price * qty)}
+            </span>
+          )}
         </Field>
       </div>
 
