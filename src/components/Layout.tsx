@@ -121,7 +121,10 @@ export default function Layout() {
     return !module || state.settings.enabledModules[module];
   };
 
+  // La comptabilité est transverse aux deux secteurs : dans un contexte secteur, elle ne
+  // se répète pas dans le menu — elle reste accessible depuis le hub Comptabilité de l'accueil.
   const visibleGroups = NAV_GROUPS
+    .filter((g) => !(activeSecteur && g.label === "Comptes"))
     .map((group) => ({ ...group, routes: group.routes.filter(routeIsEnabled) }))
     .filter((group) => group.routes.length > 0);
 

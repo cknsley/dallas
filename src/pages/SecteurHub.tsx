@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Scale } from "lucide-react";
 import {
   MODULE_BY_PATH,
   NAV_GROUPS,
@@ -27,15 +27,18 @@ export default function SecteurHub() {
 
   if (!isSectorDomain(secteurParam)) return <Navigate to="/" replace />;
 
-  const visibleGroups = NAV_GROUPS.map((group) => ({
-    ...group,
-    routes: group.routes.filter((r) => {
-      if (r.path === "/dashboard") return false;
-      if (r.path === "/tcg" && secteur === "fashion") return false;
-      const module = MODULE_BY_PATH[r.path as keyof typeof MODULE_BY_PATH];
-      return !module || state.settings.enabledModules[module];
-    }),
-  })).filter((group) => group.routes.length > 0);
+  // Le groupe "Comptes" est retiré du hub secteur : il fait déjà double emploi avec
+  // le hub Comptabilité de l'accueil, qui regroupe ces mêmes pages en un seul endroit.
+  const visibleGroups = NAV_GROUPS.filter((g) => g.label !== "Comptes")
+    .map((group) => ({
+      ...group,
+      routes: group.routes.filter((r) => {
+        if (r.path === "/dashboard") return false;
+        if (r.path === "/tcg" && secteur === "fashion") return false;
+        const module = MODULE_BY_PATH[r.path as keyof typeof MODULE_BY_PATH];
+        return !module || state.settings.enabledModules[module];
+      }),
+    })).filter((group) => group.routes.length > 0);
 
   const targetFor = (path: string) => `${path}?secteur=${secteur}`;
 
@@ -92,6 +95,23 @@ export default function SecteurHub() {
             </div>
           </div>
         ))}
+
+        <div className="hub-group">
+          <div className="hub-group-label">Comptes</div>
+          <div className="hub-grid">
+            <Link to="/comptabilite" className="kpi hub-tile">
+              <span className="hub-tile-ic">
+                <Scale size={20} />
+              </span>
+              <div className="hub-tile-lbl">Comptabilité</div>
+              <div className="hub-tile-sub">Fournisseurs, charges, bilan, facturation & clients</div>
+              <div className="hub-tile-transverse">Commun aux deux secteurs</div>
+              <span className="go">
+                <ArrowRight size={14} />
+              </span>
+            </Link>
+          </div>
+        </div>
       </div>
       </main>
     </div>
