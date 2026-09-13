@@ -8,6 +8,7 @@ import { caOfYear } from "../lib/calc";
 import { dfr, eur, eur2, pct } from "../lib/format";
 import { docKindLabel, isSociete, vatRegime } from "../lib/vat";
 import { useQueryState } from "../lib/useQueryState";
+import { useSecteur } from "../lib/useSecteur";
 import { links } from "../lib/links";
 import DocModal from "../modals/DocModal";
 import DocPreview from "../modals/DocPreview";
@@ -21,6 +22,7 @@ export default function Facturation() {
   const [creating, setCreating] = useState<string[] | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [docFilter, setDocFilter] = useQueryState("state", "all");
+  const secteur = useSecteur();
   const [confirming, setConfirming] = useState<SalesDoc | null>(null);
 
   const year = new Date().getFullYear();
@@ -45,13 +47,19 @@ export default function Facturation() {
     }
   }, [params, setParams, state.docs]);
 
-  const unpaid = state.docs.filter((d) => !d.paid);
+  // Le régime de TVA reste calculé sur l'activité entière : le seuil est légal, pas sectoriel.
+  const scopedDocs = useMemo(
+    () => state.docs.filter((d) => secteur.matchesLinked(d.itemIds)),
+    [state.docs, secteur],
+  );
+
+  const unpaid = scopedDocs.filter((d) => !d.paid);
   const unpaidTotal = unpaid.reduce((a, d) => a + d.total, 0);
-  const vatCollected = state.docs
+  const vatCollected = scopedDocs
     .filter((d) => d.date.slice(0, 4) === String(year))
     .reduce((a, d) => a + d.vatAmount, 0);
 
-  const visibleDocs = [...state.docs]
+  const visibleDocs = [...scopedDocs]
     .filter((d) => docFilter === "all" || (docFilter === "paid" ? d.paid : !d.paid))
     .sort((a, b) => b.createdAt - a.createdAt);
 

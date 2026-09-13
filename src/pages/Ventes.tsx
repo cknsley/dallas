@@ -8,7 +8,8 @@ import { usePref } from "../lib/usePref";
 import { useClearQuery, useQueryState } from "../lib/useQueryState";
 import { links } from "../lib/links";
 import { LABEL } from "../lib/lexicon";
-import { canFileLitige, costOf, filterItemsByDomain, marginOf, periodRange, qtyOf, revenueOf, saleCostsOf, soldItems, type Domain } from "../lib/calc";
+import { canFileLitige, costOf, marginOf, periodRange, qtyOf, revenueOf, saleCostsOf, soldItems } from "../lib/calc";
+import { useSecteur } from "../lib/useSecteur";
 import { dshort, eur, eur2, pct, today } from "../lib/format";
 import { DELIVERY_LABEL, DELIVERY_ORDER } from "../lib/constants";
 import { downloadText, itemsToCSV } from "../lib/csv";
@@ -30,8 +31,7 @@ export default function Ventes() {
   const toast = useToast();
   const navigate = useNavigate();
   const [period, setPeriod] = usePref<Period>("period", "month");
-  const [secteurRaw] = useQueryState("secteur");
-  const domain: Domain = secteurRaw === "tcg" || secteurRaw === "fashion" ? secteurRaw : "all";
+  const secteur = useSecteur();
   const [deliveryParam, setDelivery] = useQueryState("delivery", "all");
   const [platform, setPlatform] = useQueryState("platform");
   const [brand, setBrand] = useQueryState("brand");
@@ -48,7 +48,7 @@ export default function Ventes() {
   const [addingExpense, setAddingExpense] = useState(false);
 
   const range = useMemo(() => periodRange(period), [period]);
-  const items = useMemo(() => filterItemsByDomain(state.items, domain), [state.items, domain]);
+  const items = secteur.items;
   const list = useMemo(
     () =>
       soldItems(items, range)

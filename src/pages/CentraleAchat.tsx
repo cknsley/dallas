@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
 import { Kpi, Modal, Photo } from "../components/ui";
 import InlineField from "../components/InlineField";
 import MenuButton from "../components/MenuButton";
 import { useStore } from "../store/StoreContext";
-import { costOf, filterItemsByDomain, qtyOf, type Domain } from "../lib/calc";
+import { costOf, qtyOf } from "../lib/calc";
+import { useSecteur } from "../lib/useSecteur";
 import { dshort, eur, eur2, num, today } from "../lib/format";
 import { links } from "../lib/links";
 import { uid } from "../lib/id";
@@ -167,9 +168,7 @@ export default function CentraleAchat() {
   const { state, dispatch } = useStore();
   const toast = useToast();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const secteurRaw = searchParams.get("secteur");
-  const domain: Domain = secteurRaw === "tcg" || secteurRaw === "fashion" ? secteurRaw : "all";
+  const secteur = useSecteur();
   const [tab, setTab] = useState<Tab>("colis");
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [receivingParcel, setReceivingParcel] = useState<Item[] | null>(null);
@@ -193,8 +192,8 @@ export default function CentraleAchat() {
   const now = today();
 
   const incomingItems = useMemo(
-    () => filterItemsByDomain(state.items.filter((i) => i.status === "arrivage"), domain),
-    [state.items, domain],
+    () => secteur.items.filter((i) => i.status === "arrivage"),
+    [secteur.items],
   );
 
   /** Un colis = une commande. Les lignes isolées forment leur propre colis. */

@@ -6,6 +6,7 @@ import TrackingLink from "../components/TrackingLink";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { useQueryState } from "../lib/useQueryState";
+import { useSecteur } from "../lib/useSecteur";
 import { links } from "../lib/links";
 import { revenueOf } from "../lib/calc";
 import { dfr, eur, eur2, today } from "../lib/format";
@@ -34,6 +35,7 @@ export default function Sav() {
   const navigate = useNavigate();
   const [tabParam, setTab] = useQueryState("tab", "litiges");
   const tab = tabParam as SavTab;
+  const secteur = useSecteur();
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<Item | null>(null);
   const [selling, setSelling] = useState<Item | null>(null);
@@ -60,8 +62,8 @@ export default function Sav() {
 
   // Articles vendus pertinents pour le SAV (non expirés après 14j si validés)
   const soldItems = useMemo(
-    () => state.items.filter((i) => i.status === "vendu" && !isExpiredAfter14Days(i)),
-    [state.items]
+    () => secteur.items.filter((i) => i.status === "vendu" && !isExpiredAfter14Days(i)),
+    [secteur.items]
   );
 
   // Commandes avec litige / notes SAV actifs
@@ -172,7 +174,9 @@ export default function Sav() {
 
   const openPersonalLitiges = state.personalLitiges.filter((l) => l.status !== "resolu");
 
-  const openReturns = state.returns.filter((r) => !["rembourse", "clos"].includes(r.status)).length;
+  const openReturns = state.returns.filter(
+    (r) => !["rembourse", "clos"].includes(r.status) && secteur.matchesLinked([r.itemId]),
+  ).length;
 
   return (
     <>

@@ -4,6 +4,7 @@ import { Confirm, Empty, Kpi, Segmented } from "../../components/ui";
 import { useToast } from "../../components/Toast";
 import { useStore } from "../../store/StoreContext";
 import { marginOf, soldItems } from "../../lib/calc";
+import { useSecteur } from "../../lib/useSecteur";
 import { links } from "../../lib/links";
 import { dshort, eur, num, today } from "../../lib/format";
 import ReturnModal, {
@@ -21,25 +22,30 @@ export default function RetoursTab() {
   const { state, dispatch } = useStore();
   const toast = useToast();
   const navigate = useNavigate();
+  const secteur = useSecteur();
   const [filter, setFilter] = useState<ReturnFilter>("all");
   const [editing, setEditing] = useState<ReturnCase | null>(null);
   const [creating, setCreating] = useState<ReturnKind | null>(null);
   const [confirming, setConfirming] = useState<ReturnCase | null>(null);
 
-  const sold = useMemo(() => soldItems(state.items), [state.items]);
-  const supplierItems = useMemo(() => state.items.filter((i) => i.status !== "vendu"), [state.items]);
+  const sold = useMemo(() => soldItems(secteur.items), [secteur.items]);
+  const supplierItems = useMemo(() => secteur.items.filter((i) => i.status !== "vendu"), [secteur.items]);
+  const returns = useMemo(
+    () => state.returns.filter((r) => secteur.matchesLinked([r.itemId])),
+    [state.returns, secteur],
+  );
   const visible = useMemo(
     () =>
-      state.returns
+      returns
         .filter((r) => filter === "all" || r.kind === filter)
         .sort((a, b) => b.openedDate.localeCompare(a.openedDate) || b.createdAt - a.createdAt),
-    [state.returns, filter],
+    [returns, filter],
   );
 
-  const open = state.returns.filter((r) => !["rembourse", "clos"].includes(r.status));
+  const open = returns.filter((r) => !["rembourse", "clos"].includes(r.status));
   const late = open.filter((r) => r.dueDate && r.dueDate < today());
-  const refunds = state.returns.reduce((a, r) => a + num(r.amount), 0);
-  const feesLost = state.returns.reduce((a, r) => a + num(r.feesLost), 0);
+  const refunds = returns.reduce((a, r) => a + num(r.amount), 0);
+  const feesLost = returns.reduce((a, r) => a + num(r.feesLost), 0);
 
   const candidates = creating === "fournisseur" || editing?.kind === "fournisseur" ? supplierItems : sold;
   const closeModal = () => {

@@ -6,6 +6,7 @@ import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
 import { useQueryState } from "../lib/useQueryState";
+import { useSecteur } from "../lib/useSecteur";
 import { buildClients } from "../lib/clients";
 import { groupBy, marginOf, qtyOf, revenueOf } from "../lib/calc";
 import { dshort, eur, eur2, pct } from "../lib/format";
@@ -29,6 +30,7 @@ export default function Clients() {
   const navigate = useNavigate();
   const [sort, setSort] = usePref<Sort>("clientSort", "revenue");
   const [q, setQ] = useQueryState("q");
+  const secteur = useSecteur();
   const [open, setOpen] = useState("");
   const [editing, setEditing] = useState<Item | null>(null);
 
@@ -38,7 +40,10 @@ export default function Clients() {
   const [previewDoc, setPreviewDoc] = useState<SalesDoc | null>(null);
   const [clientRecordModal, setClientRecordModal] = useState<{ record: ClientRecord | null; name: string } | null>(null);
 
-  const clients = useMemo(() => buildClients(state.items, state.clients), [state.items, state.clients]);
+  const clients = useMemo(
+    () => buildClients(secteur.items, state.clients),
+    [secteur.items, state.clients],
+  );
 
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -59,11 +64,11 @@ export default function Clients() {
 
   const totalRevenue = clients.reduce((a, c) => a + c.revenue, 0);
   const repeat = clients.filter((c) => c.orders > 1);
-  const anonymous = state.items.filter((i) => i.status === "vendu" && !i.buyer.trim()).length;
+  const anonymous = secteur.items.filter((i) => i.status === "vendu" && !i.buyer.trim()).length;
   const best = clients[0];
 
   // Ce qui part le mieux auprès de ces acheteurs.
-  const sold = useMemo(() => state.items.filter((i) => i.status === "vendu"), [state.items]);
+  const sold = useMemo(() => secteur.items.filter((i) => i.status === "vendu"), [secteur.items]);
   const topItems = useMemo(() => groupBy(sold, "item").slice(0, 3), [sold]);
   const topBrands = useMemo(() => groupBy(sold, "brand").slice(0, 3), [sold]);
 

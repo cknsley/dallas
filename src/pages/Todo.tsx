@@ -4,6 +4,7 @@ import { HeaderActions } from "../components/Layout";
 import { Empty, Modal, Segmented } from "../components/ui";
 import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
+import { useSecteur } from "../lib/useSecteur";
 import { TODO_LABEL, TODO_ORDER } from "../lib/constants";
 import { uid } from "../lib/id";
 import { links } from "../lib/links";
@@ -138,6 +139,7 @@ function AddTodoModal({
 
 export default function Todo() {
   const { state, dispatch, resolveAutoTodo } = useStore();
+  const secteur = useSecteur();
   const toast = useToast();
   const navigate = useNavigate();
   const [view, setView] = usePref<"kanban" | "list">("todoView", "kanban");
@@ -151,7 +153,10 @@ export default function Todo() {
   const [showAddTodoModal, setShowAddTodoModal] = useState(false);
   const [defaultAddCol, setDefaultAddCol] = useState<TodoCol>("envoyer");
 
-  const byCol = (c: TodoCol) => state.todos.filter((t) => t.col === c).sort((a, b) => a.order - b.order);
+  // L'affichage est filtré par secteur, jamais les écritures : réordonner une colonne
+  // renvoie la liste complète des tâches, y compris celles de l'autre secteur.
+  const visibleTodos = state.todos.filter((t) => secteur.matchesLinked([t.itemId, ...(t.itemIds ?? [])]));
+  const byCol = (c: TodoCol) => visibleTodos.filter((t) => t.col === c).sort((a, b) => a.order - b.order);
 
   const add = (col: TodoCol, text: string, dueDate?: string) => {
     const clean = text.trim();
@@ -207,9 +212,9 @@ export default function Todo() {
     dispatch({ type: "reorderTodos", todos: [...others, ...renumbered] });
   };
 
-  const remaining = state.todos.filter((t) => t.col !== "termine").length;
-  const autoCount = state.todos.filter((t) => t.auto).length;
-  const sourcingCount = state.todos.filter((t) => t.isSourcing || t.col === "acheter").length;
+  const remaining = visibleTodos.filter((t) => t.col !== "termine").length;
+  const autoCount = visibleTodos.filter((t) => t.auto).length;
+  const sourcingCount = visibleTodos.filter((t) => t.isSourcing || t.col === "acheter").length;
 
   /** Où se règle réellement la tâche. */
   const autoTarget = (t: TodoItem) =>

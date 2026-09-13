@@ -4,6 +4,7 @@ import { Empty } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { caOfYear, costOf, revenueOf, saleCostsOf } from "../lib/calc";
+import { useSecteur } from "../lib/useSecteur";
 import { eur2, num, pct } from "../lib/format";
 import { STATUS_LABEL } from "../lib/constants";
 import { HINT, LABEL } from "../lib/lexicon";
@@ -253,6 +254,7 @@ const newSellLine = (): SellLine => ({ id: uid(), label: "", price: "", cost: ""
 /** Compose un lot à vendre et montre jusqu'à quelle remise on reste gagnant. */
 function SellCalculator({ onSellItem }: { onSellItem: (item: Item, targetPrice: number) => void }) {
   const { state } = useStore();
+  const secteur = useSecteur();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [lines, setLines] = useState<SellLine[]>([]);
   const [query, setQuery] = useState("");
@@ -266,10 +268,10 @@ function SellCalculator({ onSellItem }: { onSellItem: (item: Item, targetPrice: 
 
   const pickable = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return state.items
+    return secteur.items
       .filter((i) => i.status !== "vendu")
       .filter((i) => !needle || [i.name, i.brand, i.type, i.size].join(" ").toLowerCase().includes(needle));
-  }, [state.items, query]);
+  }, [secteur.items, query]);
 
   const toggle = (id: string) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const patch = (id: string, p: Partial<SellLine>) => setLines((l) => l.map((x) => (x.id === id ? { ...x, ...p } : x)));

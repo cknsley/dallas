@@ -29,8 +29,11 @@ import type { SectorDomain } from "../lib/links";
 import { CommandPalette } from "./CommandPalette";
 import { SidebarMiniMenu } from "./SidebarMiniMenu";
 
-/** Routes dont les données sont filtrées par secteur ; le paramètre `secteur` les suit dans la nav. */
-export const SECTOR_SCOPED_PATHS = new Set(["/stock", "/ventes", "/livraison", "/achats", "/bilan", "/performance"]);
+/**
+ * Le secteur suit la navigation partout sauf sur l'Accueil, qui est le retour à la vue générale.
+ * Les sections transverses (charges, sourcing) ignorent le paramètre mais gardent le contexte.
+ */
+export const SECTOR_TRANSVERSE_PATHS = new Set(["/charges", "/sourcing", "/reglages"]);
 
 export function isSectorDomain(v: string | null): v is SectorDomain {
   return v === "fashion" || v === "tcg";
@@ -133,7 +136,7 @@ export default function Layout() {
   const badges = activeSecteur ? computeSectorNavBadges(state, activeSecteur) : computeNavBadges(state);
 
   const navTarget = (r: NavRoute) =>
-    activeSecteur && r.path !== "/" && SECTOR_SCOPED_PATHS.has(r.path) ? `${r.path}?secteur=${activeSecteur}` : r.path;
+    activeSecteur && r.path !== "/" ? `${r.path}?secteur=${activeSecteur}` : r.path;
 
   return (
     <div className="app">

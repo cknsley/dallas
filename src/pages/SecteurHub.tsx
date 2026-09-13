@@ -5,7 +5,7 @@ import {
   HeaderActions,
   MODULE_BY_PATH,
   NAV_GROUPS,
-  SECTOR_SCOPED_PATHS,
+  SECTOR_TRANSVERSE_PATHS,
   isSectorDomain,
 } from "../components/Layout";
 import { useStore } from "../store/StoreContext";
@@ -37,7 +37,7 @@ export default function SecteurHub() {
     }),
   })).filter((group) => group.routes.length > 0);
 
-  const targetFor = (path: string) => (SECTOR_SCOPED_PATHS.has(path) ? `${path}?secteur=${secteur}` : path);
+  const targetFor = (path: string) => `${path}?secteur=${secteur}`;
 
   return (
     <>
@@ -74,6 +74,9 @@ export default function SecteurHub() {
                     </span>
                     <div className="hub-tile-lbl">{r.label}</div>
                     <div className="hub-tile-sub">{r.subtitle}</div>
+                    {SECTOR_TRANSVERSE_PATHS.has(r.path) && (
+                      <div className="hub-tile-transverse">Commun aux deux secteurs</div>
+                    )}
                     {!!count && <span className="hub-tile-badge">{count}</span>}
                     <span className="go">
                       <ArrowRight size={14} />

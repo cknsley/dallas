@@ -5,6 +5,7 @@ import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
 import { useQueryState } from "../lib/useQueryState";
+import { useSecteur } from "../lib/useSecteur";
 import { buildSuppliers, blankSupplierRecord, looksLikeRetail, type Supplier } from "../lib/suppliers";
 import { costOf, periodRange, revenueOf } from "../lib/calc";
 import { dshort, eur, eur2 } from "../lib/format";
@@ -43,6 +44,7 @@ export default function Fournisseurs() {
   const [period, setPeriod] = usePref<Period>("period", "month");
   const [sort, setSort] = usePref<Sort>("supplierSort", "rating");
   const [q, setQ] = useQueryState("q");
+  const secteur = useSecteur();
   const [activeTags, setActiveTags] = useState<string[]>([]);
   const [editing, setEditing] = useState<Item | null>(null);
   const [recordFor, setRecordFor] = useState<{ name: string; record: SupplierRecord | null } | null>(null);
@@ -51,7 +53,10 @@ export default function Fournisseurs() {
 
   const range = useMemo(() => periodRange(period), [period]);
   const excluded = state.settings.nonSuppliers;
-  const allSources = useMemo(() => buildSuppliers(state.items, state.suppliers), [state.items, state.suppliers]);
+  const allSources = useMemo(
+    () => buildSuppliers(secteur.items, state.suppliers),
+    [secteur.items, state.suppliers],
+  );
 
   const suppliers = useMemo(
     () => allSources.filter((s) => s.name !== "Source non renseignée" && !excluded.includes(s.key)),
@@ -96,16 +101,16 @@ export default function Fournisseurs() {
 
   const supplierKeys = useMemo(() => new Set(suppliers.map((s) => s.key)), [suppliers]);
   const bought = useMemo(
-    () => state.items.filter((i) => supplierKeys.has((i.source.trim() || "Source non renseignée").toLowerCase()) && i.buyDate >= range.from && i.buyDate <= range.to),
-    [state.items, supplierKeys, range],
+    () => secteur.items.filter((i) => supplierKeys.has((i.source.trim() || "Source non renseignée").toLowerCase()) && i.buyDate >= range.from && i.buyDate <= range.to),
+    [secteur.items, supplierKeys, range],
   );
 
   const debt = suppliers.reduce((a, s) => a + s.debt, 0);
   const debtors = suppliers.filter((s) => s.debt > 0);
-  const clientDebt = state.items
+  const clientDebt = secteur.items
     .filter((i) => i.status === "vendu" && i.delivery === "non_payee")
     .reduce((a, i) => a + revenueOf(i), 0);
-  const unpaidDocs = state.docs.filter((d) => !d.paid);
+  const unpaidDocs = state.docs.filter((d) => !d.paid && secteur.matchesLinked(d.itemIds));
   const unpaidTotal = unpaidDocs.reduce((a, d) => a + d.total, 0);
   const receivables = clientDebt + unpaidTotal;
 

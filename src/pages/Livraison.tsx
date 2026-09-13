@@ -8,7 +8,8 @@ import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
 import { links } from "../lib/links";
-import { costOf, filterItemsByDomain, qtyOf, revenueOf, type Domain } from "../lib/calc";
+import { costOf, qtyOf, revenueOf } from "../lib/calc";
+import { useSecteur } from "../lib/useSecteur";
 import { dshort, eur, eur2, today } from "../lib/format";
 import { SHIPPING_LABEL } from "../lib/constants";
 import { useQueryState } from "../lib/useQueryState";
@@ -33,9 +34,7 @@ export default function Livraison() {
   const navigate = useNavigate();
 
   const [tab, setTab] = useQueryState("tab", "a_partir");
-  const [secteurRaw] = useQueryState("secteur");
-  const domain: Domain = secteurRaw === "tcg" || secteurRaw === "fashion" ? secteurRaw : "all";
-  const items = useMemo(() => filterItemsByDomain(state.items, domain), [state.items, domain]);
+  const items = useSecteur().items;
   const [viewMode, setViewMode] = usePref<"kanban" | "table">("livraisonView", "kanban");
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<Shipping | null>(null);
