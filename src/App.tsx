@@ -3,6 +3,7 @@ import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import PerformancePage from "./pages/PerformancePage";
 import Stock from "./pages/Stock";
+import TcgPage from "./pages/TcgPage";
 import CentraleAchat from "./pages/CentraleAchat";
 import Ventes from "./pages/Ventes";
 import Livraison from "./pages/Livraison";
@@ -24,6 +25,7 @@ export default function App() {
         <Route index element={<Dashboard />} />
         <Route path="performance" element={<PerformancePage />} />
         <Route path="stock" element={<Stock />} />
+        <Route path="tcg" element={<TcgPage />} />
         <Route path="achats" element={<CentraleAchat />} />
         <Route path="arrivage" element={<Navigate to="/achats" replace />} />
         <Route path="ventes" element={<Ventes />} />

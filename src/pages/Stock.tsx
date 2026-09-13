@@ -16,12 +16,24 @@ import ItemModal from "../modals/ItemModal";
 import SellModal from "../modals/SellModal";
 import type { Item } from "../types";
 
-export type StockCategoryTab = "vetements" | "chaussures" | "sacs" | "accessoires" | "emballages" | "total";
+export type StockCategoryTab = "vetements" | "chaussures" | "sacs" | "accessoires" | "tcg" | "emballages" | "total";
 
-export function getStockCategory(i: Item): "vetements" | "chaussures" | "sacs" | "accessoires" | "emballages" {
+export function getStockCategory(i: Item): "vetements" | "chaussures" | "sacs" | "accessoires" | "tcg" | "emballages" {
+  if (i.isTcg) return "tcg";
+
   const t = (i.type || "").toLowerCase().trim();
   const n = (i.name || "").toLowerCase().trim();
   const c = ((i as any).category || "").toLowerCase().trim();
+
+  // TCG Cards & Sealed
+  if (
+    c === "tcg" || t.includes("tcg") || t.includes("carte") || t.includes("booster") ||
+    t.includes("display") || t.includes("etb") || t.includes("pokemon") ||
+    t.includes("pokémon") || t.includes("lorcana") || t.includes("yugioh") ||
+    t.includes("magic") || t.includes("one piece")
+  ) {
+    return "tcg";
+  }
 
   // Emballages (Cartons, sachets, papier bulle, scotch, fournitures d'envoi)
   if (
@@ -73,6 +85,7 @@ const STOCK_TABS: { key: StockCategoryTab; label: string; icon: string }[] = [
   { key: "chaussures", label: "Chaussures", icon: "👟" },
   { key: "sacs", label: "Sacs", icon: "👜" },
   { key: "accessoires", label: "Accessoires", icon: "🧢" },
+  { key: "tcg", label: "TCG & Cartes", icon: "🃏" },
   { key: "emballages", label: "Emballages", icon: "📦" },
   { key: "total", label: "Total", icon: "📊" },
 ];
@@ -133,6 +146,7 @@ export default function Stock() {
       chaussures: 0,
       sacs: 0,
       accessoires: 0,
+      tcg: 0,
       emballages: 0,
       total: 0,
     };

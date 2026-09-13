@@ -12,6 +12,7 @@ import {
   ShoppingCart,
   Truck,
   HelpCircle,
+  Layers,
   DollarSign,
   FileText,
   Users,
@@ -59,6 +60,7 @@ export const NAV_GROUPS: { label: string; routes: NavRoute[] }[] = [
       { path: "/ventes", label: "Vente", icon: ShoppingCart, subtitle: "Historique et suivi des ventes" },
       { path: "/livraison", label: "Livraison", icon: Truck, subtitle: "Livraisons à partir (ventes) et à venir (centrale d'achat)" },
       { path: "/sav", label: "SAV & Litiges", icon: HelpCircle, subtitle: "Litiges, retours clients et remboursements fournisseurs" },
+      { path: "/tcg", label: "TCG & Cartes", icon: Layers, subtitle: "Cartes gradées (PSA, BGS), scellé & booster boxes" },
     ],
   },
   {

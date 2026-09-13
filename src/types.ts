@@ -68,6 +68,12 @@ export interface Item {
   lotTag: string;
   /** Entre en stock tout seul dès que la date d'arrivée est atteinte. */
   autoReceive: boolean;
+  /* TCG & Cartes */
+  isTcg?: boolean;
+  tcgGame?: string;       // Pokémon, Yu-Gi-Oh!, Magic, One Piece, Lorcana
+  tcgGrade?: string;      // PSA 10, BGS 9.5, PCA 10, Raw NM, etc.
+  tcgSet?: string;        // 151, Évolution Céleste, OP-05
+  tcgCategory?: "raw" | "graded" | "sealed"; // Carte seule, Gradée, Booster/ETB/Display
   /* SAV & Litiges */
   litigeState?: "en_cours" | "attente" | "resolu";
   litigeCategory?: string;

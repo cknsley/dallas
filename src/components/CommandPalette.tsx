@@ -17,30 +17,26 @@ import {
   CheckSquare,
   Settings,
   Sparkles,
+  Layers,
   LucideIcon,
 } from "lucide-react";
 import { useStore } from "../store/StoreContext";
 import { eur } from "../lib/format";
 import type { Item, ClientRecord, SupplierRecord } from "../types";
 
-interface CommandPaletteProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-interface SearchResult {
+export interface SearchResult {
   id: string;
   title: string;
-  sub: string;
-  category: string;
+  sub?: string;
+  category: "Navigation" | "Stock" | "Clients" | "Fournisseurs";
   icon: LucideIcon;
   path: string;
-  type: "page" | "item" | "client" | "supplier" | "sale" | "expense";
+  type?: string;
 }
 
-export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
-  const { state } = useStore();
+export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const navigate = useNavigate();
+  const { state } = useStore();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -56,6 +52,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const pages = useMemo(() => [
     { title: "Tableau de bord", path: "/dashboard", icon: LayoutDashboard, category: "Navigation" },
     { title: "Stock & Articles", path: "/stock", icon: Package, category: "Navigation" },
+    { title: "TCG & Cartes", path: "/tcg", icon: Layers, category: "Navigation" },
     { title: "Sourcing & Achats", path: "/sourcing", icon: Sparkles, category: "Navigation" },
     { title: "Ventes & Commandes", path: "/ventes", icon: ShoppingCart, category: "Navigation" },
     { title: "Livraisons & Colis", path: "/livraison", icon: Truck, category: "Navigation" },

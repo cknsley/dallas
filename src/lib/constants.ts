@@ -44,13 +44,14 @@ export const TODO_LABEL: Record<TodoCol, string> = {
 export const TODO_ORDER: TodoCol[] = ["acheter", "faire", "envoyer", "termine"];
 
 export const ARTICLE_TYPES = [
-  "Sneakers", "Chaussures", "T-shirt", "Sweat / Hoodie", "Veste", "Manteau",
+  "Sneakers", "Chaussures", "Carte TCG (Gradée)", "Carte TCG (Raw / Brut)", "TCG Coffret / Booster Box",
+  "T-shirt", "Sweat / Hoodie", "Veste", "Manteau",
   "Pantalon", "Jean", "Short", "Robe", "Chemise", "Sac", "Ceinture",
   "Casquette", "Bijou", "Lunettes", "Montre", "Accessoire", "Emballage", "Autre",
 ];
 
 export const PLATFORMS = [
-  "Vinted", "Vestiaire Collective", "Depop", "eBay", "Leboncoin",
+  "Vinted", "Cardmarket", "eBay", "Vestiaire Collective", "Depop", "Leboncoin",
   "Grailed", "Instagram", "WhatsApp", "Main propre", "Boutique", "Autre",
 ];
 
