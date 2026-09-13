@@ -1,8 +1,7 @@
 import { useMemo } from "react";
-import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import {
-  HeaderActions,
   MODULE_BY_PATH,
   NAV_GROUPS,
   SECTOR_TRANSVERSE_PATHS,
@@ -41,12 +40,17 @@ export default function SecteurHub() {
   const targetFor = (path: string) => `${path}?secteur=${secteur}`;
 
   return (
-    <>
-      <HeaderActions>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <header style={{ display: "flex", alignItems: "center", gap: 12, padding: "20px 28px", borderBottom: "1px solid var(--line)", background: "var(--bg)" }}>
+        <Link to="/" title="Retour à l'accueil" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none", color: "inherit" }}>
+          <span style={{ fontSize: 20 }}>←</span>
+        </Link>
+        <div style={{ flex: 1 }} />
         <span className="pill info">{stats.enStock + stats.arrivage} article(s) en stock/arrivage</span>
         <span className="pill">{eur(stats.stockEstimate)} de valeur estimée</span>
-      </HeaderActions>
+      </header>
 
+      <main style={{ flex: 1 }}>
       <div className="hub-header">
         <span className="hub-header-ic">{meta.icon}</span>
         <div>
@@ -89,6 +93,7 @@ export default function SecteurHub() {
           </div>
         ))}
       </div>
-    </>
+      </main>
+    </div>
   );
 }

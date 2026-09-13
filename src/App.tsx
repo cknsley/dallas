@@ -23,12 +23,12 @@ import Home from "./pages/Home";
 export default function App() {
   return (
     <Routes>
-      {/* L'accueil est une interface à part : pas de cockpit, on y choisit son univers. */}
+      {/* L'accueil et les hubs secteur sont des interfaces à part : pas de sidebar. */}
       <Route index element={<Home />} />
+      <Route path="secteur" element={<SecteurHub />} />
 
       <Route element={<Layout />}>
         <Route path="dashboard" element={<Dashboard />} />
-        <Route path="secteur" element={<SecteurHub />} />
         <Route path="performance" element={<PerformancePage />} />
         <Route path="stock" element={<Stock />} />
         <Route path="tcg" element={<TcgPage />} />
