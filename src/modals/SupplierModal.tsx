@@ -17,7 +17,8 @@ export default function SupplierModal({
 }) {
   const { dispatch } = useStore();
   const toast = useToast();
-  const [d, setD] = useState<SupplierRecord>(record ?? blankSupplierRecord(name, uid()));
+  const [d, setD] = useState<SupplierRecord>(record ? { ...record, tags: record.tags ?? [] } : blankSupplierRecord(name, uid()));
+  const [tagsInput, setTagsInput] = useState((record?.tags ?? []).join(", "));
   const set = <K extends keyof SupplierRecord>(k: K, v: SupplierRecord[K]) => setD((x) => ({ ...x, [k]: v }));
 
   const submit = () => {
@@ -25,7 +26,8 @@ export default function SupplierModal({
       toast("Le nom du fournisseur est obligatoire");
       return;
     }
-    dispatch({ type: "upsertSupplier", supplier: { ...d, name: d.name.trim() } });
+    const tags = tagsInput.split(",").map((t) => t.trim()).filter(Boolean);
+    dispatch({ type: "upsertSupplier", supplier: { ...d, name: d.name.trim(), tags } });
     toast("Fiche fournisseur enregistrée");
     onClose();
   };
@@ -78,6 +80,14 @@ export default function SupplierModal({
         </Field>
         <Field label="Délai de paiement (jours)">
           <input type="number" step="1" min="0" value={d.terms} onChange={(e) => set("terms", num(e.target.value))} />
+        </Field>
+        <Field label="Spécialités (séparées par des virgules)" span>
+          <input
+            type="text"
+            value={tagsInput}
+            placeholder="Sneakers, Streetwear, Vintage…"
+            onChange={(e) => setTagsInput(e.target.value)}
+          />
         </Field>
         <Field label="Adresse" span>
           <textarea rows={2} value={d.address} onChange={(e) => set("address", e.target.value)} />

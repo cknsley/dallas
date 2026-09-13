@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { eur, pct } from "../lib/format";
 import { chargesInRange, costOf, marginOf, qtyOf, saleCostsOf } from "../lib/calc";
 import type { AppState } from "../types";
 
-/** Bilan de rentabilité globale : d'où vient le chiffre d'affaires, marque par marque. */
+/** Bilan de rentabilité des ventes : d'où vient le chiffre d'affaires, marque par marque. */
 export default function RentabilitePanel({ state }: { state: AppState }) {
+  const [collapsed, setCollapsed] = useState(false);
   const soldItems = state.items.filter((i) => i.status === "vendu");
   const totalCa = soldItems.reduce((a, i) => a + i.price * qtyOf(i), 0);
   const totalMarge = soldItems.reduce((a, i) => a + marginOf(i), 0);
@@ -45,12 +47,30 @@ export default function RentabilitePanel({ state }: { state: AppState }) {
 
   return (
     <div className="card" style={{ marginTop: 16 }}>
-      <div className="card-h">
-        <h3>📈 Rentabilité globale</h3>
+      <div
+        className="card-h"
+        style={{ cursor: "pointer", userSelect: "none" }}
+        onClick={() => setCollapsed(!collapsed)}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <h3>📈 Rentabilité des Ventes</h3>
+          <button
+            type="button"
+            className={`btn sm ${collapsed ? "ghost" : "primary"}`}
+            style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setCollapsed(!collapsed);
+            }}
+          >
+            {collapsed ? "▸ Afficher la section" : "▾ Masquer"}
+          </button>
+        </div>
         <div className="spacer" />
-        <span className="hint">Toutes ventes confondues</span>
+        <span className="hint">{collapsed ? "Cliquer pour déplier" : "Toutes ventes confondues"}</span>
       </div>
-      <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {!collapsed && (
+        <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         <div
           className={`note ${healthBadge.class}`}
           style={{ display: "flex", alignItems: "center", gap: 12, padding: 14, borderRadius: "var(--r-sm)" }}
@@ -161,6 +181,7 @@ export default function RentabilitePanel({ state }: { state: AppState }) {
           </div>
         </div>
       </div>
-    </div>
-  );
+    )}
+  </div>
+);
 }

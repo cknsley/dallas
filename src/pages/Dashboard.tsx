@@ -1,39 +1,40 @@
 import { useMemo, useState } from "react";
-import {
-  Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip,
-} from "recharts";
 import { Link, useNavigate } from "react-router-dom";
+import {
+  Plus,
+  ShoppingCart,
+  Scale,
+  Building2,
+  Package,
+  Truck,
+  AlertTriangle,
+  ArrowRight,
+  TrendingUp,
+  DollarSign,
+  Boxes,
+  CheckCircle2,
+  Clock,
+  Sparkles,
+} from "lucide-react";
 import { HeaderActions } from "../components/Layout";
 import StockValueCard from "../components/StockValueCard";
-import { BarList, Empty, Kpi, Segmented } from "../components/ui";
+import { Kpi, Segmented } from "../components/ui";
 import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
-import {
-  caOfYear, computeStats, groupBy, periodRange, soldItems, type Dimension,
-} from "../lib/calc";
-import { eur, pct } from "../lib/format";
+import { caOfYear, computeStats, periodRange } from "../lib/calc";
+import { eur, num, pct } from "../lib/format";
 import { links } from "../lib/links";
 import { vatRegime } from "../lib/vat";
 import ItemModal from "../modals/ItemModal";
 import OrderModal from "../modals/OrderModal";
+import ExpenseModal from "../modals/ExpenseModal";
 import type { Period } from "../types";
-
-type SplitKind = "table" | "bars" | "donut";
-
-const DIMS: { value: Dimension; label: string }[] = [
-  { value: "item", label: "Article" },
-  { value: "brand", label: "Marque" },
-  { value: "type", label: "Type" },
-  { value: "size", label: "Taille" },
-];
 
 export default function Dashboard() {
   const { state } = useStore();
   const navigate = useNavigate();
-  const [creating, setCreating] = useState<"item" | "order" | null>(null);
+  const [creating, setCreating] = useState<"item" | "order" | "charge" | null>(null);
   const [period, setPeriod] = usePref<Period>("period", "month");
-  const [dim, setDim] = usePref<Dimension>("dashDim", "type");
-  const [split, setSplit] = usePref<SplitKind>("dashSplit", "donut");
 
   const range = useMemo(() => periodRange(period), [period]);
   const stats = useMemo(() => computeStats(state, range), [state, range]);
@@ -42,9 +43,8 @@ export default function Dashboard() {
     [state.settings, state.items],
   );
 
-  const soldInPeriod = useMemo(() => soldItems(state.items, range), [state.items, range]);
   const clients = useMemo(
-    () => state.items.filter((i) => i.buyer?.trim()).map((i) => i.buyer.trim()),
+    () => state.items.filter((i) => i.buyer?.trim()).map((i) => i.buyer!.trim()),
     [state.items],
   );
   const buyerCounts = useMemo(() => {
@@ -58,38 +58,18 @@ export default function Dashboard() {
   );
   const repeatRate = clients.length ? (repeatBuyers / buyerCounts.size) * 100 : 0;
 
-  const rows = useMemo(() => groupBy(soldInPeriod, dim), [soldInPeriod, dim]);
-
-  const COLORS = ["#7c5cff", "#10b981", "#f59e0b", "#ef4444", "#3b82f6", "#ec4899", "#8b5cf6", "#14b8a6"];
-  const donutData = useMemo(() => {
-    const top = rows.slice(0, 7);
-    const otherCa = rows.slice(7).reduce((a, r) => a + r.ca, 0);
-    const res = top.map((r, idx) => ({
-      name: r.key,
-      value: r.ca,
-      fill: COLORS[idx % COLORS.length],
-    }));
-    if (otherCa > 0) {
-      res.push({ name: "Autres", value: otherCa, fill: "var(--ink-3)" });
-    }
-    return res;
-  }, [rows]);
-
-  const tooltipStyle = {
-    background: "var(--surface-solid)",
-    border: "1px solid var(--line-2)",
-    borderRadius: 8,
-    color: "var(--ink)",
-    fontSize: 12,
-  };
-  const tooltipItemStyle = { color: "var(--ink)" };
-  const tooltipLabelStyle = { fontWeight: 700, color: "var(--ink)" };
-
   return (
     <>
       <HeaderActions>
-        <button className="btn" onClick={() => setCreating("item")}>+ Nouvel article</button>
-        <button className="btn primary" onClick={() => setCreating("order")}>+ Nouvelle commande</button>
+        <button className="btn primary" onClick={() => setCreating("order")}>
+          <Plus size={15} /> Nouvelle commande
+        </button>
+        <button className="btn" onClick={() => navigate(links.ventes())}>
+          <ShoppingCart size={15} /> + Vente
+        </button>
+        <button className="btn" onClick={() => navigate(links.deal())}>
+          <Scale size={15} /> Deal
+        </button>
         <Segmented<Period>
           value={period}
           onChange={setPeriod}
@@ -103,20 +83,126 @@ export default function Dashboard() {
 
       {regime.alert && (
         <div className={`note ${regime.alert.level === "bad" ? "bad" : "warn"}`} style={{ marginBottom: 18 }}>
-          <span className="glyph">⚠</span>
+          <AlertTriangle size={18} className="glyph-icon" />
           <div>
             <b>{regime.alert.title}</b><br />{regime.alert.text}{" "}
-            <Link to={links.facturation()}>Régler le régime de TVA →</Link>
+            <Link to={links.facturation()} style={{ fontWeight: 600 }}>Régler le régime de TVA →</Link>
           </div>
         </div>
       )}
 
       <StockValueCard state={state} />
 
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", margin: "14px 0 18px" }}>
-        <button className="btn primary" onClick={() => setCreating("order")}>+ Nouvelle commande</button>
-        <button className="btn" onClick={() => navigate(links.ventes())}>+ Vente</button>
-        <button className="btn" onClick={() => navigate(links.deal())}>⚖ Deal</button>
+      {/* COCKPIT OPÉRATIONNEL & ACTIONS DU JOUR */}
+      <div className="card" style={{ marginBottom: 18 }}>
+        <div className="card-h">
+          <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Sparkles size={18} style={{ color: "var(--accent)" }} /> Cockpit Opérationnel
+          </h3>
+          <div className="spacer" />
+          <span className="hint">Actions et opérations du jour</span>
+        </div>
+        <div className="card-b" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+          {/* 1. Commandes en cours */}
+          <button
+            type="button"
+            className="card"
+            style={{ padding: 14, cursor: "pointer", textAlign: "left", transition: "transform 0.12s, border-color 0.12s", border: "1px solid var(--line-2)" }}
+            onClick={() => navigate(links.achats())}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <span style={{ fontSize: 12, color: "var(--ink-3)", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                <Building2 size={15} /> Commandes en cours
+              </span>
+              <span className="pill info">
+                {state.items.filter((i) => i.status === "arrivage").length} commande(s)
+              </span>
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+              {eur(state.items.filter((i) => i.status === "arrivage").reduce((a, i) => a + (num(i.cost) + num(i.fees)) * Math.max(1, i.quantity || 1), 0))}
+            </div>
+            <div className="hint" style={{ fontSize: 11, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+              Centrale d'achat & commandes <ArrowRight size={12} />
+            </div>
+          </button>
+
+          {/* 2. Envois en cours */}
+          <button
+            type="button"
+            className="card"
+            style={{ padding: 14, cursor: "pointer", textAlign: "left", transition: "transform 0.12s, border-color 0.12s", border: "1px solid var(--line-2)" }}
+            onClick={() => navigate(links.livraison({ tab: "a_partir" }))}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <span style={{ fontSize: 12, color: "var(--ink-3)", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                <Package size={15} /> Envois en cours
+              </span>
+              <span className={`pill ${state.items.filter((i) => i.status === "vendu" && i.delivery === "commandee" && i.shipping !== "recu").length ? "warn" : "good"}`}>
+                {state.items.filter((i) => i.status === "vendu" && i.delivery === "commandee" && i.shipping !== "recu").length} à expédier
+              </span>
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>
+              {state.items.filter((i) => i.status === "vendu" && i.delivery === "commandee" && i.shipping !== "recu").length > 0
+                ? `${state.items.filter((i) => i.status === "vendu" && i.delivery === "commandee" && i.shipping !== "recu").length} colis en attente`
+                : "Tout est expédié ✓"}
+            </div>
+            <div className="hint" style={{ fontSize: 11, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+              Kanban d'expédition <ArrowRight size={12} />
+            </div>
+          </button>
+
+          {/* 3. Colis qui arrivent */}
+          <button
+            type="button"
+            className="card"
+            style={{ padding: 14, cursor: "pointer", textAlign: "left", transition: "transform 0.12s, border-color 0.12s", border: "1px solid var(--line-2)" }}
+            onClick={() => navigate(links.livraison({ tab: "a_venir" }))}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <span style={{ fontSize: 12, color: "var(--ink-3)", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                <Truck size={15} /> Colis qui arrivent
+              </span>
+              <span className="pill info">
+                {state.items.filter((i) => i.status === "arrivage").length} en transit
+              </span>
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>
+              {state.items.filter((i) => i.status === "arrivage").length > 0
+                ? `${state.items.filter((i) => i.status === "arrivage").length} colis attendu(s)`
+                : "Aucun colis en attente"}
+            </div>
+            <div className="hint" style={{ fontSize: 11, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+              Réceptionner les arrivages <ArrowRight size={12} />
+            </div>
+          </button>
+
+          {/* 4. Argent bloqué */}
+          <button
+            type="button"
+            className="card"
+            style={{ padding: 14, cursor: "pointer", textAlign: "left", transition: "transform 0.12s, border-color 0.12s", border: "1px solid var(--line-2)" }}
+            onClick={() => navigate(links.ventes())}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <span style={{ fontSize: 12, color: "var(--ink-3)", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                <DollarSign size={15} /> Argent bloqué
+              </span>
+              <span className="pill warn">
+                {state.items.filter((i) => i.status === "vendu" && i.shipping !== "recu").length} vente(s)
+              </span>
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "var(--warn)", fontVariantNumeric: "tabular-nums" }}>
+              {eur(
+                state.items
+                  .filter((i) => i.status === "vendu" && i.shipping !== "recu")
+                  .reduce((a, i) => a + (num(i.price) * Math.max(1, i.quantity || 1) + num(i.shippingPaid)), 0)
+              )}
+            </div>
+            <div className="hint" style={{ fontSize: 11, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+              Ventes en attente de déblocage <ArrowRight size={12} />
+            </div>
+          </button>
+        </div>
       </div>
 
       <div className="kpi-grid">
@@ -142,131 +228,61 @@ export default function Dashboard() {
           value={String(stats.count)}
           meta={`${stats.enStock} en stock · ${stats.arrivage} en arrivage`}
         />
-        <Kpi
-          label="Taux de recommande"
-          value={pct(repeatRate)}
-          meta={clients.length
-            ? `${repeatBuyers} acheteur${repeatBuyers > 1 ? "s" : ""} sur ${clients.length} ${repeatBuyers > 1 ? "sont revenus" : "est revenu"}`
-            : "Renseignez l'acheteur à la vente"}
-          tone={repeatRate >= 20 ? "ok" : undefined}
-        />
       </div>
 
-      <div className="cols two">
-        <section className="card col-1">
+      <div className="cols two" style={{ marginTop: 18 }}>
+        <div className="card">
           <div className="card-h">
-            <h3>Stock & Immobilisations</h3>
-            <div className="spacer" />
-            <span className="hint">Au coût d'achat</span>
+            <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <TrendingUp size={18} style={{ color: "var(--ok)" }} /> Top Ventes & Répétition Clients
+            </h3>
           </div>
           <div className="card-b">
-            <div className="totrow">
-              <span>Capital immobilisé en stock</span>
-              <b className="num">{eur(stats.stockValue)}</b>
-            </div>
-            <div className="totrow" style={{ marginTop: -10 }}>
-              <span>Valeur estimée de revente</span>
-              <b className="num">{eur(stats.stockEstimate)}</b>
-            </div>
-            <hr className="sep" />
-            <div className="totrow" style={{ marginTop: -10 }}>
-              <span>Marge potentielle estimée</span>
-              <b className={`num ${stats.stockPotential >= 0 ? "pos" : "neg"}`}>{eur(stats.stockPotential)}</b>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+              <div style={{ padding: 12, borderRadius: 8, background: "var(--surface-sub)", border: "1px solid var(--border)" }}>
+                <div style={{ fontSize: 11, color: "var(--ink-3)", textTransform: "uppercase" }}>Taux de réachat</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: "var(--accent)" }}>{pct(repeatRate)}</div>
+                <div style={{ fontSize: 11, color: "var(--ink-3)" }}>{repeatBuyers} client(s) récurrent(s)</div>
+              </div>
+              <div style={{ padding: 12, borderRadius: 8, background: "var(--surface-sub)", border: "1px solid var(--border)" }}>
+                <div style={{ fontSize: 11, color: "var(--ink-3)", textTransform: "uppercase" }}>Panier moyen</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: "var(--ink-1)" }}>
+                  {eur(stats.count > 0 ? stats.ca / stats.count : 0)}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--ink-3)" }}>sur {stats.count} vente(s)</div>
+              </div>
             </div>
           </div>
-        </section>
+        </div>
 
-        <section className="card col-2">
+        <div className="card">
           <div className="card-h">
-            <h3>Meilleures ventes</h3>
-            <div className="spacer" />
-            <Segmented<Dimension> value={dim} onChange={setDim} options={DIMS} />
-            <Segmented<SplitKind>
-              value={split}
-              onChange={setSplit}
-              options={[
-                { value: "table", label: "Chiffré" },
-                { value: "bars", label: "Barres" },
-                { value: "donut", label: "Anneau" },
-              ]}
-            />
+            <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Boxes size={18} style={{ color: "var(--info)" }} /> État Général du Stock
+            </h3>
           </div>
-
-          {rows.length === 0 ? (
-            <Empty glyph="◌" title="Aucune vente sur la période">
-              Changez de période, ou marquez un article comme vendu depuis le stock.
-            </Empty>
-          ) : split === "table" ? (
-            <div className="twrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>{DIMS.find((d) => d.value === dim)?.label}</th>
-                    <th className="r">Qté</th>
-                    <th className="r">CA</th>
-                    <th className="r">Marge</th>
-                    <th className="r">Marge %</th>
-                    <th className="r">Part du CA</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r) => (
-                    <tr key={r.key}>
-                      <td style={{ fontWeight: 600 }}>{r.key}</td>
-                      <td className="r num">{r.qty}</td>
-                      <td className="r num">{eur(r.ca)}</td>
-                      <td className={`r num ${r.marge >= 0 ? "pos" : "neg"}`}>{eur(r.marge)}</td>
-                      <td className="r num">{pct(r.ca ? (r.marge / r.ca) * 100 : 0)}</td>
-                      <td className="r num">{pct(stats.ca ? (r.ca / stats.ca) * 100 : 0)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div className="card-b">
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", borderRadius: 6, background: "var(--surface-sub)" }}>
+                <span style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                  <CheckCircle2 size={14} style={{ color: "var(--ok)" }} /> Articles en Stock Boutique
+                </span>
+                <b style={{ fontVariantNumeric: "tabular-nums" }}>{stats.enStock}</b>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", borderRadius: 6, background: "var(--surface-sub)" }}>
+                <span style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                  <Clock size={14} style={{ color: "var(--warn)" }} /> Arrivages en Transit
+                </span>
+                <b style={{ fontVariantNumeric: "tabular-nums" }}>{stats.arrivage}</b>
+              </div>
             </div>
-          ) : split === "bars" ? (
-            <div className="card-b">
-              <BarList
-                rows={rows.slice(0, 14).map((r) => ({
-                  key: r.key,
-                  label: r.key,
-                  value: r.ca,
-                  display: eur(r.ca),
-                  note: `${r.qty} vendue${r.qty > 1 ? "s" : ""}`,
-                }))}
-              />
-            </div>
-          ) : (
-            <div className="card-b" style={{ height: 340 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={donutData}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius="52%"
-                    outerRadius="80%"
-                    paddingAngle={2}
-                    stroke="var(--surface-solid)"
-                    strokeWidth={2}
-                  >
-                    {donutData.map((d) => <Cell key={d.name} fill={d.fill} />)}
-                  </Pie>
-                  <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} formatter={(v: number, k) => [eur(v), String(k)]} />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </section>
+          </div>
+        </div>
       </div>
 
       {creating === "item" && <ItemModal item={null} onClose={() => setCreating(null)} />}
-      {creating === "order" && (
-        <OrderModal
-          onClose={() => setCreating(null)}
-          onCreated={() => navigate(links.arrivage())}
-        />
-      )}
+      {creating === "order" && <OrderModal onClose={() => setCreating(null)} />}
+      {creating === "charge" && <ExpenseModal expense={null} onClose={() => setCreating(null)} />}
     </>
   );
 }

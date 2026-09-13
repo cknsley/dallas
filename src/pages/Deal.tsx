@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { HeaderActions } from "../components/Layout";
 import { Empty } from "../components/ui";
-import RentabilitePanel from "../components/RentabilitePanel";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { caOfYear, costOf, revenueOf, saleCostsOf } from "../lib/calc";
@@ -452,7 +451,6 @@ function SellCalculator({ onSellItem }: { onSellItem: (item: Item, targetPrice: 
 /* ============================ PAGE ============================ */
 
 export default function Deal() {
-  const { state } = useStore();
   const toast = useToast();
 
   const [convertingOrder, setConvertingOrder] = useState<OrderPresetLine[] | null>(null);
@@ -483,8 +481,6 @@ export default function Deal() {
           <SellCalculator onSellItem={(item, price) => setSellingPreset({ item, price })} />
         </div>
       </div>
-
-      <RentabilitePanel state={state} />
 
       {convertingOrder && (
         <OrderModal

@@ -46,7 +46,7 @@ export const TODO_ORDER: TodoCol[] = ["acheter", "faire", "envoyer", "termine"];
 export const ARTICLE_TYPES = [
   "Sneakers", "Chaussures", "T-shirt", "Sweat / Hoodie", "Veste", "Manteau",
   "Pantalon", "Jean", "Short", "Robe", "Chemise", "Sac", "Ceinture",
-  "Casquette", "Bijou", "Lunettes", "Montre", "Accessoire", "Autre",
+  "Casquette", "Bijou", "Lunettes", "Montre", "Accessoire", "Emballage", "Autre",
 ];
 
 export const PLATFORMS = [

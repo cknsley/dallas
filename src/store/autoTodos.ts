@@ -10,30 +10,7 @@ export function deriveAutoTodos(state: AppState): Todo[] {
   const now = today();
   const out: Todo[] = [];
 
-  state.items.forEach((i, ix) => {
-    if (i.status === "vendu" && i.delivery === "commandee" && i.shipping === "en_preparation") {
-      out.push({
-        id: `auto:ship:${i.id}`,
-        text: `Expédier « ${i.name || "Sans nom"} »${i.buyer ? ` à ${i.buyer}` : ""}`,
-        col: "envoyer",
-        order: ix,
-        createdAt: i.createdAt,
-        auto: "ship",
-        itemId: i.id,
-      });
-    }
-    if (i.status === "arrivage" && i.expectedDate && i.expectedDate < now) {
-      out.push({
-        id: `auto:receive:${i.id}`,
-        text: `Réceptionner « ${i.name || "Sans nom"} » — arrivée prévue dépassée`,
-        col: "faire",
-        order: ix,
-        createdAt: i.createdAt,
-        auto: "receive",
-        itemId: i.id,
-      });
-    }
-  });
+  // Les livraisons sont désormais directement gérées avec leur vue Kanban priorisée dans l'onglet Livraison.
 
   state.docs.forEach((d, ix) => {
     if (!d.paid && d.dueDate && d.dueDate < now) {

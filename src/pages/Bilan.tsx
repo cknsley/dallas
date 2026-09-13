@@ -2,37 +2,30 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
 import CashFlowCard from "../components/CashFlowCard";
-import StockValueCard from "../components/StockValueCard";
+import RentabilitePanel from "../components/RentabilitePanel";
 import { BarList, Empty, Kpi, Segmented } from "../components/ui";
 import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
 import {
-  caOfYear, chargesInRange, computeStats, costOf, expenseMonthlyShare, groupBy,
-  pendingDeliveryValue, periodRange, qtyOf, remainingToAmortize, revenueOf, soldItems,
+  caOfYear, chargesInRange, chargesByKind, computeStats, costOf, expenseMonthlyShare,
+  groupBy, pendingDeliveryValue, periodRange, qtyOf, remainingToAmortize, revenueOf,
+  soldItems,
 } from "../lib/calc";
 import { dshort, eur, eur2, num, pct } from "../lib/format";
 import { STATUS_LABEL } from "../lib/constants";
 import { vatDue, vatRegime } from "../lib/vat";
 import { links } from "../lib/links";
-import { HINT, LABEL } from "../lib/lexicon";
 import type { Period } from "../types";
+
+
 
 interface BalanceLine { key: string; label: string; note: string; amount: number; }
 
-/** Une ligne de patrimoine qui se déplie sur ce qui la compose. */
 function BalanceRow({
   id, label, note, amount, lines, open, onToggle, to, linkLabel, emptyNote,
 }: {
-  id: string;
-  label: string;
-  note: string;
-  amount: number;
-  lines: BalanceLine[];
-  open: string;
-  onToggle: (v: string) => void;
-  to: string;
-  linkLabel: string;
-  emptyNote: string;
+  id: string; label: string; note: string; amount: number; lines: BalanceLine[];
+  open: string; onToggle: (v: string) => void; to: string; linkLabel: string; emptyNote: string;
 }) {
   const isOpen = open === id;
   return (
@@ -61,34 +54,12 @@ function BalanceRow({
   );
 }
 
-/** Ligne de résultat : quand elle a une source, elle y mène. */
-function ResultRow({
-  label, note, value, to,
-}: {
-  label: string;
-  note?: string;
-  value: string;
-  to?: string;
-}) {
-  const inner = (
-    <>
-      <span>
-        {label}
-        {note && <span className="hint"> ({note})</span>}
-      </span>
-      <b className="num">{value}</b>
-    </>
-  );
-  if (!to) return <div className="totrow">{inner}</div>;
-  return <Link className="totrow linked" to={to}>{inner}</Link>;
-}
 
-/** Montant retranché : le signe n'apparaît que si la valeur est non nulle. */
-const deducted = (v: number) => (v > 0 ? `−${eur2(v)}` : eur2(0));
 
 export default function Bilan() {
   const { state } = useStore();
   const [period, setPeriod] = usePref<Period>("period", "month");
+
 
   const range = useMemo(() => periodRange(period), [period]);
   const stats = useMemo(() => computeStats(state, range), [state, range]);
@@ -97,10 +68,12 @@ export default function Bilan() {
     [state.settings, state.items],
   );
   const byBrand = useMemo(() => groupBy(soldItems(state.items, range), "brand"), [state.items, range]);
+  const byType = useMemo(() => groupBy(soldItems(state.items, range), "type"), [state.items, range]);
   const sold = useMemo(() => soldItems(state.items, range), [state.items, range]);
 
   const tva = vatDue(regime, stats.ca, stats.marge);
   const charges = useMemo(() => chargesInRange(state.expenses, range), [state.expenses, range]);
+  const chargesKinds = useMemo(() => chargesByKind(state.expenses, range), [state.expenses, range]);
   const sleeping = useMemo(() => pendingDeliveryValue(state.items), [state.items]);
   const immo = useMemo(() => remainingToAmortize(state.expenses), [state.expenses]);
   const [openRow, setOpenRow] = useState("");
@@ -110,30 +83,28 @@ export default function Bilan() {
     [state.items],
   );
   const pendingItems = useMemo(
-    () =>
-      state.items
-        .filter((i) => i.status === "vendu" && i.delivery === "commandee")
-        .sort((a, b) => revenueOf(b) - revenueOf(a)),
+    () => state.items
+      .filter((i) => i.status === "vendu" && i.delivery === "commandee")
+      .sort((a, b) => revenueOf(b) - revenueOf(a)),
     [state.items],
   );
-  // Part de chaque charge qui n'a pas encore pesé sur la marge.
   const remainingByExpense = useMemo(
-    () =>
-      state.expenses
-        .map((e) => ({
-          key: e.id,
-          label: e.label || "Sans nom",
-          note: `${e.category || "Autre"} · ${eur2(expenseMonthlyShare(e))} par mois`,
-          amount: remainingToAmortize([e]),
-        }))
-        .filter((r) => r.amount > 0)
-        .sort((a, b) => b.amount - a.amount),
+    () => state.expenses
+      .map((e) => ({
+        key: e.id,
+        label: e.label || "Sans nom",
+        note: `${e.category || "Autre"} · ${eur2(expenseMonthlyShare(e))} par mois`,
+        amount: remainingToAmortize([e]),
+      }))
+      .filter((r) => r.amount > 0)
+      .sort((a, b) => b.amount - a.amount),
     [state.expenses],
   );
+
   const sleepingCount = state.items.filter((i) => i.status === "vendu" && i.delivery === "commandee").length;
   const net = stats.marge - tva - charges;
 
-  /* ---- détail des coûts de la période ---- */
+  // Achats côté bilan
   const detail = useMemo(() => {
     const achat = sold.reduce((a, i) => a + num(i.cost), 0);
     const fraisAchat = sold.reduce((a, i) => a + num(i.fees), 0);
@@ -142,6 +113,22 @@ export default function Bilan() {
     const portRecu = sold.reduce((a, i) => a + num(i.shippingPaid), 0);
     return { achat, fraisAchat, commissions, portPaye, portRecu, charges };
   }, [sold, charges]);
+
+  // Total achats (stock + arrivage) — côté balance achats
+  const stockItems = state.items.filter((i) => i.status !== "vendu");
+  const totalAchats = stockItems.reduce((a, i) => a + costOf(i), 0);
+  const arrivageItems = state.items.filter((i) => i.status === "arrivage");
+  const arrivageVal = arrivageItems.reduce((a, i) => a + costOf(i), 0);
+  const stockSeulVal = state.items.filter((i) => i.status === "stock").reduce((a, i) => a + costOf(i), 0);
+
+  // Balance ventes
+  const allSold = soldItems(state.items); // toutes périodes
+  const totalCA = allSold.reduce((a, i) => a + revenueOf(i), 0);
+  const totalCost = allSold.reduce((a, i) => a + costOf(i), 0);
+  const totalSaleCosts = allSold.reduce((a, i) => a + num(i.saleFees) + num(i.shippingCost) - num(i.shippingPaid), 0);
+  const totalMargeGlobale = totalCA - totalCost - Math.max(0, totalSaleCosts);
+  const roiGlobal = totalCost > 0 ? (totalMargeGlobale / totalCost) * 100 : 0;
+
 
   return (
     <>
@@ -157,8 +144,184 @@ export default function Bilan() {
         />
       </HeaderActions>
 
-      <StockValueCard state={state} />
+      {/* ── TRÉSORERIE ── */}
+      <CashFlowCard state={state} range={range} />
 
+      {/* ── RENTABILITÉ ── */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-h">
+          <h3>📊 Rentabilité</h3>
+          <div className="spacer" />
+          <span className="hint">{range.label} · toutes ventes confondues</span>
+        </div>
+        <div className="card-b">
+          {/* Ligne principale : CA / Marge brute / Charges / Marge nette */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, borderRadius: 10, overflow: "hidden", border: "1px solid var(--border)" }}>
+            {[
+              {
+                label: "Chiffre d'affaires",
+                value: eur2(stats.ca),
+                sub: `${stats.count} vente${stats.count > 1 ? "s" : ""}`,
+                color: "var(--accent-glow)",
+                icon: "💰",
+              },
+              {
+                label: "Marge brute",
+                value: eur2(stats.marge),
+                sub: stats.ca > 0 ? `${pct((stats.marge / stats.ca) * 100)} du CA` : "–",
+                color: stats.marge >= 0 ? "var(--ok)" : "var(--bad)",
+                icon: "📈",
+              },
+              {
+                label: "Charges (période)",
+                value: `−${eur2(charges)}`,
+                sub: `${state.expenses.length} charge(s) imputée(s)`,
+                color: "var(--warn)",
+                icon: "📋",
+              },
+              {
+                label: "Marge nette",
+                value: eur2(net),
+                sub: stats.ca > 0 ? `${pct((net / stats.ca) * 100)} du CA` : "–",
+                color: net >= 0 ? "var(--ok)" : "var(--bad)",
+                icon: "🎯",
+              },
+            ].map((cell) => (
+              <div
+                key={cell.label}
+                style={{
+                  padding: "16px 18px",
+                  background: "var(--surface)",
+                  borderRight: "1px solid var(--border)",
+                }}
+              >
+                <div style={{ fontSize: 11, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                  {cell.icon} {cell.label}
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: cell.color, fontVariantNumeric: "tabular-nums" }}>
+                  {cell.value}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 4 }}>{cell.sub}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Ligne secondaire : ROI / Coûts d'achat / Commissions / Port */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginTop: 14 }}>
+            {[
+              {
+                label: "ROI",
+                value: `${pct(roiGlobal)}`,
+                hint: "Marge / coûts d'achat (tout temps)",
+                good: roiGlobal > 0,
+              },
+              {
+                label: "Coût d'achat moyen",
+                value: eur2(stats.count > 0 ? detail.achat / stats.count : 0),
+                hint: `Total coûts vendus : ${eur(detail.achat)}`,
+                good: true,
+              },
+              {
+                label: "Commissions plateformes",
+                value: eur2(detail.commissions),
+                hint: `${stats.ca > 0 ? pct((detail.commissions / stats.ca) * 100) : "0 %"} du CA`,
+                good: detail.commissions === 0,
+              },
+              {
+                label: "Port payé",
+                value: eur2(detail.portPaye),
+                hint: `Port refacturé : +${eur2(detail.portRecu)}`,
+                good: detail.portPaye <= detail.portRecu,
+              },
+              {
+                label: "Capital immobilisé",
+                value: eur2(stats.engaged),
+                hint: `${heldItems.length} article(s) en stock/arrivage`,
+                good: false,
+              },
+            ].map((cell) => (
+              <div
+                key={cell.label}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  background: "var(--surface-sub)",
+                  border: "1px solid var(--border)",
+                }}
+              >
+                <div style={{ fontSize: 10, color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
+                  {cell.label}
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: cell.good ? "var(--ok)" : "var(--ink-1)" }}>
+                  {cell.value}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>{cell.hint}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── PANNEAU DÉTAILLÉ DE RENTABILITÉ DES VENTES ── */}
+      <RentabilitePanel state={state} />
+
+      {/* ── KPIs RAPIDES ── */}
+      <div className="kpi-grid" style={{ marginBottom: 16 }}>
+        <Kpi
+          label="Capital engagé"
+          value={eur(stats.engaged)}
+          meta="Immobilisé dans le stock non vendu"
+          tone="info"
+          to={links.stock({ status: "stock" })}
+          hint="Stock"
+        />
+        <Kpi
+          label="Argent dormant"
+          value={eur(sleeping)}
+          meta={sleepingCount
+            ? `${sleepingCount} vente${sleepingCount > 1 ? "s" : ""} payée${sleepingCount > 1 ? "s" : ""} mais pas encore livrée${sleepingCount > 1 ? "s" : ""}`
+            : "Toutes les ventes payées sont livrées"}
+          tone={sleepingCount ? "warn" : "ok"}
+          to={links.livraison()}
+          hint="Livraison"
+        />
+        <Kpi
+          label="Marge réalisée"
+          value={eur(stats.marge)}
+          meta={stats.ca ? `${pct(stats.margePct)} du CA · ${range.label}` : `Aucune vente sur ${range.label.toLowerCase()}`}
+          tone="ok"
+          to={links.ventes()}
+          hint="Ventes"
+        />
+        <Kpi
+          label="Charges imputées"
+          value={eur(charges)}
+          meta="Matériel, emballages, abonnements amortis"
+          to={links.charges()}
+          hint="Charges"
+        />
+        <Kpi
+          label="Marge nette finale"
+          value={eur(net)}
+          meta={
+            stats.ca === 0 && charges > 0
+              ? `Charges générales de ${range.label.toLowerCase()}, avant la première vente`
+              : regime.subject
+                ? `TVA −${eur(tva)} · charges générales −${eur(charges)}`
+                : `Charges générales −${eur(charges)}`
+          }
+          tone={net >= 0 ? "ok" : "warn"}
+        />
+      </div>
+
+      {regime.alert && (
+        <div className={`note ${regime.alert.level === "bad" ? "bad" : "warn"}`} style={{ marginBottom: 18 }}>
+          <span className="glyph">⚠</span>
+          <div><b>{regime.alert.title}</b><br />{regime.alert.text}</div>
+        </div>
+      )}
+
+      {/* ── CE QUE VOUS POSSÉDEZ ── */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-h">
           <h3>Ce que vous possédez</h3>
@@ -219,111 +382,113 @@ export default function Bilan() {
         </div>
       </div>
 
-      <div className="kpi-grid">
-        <Kpi
-          label="Capital engagé"
-          value={eur(stats.engaged)}
-          meta="Immobilisé dans le stock non vendu"
-          tone="info"
-          to={links.stock({ status: "stock" })}
-          hint="Stock"
-        />
-        <Kpi
-          label="Argent dormant"
-          value={eur(sleeping)}
-          meta={sleepingCount
-            ? `${sleepingCount} vente${sleepingCount > 1 ? "s" : ""} payée${sleepingCount > 1 ? "s" : ""} mais pas encore livrée${sleepingCount > 1 ? "s" : ""}`
-            : "Toutes les ventes payées sont livrées"}
-          tone={sleepingCount ? "warn" : "ok"}
-          to={links.livraison()}
-          hint="Livraison"
-        />
-        <Kpi
-          label="Marge réalisée"
-          value={eur(stats.marge)}
-          meta={stats.ca ? `${pct(stats.margePct)} du CA · ${range.label}` : `Aucune vente sur ${range.label.toLowerCase()}`}
-          tone="ok"
-          to={links.ventes()}
-          hint="Ventes"
-        />
-        <Kpi
-          label="Charges générales"
-          value={eur(charges)}
-          meta="Matériel, emballages, abonnements amortis"
-          to={links.charges()}
-          hint="Charges"
-        />
-        <Kpi
-          label="Marge nette finale"
-          value={eur(net)}
-          meta={
-            stats.ca === 0 && charges > 0
-              ? `Charges générales de ${range.label.toLowerCase()}, avant la première vente`
-              : regime.subject
-                ? `TVA −${eur(tva)} · charges générales −${eur(charges)}`
-                : `Charges générales −${eur(charges)}`
-          }
-          tone={net >= 0 ? "ok" : "warn"}
-        />
-      </div>
-
-      {regime.alert && (
-        <div className={`note ${regime.alert.level === "bad" ? "bad" : "warn"}`} style={{ marginBottom: 18 }}>
-          <span className="glyph">⚠</span>
-          <div><b>{regime.alert.title}</b><br />{regime.alert.text}</div>
-        </div>
-      )}
-
-      <div className="cols two">
+      {/* ── BALANCE ACHATS + BALANCE VENTES côte à côte ── */}
+      <div className="cols two" style={{ marginBottom: 16 }}>
+        {/* Balance achats */}
         <div className="card">
           <div className="card-h">
-            <h3>Compte de résultat</h3>
+            <h3>📦 Balance achats</h3>
+            <div className="spacer" />
+            <span className="hint">Stock actuel</span>
+          </div>
+          <div className="card-b">
+            <div className="totrow">
+              <span>Stock en boutique</span>
+              <b className="num">{eur2(stockSeulVal)}</b>
+            </div>
+            <div className="totrow">
+              <span>Arrivages en cours</span>
+              <b className="num">{eur2(arrivageVal)}</b>
+            </div>
+            <div className="totrow big">
+              <span>Total immobilisé</span>
+              <b className="num" style={{ color: "var(--accent-glow)" }}>{eur2(totalAchats)}</b>
+            </div>
+            <hr className="sep" />
+            <div className="totrow">
+              <span>Coût d'achat vendus ({range.label})</span>
+              <b className="num">{eur2(detail.achat)}</b>
+            </div>
+            <div className="totrow">
+              <span>Frais d'achat</span>
+              <b className="num">{eur2(detail.fraisAchat)}</b>
+            </div>
+            <div className="totrow">
+              <span>Charges achat (période)</span>
+              <b className="num">{eur2(chargesKinds.achat?.total ?? 0)}</b>
+            </div>
+            <div className="totrow big" style={{ marginTop: 8 }}>
+              <span>Total sorties achat</span>
+              <b className="num" style={{ color: "var(--warn)" }}>
+                {eur2(detail.achat + detail.fraisAchat + (chargesKinds.achat?.total ?? 0))}
+              </b>
+            </div>
+            <Link className="btn sm ghost" to={links.fournisseurs()} style={{ marginTop: 8, alignSelf: "flex-start" }}>
+              Fournisseurs →
+            </Link>
+          </div>
+        </div>
+
+        {/* Balance ventes */}
+        <div className="card">
+          <div className="card-h">
+            <h3>🏷️ Balance ventes</h3>
             <div className="spacer" />
             <span className="hint">{range.label}</span>
           </div>
           <div className="card-b">
-            <ResultRow label="Chiffre d'affaires" value={eur2(stats.ca)} to={links.ventes()} />
-            <ResultRow
-              label={LABEL.shippingPaid}
-              value={detail.portRecu ? `+${eur2(detail.portRecu)}` : eur2(0)}
-              to={links.ventes()}
-            />
+            <div className="totrow">
+              <span>Chiffre d'affaires</span>
+              <b className="num" style={{ color: "var(--accent-glow)" }}>{eur2(stats.ca)}</b>
+            </div>
+            <div className="totrow">
+              <span>Port refacturé</span>
+              <b className="num">+{eur2(detail.portRecu)}</b>
+            </div>
             <hr className="sep" />
-            <ResultRow
-              label={`${LABEL.cost} des articles vendus`}
-              value={deducted(detail.achat)}
-              to={links.fournisseurs()}
-            />
-            <ResultRow
-              label={LABEL.fees}
-              note={HINT.fees.toLowerCase()}
-              value={deducted(detail.fraisAchat)}
-              to={links.fournisseurs()}
-            />
-            <ResultRow label={LABEL.saleFees} value={deducted(detail.commissions)} to={links.ventes()} />
-            <ResultRow
-              label={LABEL.shippingCost}
-              value={deducted(detail.portPaye)}
-              to={links.livraison()}
-            />
-            <div className="totrow big" style={{ fontSize: 15 }}>
-              <span>Marge réalisée</span><b className={`num ${stats.marge >= 0 ? "pos" : "neg"}`}>{eur2(stats.marge)}</b>
+            <div className="totrow">
+              <span>Coût des articles vendus</span>
+              <b className="num">−{eur2(detail.achat)}</b>
+            </div>
+            <div className="totrow">
+              <span>Commissions plateformes</span>
+              <b className="num">−{eur2(detail.commissions)}</b>
+            </div>
+            <div className="totrow">
+              <span>Port payé</span>
+              <b className="num">−{eur2(detail.portPaye)}</b>
+            </div>
+            <div className="totrow">
+              <span>Charges vente (période)</span>
+              <b className="num">−{eur2(chargesKinds.vente?.total ?? 0)}</b>
+            </div>
+            <div className="totrow big" style={{ marginTop: 8 }}>
+              <span>Marge brute</span>
+              <b className={`num ${stats.marge >= 0 ? "pos" : "neg"}`}>{eur2(stats.marge)}</b>
+            </div>
+            <div className="totrow">
+              <span>Charges générales (période)</span>
+              <b className="num">−{eur2(chargesKinds.activite?.total ?? 0)}</b>
             </div>
             {regime.subject && (
-              <ResultRow
-                label={`TVA ${regime.scheme === "marge" ? "sur la marge" : "sur le prix"} (${regime.rate} %)`}
-                value={deducted(tva)}
-                to={links.facturation()}
-              />
+              <div className="totrow">
+                <span>TVA collectée</span>
+                <b className="num">−{eur2(tva)}</b>
+              </div>
             )}
-            <ResultRow label="Charges générales" value={deducted(detail.charges)} to={links.charges()} />
             <div className="totrow big">
-              <span>Marge nette finale</span>
+              <span>Marge nette</span>
               <b className={`num ${net >= 0 ? "pos" : "neg"}`}>{eur2(net)}</b>
             </div>
+            <Link className="btn sm ghost" to={links.ventes()} style={{ marginTop: 8, alignSelf: "flex-start" }}>
+              Toutes les ventes →
+            </Link>
           </div>
         </div>
+      </div>
 
+      {/* ── RÉPARTITION PAR MARQUE + TYPE ── */}
+      <div className="cols two" style={{ marginBottom: 16 }}>
         <div className="card">
           <div className="card-h">
             <h3>Répartition par marque</h3>
@@ -347,11 +512,46 @@ export default function Bilan() {
             </div>
           )}
         </div>
+
+        <div className="card">
+          <div className="card-h">
+            <h3>Détail par type de produit</h3>
+            <div className="spacer" />
+            <span className="hint">{range.label}</span>
+          </div>
+          {byType.length === 0 ? (
+            <Empty glyph="▦" title="Pas encore de vente">Aucun article vendu sur cette période.</Empty>
+          ) : (
+            <div className="twrap">
+              <table className="table-compact">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th className="r">Qté</th>
+                    <th className="r">Prix moyen</th>
+                    <th className="r">CA</th>
+                    <th className="r">Marge</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {byType.map((t) => (
+                    <tr key={t.key}>
+                      <td>
+                        <Link to={links.ventes({ type: t.key === "Sans type" ? undefined : t.key })}>{t.key}</Link>
+                      </td>
+                      <td className="r num">{t.qty}</td>
+                      <td className="r num">{eur2(t.qty ? t.ca / t.qty : 0)}</td>
+                      <td className="r num">{eur2(t.ca)}</td>
+                      <td className={`r num ${t.marge >= 0 ? "pos" : "neg"}`}>{eur2(t.marge)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div style={{ marginTop: 16 }}>
-        <CashFlowCard state={state} range={range} />
-      </div>
     </>
   );
 }

@@ -4,9 +4,9 @@ import type { Delivery, ItemStatus } from "../types";
 export const links = {
   stock: (f: { status?: ItemStatus | "all"; brand?: string; type?: string; size?: string; q?: string } = {}) =>
     withQuery("/stock", f),
-  ventes: (f: { delivery?: Delivery | "all"; platform?: string; brand?: string } = {}) =>
+  ventes: (f: { delivery?: Delivery | "all"; platform?: string; brand?: string; type?: string; size?: string } = {}) =>
     withQuery("/ventes", f),
-  livraison: () => "/livraison",
+  livraison: (f: { tab?: "a_partir" | "a_venir" } = {}) => withQuery("/livraison", f),
   sav: () => "/sav",
   retours: () => "/sav?tab=retours",
   facturation: (f: { state?: "all" | "unpaid" | "paid" } = {}) => withQuery("/facturation", f),
@@ -17,9 +17,10 @@ export const links = {
   clients: (f: { q?: string; client?: string } = {}) => withQuery("/clients", f),
   fournisseurs: (f: { q?: string } = {}) => withQuery("/fournisseurs", f),
   achats: () => "/achats",
-  arrivage: () => "/arrivage",
+  arrivage: () => "/achats",
   charges: () => "/charges",
   todo: () => "/todo",
+  sourcing: () => "/sourcing",
   performance: () => "/performance",
   reglages: () => "/reglages",
 };

@@ -1,59 +1,75 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
+import {
+  LayoutDashboard,
+  CheckSquare,
+  Sparkles,
+  Scale,
+  BarChart3,
+  Building2,
+  Package,
+  ShoppingCart,
+  Truck,
+  HelpCircle,
+  DollarSign,
+  FileText,
+  Users,
+  Settings,
+  Search,
+  Menu,
+  X,
+  LucideIcon,
+} from "lucide-react";
 import { useStore } from "../store/StoreContext";
-import { useTheme } from "./Theme";
+import { CommandPalette } from "./CommandPalette";
+import { SidebarMiniMenu } from "./SidebarMiniMenu";
 
 export interface NavRoute {
   path: string;
   label: string;
-  icon: string;
+  icon: LucideIcon;
   subtitle: string;
   end?: boolean;
 }
 
 const MODULE_BY_PATH = {
   "/clients": "clients",
-  "/sav": "sav",
   "/facturation": "facturation",
+  "/sav": "sav",
 } as const;
 
-/** La navigation est groupée : piloter, acheter, vendre, compter. */
+/** La navigation est groupée : Pilotage, Activité, Comptes. */
 export const NAV_GROUPS: { label: string; routes: NavRoute[] }[] = [
   {
     label: "Pilotage",
     routes: [
-      { path: "/", label: "Dashboard", icon: "◧", subtitle: "Vue d'ensemble de l'activité", end: true },
-      { path: "/todo", label: "Todo", icon: "☑", subtitle: "À acheter, à faire, à envoyer" },
-      { path: "/performance", label: "Performance", icon: "📊", subtitle: "Indicateurs de performance et cockpit d'activité" },
+      { path: "/", label: "Dashboard", icon: LayoutDashboard, subtitle: "Vue d'ensemble de l'activité", end: true },
+      { path: "/todo", label: "Todo", icon: CheckSquare, subtitle: "Tâches, rappels & à faire" },
+      { path: "/sourcing", label: "Sourcing", icon: Sparkles, subtitle: "Articles à acheter/trouver, vue kanban & commande" },
+      { path: "/deal", label: "Deal", icon: Scale, subtitle: "Négocier un achat ou une vente, simulation de marge" },
+      { path: "/performance", label: "Performance", icon: BarChart3, subtitle: "Indicateurs de performance et cockpit d'activité" },
     ],
   },
   {
-    label: "Achat",
+    label: "Activité",
     routes: [
-      { path: "/achats", label: "Sourcing", icon: "⇩", subtitle: "Commandes, demandes produit et balance des achats" },
-      { path: "/arrivage", label: "Arrivage", icon: "📥", subtitle: "Colis attendus, déballage et entrée en stock" },
-      { path: "/stock", label: "Stock", icon: "▦", subtitle: "Ce que vous possédez : vos articles en stock" },
-      { path: "/deal", label: "Deal", icon: "⚖", subtitle: "Négocier un achat ou une vente, remise comprise" },
-    ],
-  },
-  {
-    label: "Vente",
-    routes: [
-      { path: "/ventes", label: "Ventes", icon: "↗", subtitle: "Historique et suivi des livraisons" },
-      { path: "/livraison", label: "Livraison", icon: "⇄", subtitle: "Ce qu'il reste à expédier, jusqu'à la livraison confirmée" },
-      { path: "/sav", label: "SAV", icon: "🛠", subtitle: "Litiges, retours clients et remboursements fournisseurs" },
-      { path: "/clients", label: "Clients", icon: "☻", subtitle: "Acheteurs et historique d'achat" },
+      { path: "/achats", label: "Centrale", icon: Building2, subtitle: "Centrale d'achat, commandes, réceptions & demandes" },
+      { path: "/stock", label: "Stock", icon: Package, subtitle: "Ce que vous possédez : vos articles en stock" },
+      { path: "/ventes", label: "Vente", icon: ShoppingCart, subtitle: "Historique et suivi des ventes" },
+      { path: "/livraison", label: "Livraison", icon: Truck, subtitle: "Livraisons à partir (ventes) et à venir (centrale d'achat)" },
+      { path: "/sav", label: "SAV & Litiges", icon: HelpCircle, subtitle: "Litiges, retours clients et remboursements fournisseurs" },
     ],
   },
   {
     label: "Comptes",
     routes: [
-      { path: "/fournisseurs", label: "Fournisseurs", icon: "⌂", subtitle: "Achats, dettes fournisseurs et créances clients" },
-      { path: "/charges", label: "Charges", icon: "◈", subtitle: "Matériel, emballages et abonnements de l'activité" },
-      { path: "/bilan", label: "Bilan", icon: "%", subtitle: "Ce que vous possédez et ce que l'activité dégage" },
-      { path: "/facturation", label: "Facturation", icon: "§", subtitle: "Factures, reçus et régime de TVA" },
-      { path: "/reglages", label: "Réglages", icon: "⚙", subtitle: "Statut, modules et paramètres de l'application" },
+      { path: "/fournisseurs", label: "Fournisseurs", icon: Building2, subtitle: "Achats, dettes fournisseurs et créances clients" },
+      { path: "/charges", label: "Charges", icon: DollarSign, subtitle: "Matériel, emballages et abonnements de l'activité" },
+      { path: "/bilan", label: "Bilan", icon: BarChart3, subtitle: "Ce que vous possédez et ce que l'activité dégage" },
+      { path: "/facturation", label: "Facturation", icon: FileText, subtitle: "Factures, reçus et régime de TVA" },
+      { path: "/clients", label: "Clients", icon: Users, subtitle: "Acheteurs et historique d'achat" },
+      { path: "/reglages", label: "Réglages", icon: Settings, subtitle: "Statut, modules et paramètres de l'application" },
     ],
   },
 ];
@@ -68,26 +84,42 @@ export function HeaderActions({ children }: { children: ReactNode }) {
 }
 
 export default function Layout() {
-  const { state, sync, resetDemoData } = useStore();
-  const theme = useTheme();
+  const { state } = useStore();
   const { pathname } = useLocation();
+  const [cmdOpen, setCmdOpen] = useState(false);
+  const [mobOpen, setMobOpen] = useState(false);
+
   const current = ROUTES.find((r) => (r.end ? pathname === r.path : pathname.startsWith(r.path))) ?? ROUTES[0];
+  
   const routeIsEnabled = (route: NavRoute) => {
     const module = MODULE_BY_PATH[route.path as keyof typeof MODULE_BY_PATH];
     return !module || state.settings.enabledModules[module];
   };
+
   const visibleGroups = NAV_GROUPS
     .map((group) => ({ ...group, routes: group.routes.filter(routeIsEnabled) }))
     .filter((group) => group.routes.length > 0);
-  const visibleRoutes = ROUTES.filter(routeIsEnabled);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCmdOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
 
   const badges: Record<string, number> = {
     "/stock": state.items.filter((i) => i.status !== "vendu").length,
     "/ventes": state.items.filter((i) => i.status === "vendu" && i.delivery === "commandee").length,
-    "/achats": state.requests.filter((r) => r.status === "en_cours").length,
-    "/arrivage": state.items.filter((i) => i.status === "arrivage").length,
+    "/achats":
+      state.requests.filter((r) => r.status === "en_cours").length +
+      state.items.filter((i) => i.status === "arrivage").length,
     "/livraison": state.items.filter((i) => i.status === "vendu" && i.delivery === "commandee").length,
-    "/todo": state.todos.filter((t) => t.col !== "termine").length,
+    "/todo": state.todos.filter((t) => !t.isSourcing && t.col !== "acheter" && t.col !== "termine").length,
+    "/sourcing": state.todos.filter((t) => (t.isSourcing || t.col === "acheter") && t.col !== "termine").length,
     "/facturation": state.docs.filter((d) => !d.paid).length,
     "/sav":
       state.items.filter((i) => i.litigeState === "en_cours" || i.litigeState === "attente").length +
@@ -97,70 +129,83 @@ export default function Layout() {
 
   return (
     <div className="app">
-      <aside className="sidebar">
+      <CommandPalette isOpen={cmdOpen} onClose={() => setCmdOpen(false)} />
+
+      <aside className={`sidebar ${mobOpen ? "open" : ""}`}>
         <div className="brand">
-          <b>Atelier</b>
-          <span>Achat · Revente</span>
+          <div className="brand-logo">
+            <Package size={20} className="brand-icon" />
+          </div>
+          <div>
+            <b>RESELL</b>
+            <span>Cockpit ERP</span>
+          </div>
+          <button className="mob-close" onClick={() => setMobOpen(false)}>
+            <X size={18} />
+          </button>
         </div>
+
+        {/* Global Search Button in Sidebar */}
+        <button className="cmd-trigger-btn" onClick={() => setCmdOpen(true)}>
+          <Search size={15} />
+          <span>Rechercher...</span>
+          <kbd>⌘K</kbd>
+        </button>
+
         <nav className="nav">
           {visibleGroups.map((group) => (
             <div className="nav-group" key={group.label}>
               <div className="nav-group-label">{group.label}</div>
-              {group.routes.map((r) => (
-                <NavLink key={r.path} to={r.path} end={r.end}>
-                  <span className="ic">{r.icon}</span>
-                  {r.label}
-                  {badges[r.path] ? <span className="badge">{badges[r.path]}</span> : null}
-                </NavLink>
-              ))}
+              {group.routes.map((r) => {
+                const IconComponent = r.icon;
+                return (
+                  <NavLink
+                    key={r.path}
+                    to={r.path}
+                    end={r.end}
+                    onClick={() => setMobOpen(false)}
+                    className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}
+                  >
+                    <span className="ic">
+                      <IconComponent size={16} />
+                    </span>
+                    <span className="lbl">{r.label}</span>
+                    {badges[r.path] ? <span className="badge">{badges[r.path]}</span> : null}
+                  </NavLink>
+                );
+              })}
             </div>
           ))}
         </nav>
+
         <div className="side-foot">
-          <div className="sync" title={sync.detail}>
-            <span className={`dot ${sync.status}`} />
-            <span>
-              {sync.label}
-              <br />
-              <span style={{ opacity: 0.75 }}>{sync.detail}</span>
-            </span>
-          </div>
-          <button className="btn ghost" style={{ justifyContent: "flex-start" }} onClick={theme.cycle}>
-            {theme.glyph} {theme.label}
-          </button>
-          <button
-            className="btn ghost sm"
-            style={{ justifyContent: "flex-start", opacity: 0.8, fontSize: 11 }}
-            title="Recharger toutes les paires, colis, clients et fournisseurs de démonstration"
-            onClick={() => {
-              if (window.confirm("Recharger toutes les données de démo (colis, stock, clients & fournisseurs) ?")) {
-                resetDemoData();
-              }
-            }}
-          >
-            ⚡ Données de démo
-          </button>
+          <SidebarMiniMenu />
         </div>
       </aside>
 
       <div className="main">
-        <nav className="mobnav">
-          {visibleRoutes.map((r) => (
-            <NavLink key={r.path} to={r.path} end={r.end}>
-              <span className="ic" style={{ marginRight: 4 }}>{r.icon}</span>
-              {r.label}
-              {badges[r.path] ? <span className="badge" style={{ marginLeft: 4 }}>{badges[r.path]}</span> : null}
-            </NavLink>
-          ))}
-        </nav>
         <header className="topbar">
+          <button className="mob-toggle" onClick={() => setMobOpen(true)}>
+            <Menu size={20} />
+          </button>
+
           <div>
             <h1>{current.label}</h1>
             <div className="sub">{current.subtitle}</div>
           </div>
+
           <div className="spacer" />
+
+          {/* Quick Cmd+K search trigger in topbar */}
+          <button className="btn ghost sm topbar-cmd" onClick={() => setCmdOpen(true)}>
+            <Search size={14} />
+            <span className="topbar-cmd-text">Recherche rapide</span>
+            <kbd>⌘K</kbd>
+          </button>
+
           <div className="topbar-actions" id="topbar-actions" />
         </header>
+
         <main className="view">
           <Outlet />
         </main>

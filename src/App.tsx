@@ -3,8 +3,7 @@ import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import PerformancePage from "./pages/PerformancePage";
 import Stock from "./pages/Stock";
-import Achats from "./pages/Achats";
-import Arrivage from "./pages/Arrivage";
+import CentraleAchat from "./pages/CentraleAchat";
 import Ventes from "./pages/Ventes";
 import Livraison from "./pages/Livraison";
 import Sav from "./pages/Sav";
@@ -14,6 +13,7 @@ import Clients from "./pages/Clients";
 import Fournisseurs from "./pages/Fournisseurs";
 import Charges from "./pages/Charges";
 import Todo from "./pages/Todo";
+import Sourcing from "./pages/Sourcing";
 import Facturation from "./pages/Facturation";
 import Reglages from "./pages/Reglages";
 
@@ -24,8 +24,8 @@ export default function App() {
         <Route index element={<Dashboard />} />
         <Route path="performance" element={<PerformancePage />} />
         <Route path="stock" element={<Stock />} />
-        <Route path="achats" element={<Achats />} />
-        <Route path="arrivage" element={<Arrivage />} />
+        <Route path="achats" element={<CentraleAchat />} />
+        <Route path="arrivage" element={<Navigate to="/achats" replace />} />
         <Route path="ventes" element={<Ventes />} />
         <Route path="livraison" element={<Livraison />} />
         <Route path="sav" element={<Sav />} />
@@ -38,6 +38,7 @@ export default function App() {
         <Route path="marge" element={<Navigate to="/bilan" replace />} />
         <Route path="charges" element={<Charges />} />
         <Route path="todo" element={<Todo />} />
+        <Route path="sourcing" element={<Sourcing />} />
         <Route path="facturation" element={<Facturation />} />
         <Route path="reglages" element={<Reglages />} />
         <Route path="*" element={<Navigate to="/" replace />} />

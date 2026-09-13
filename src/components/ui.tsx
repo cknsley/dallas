@@ -1,6 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
+import { X, ArrowRight, ImageOff, LucideIcon } from "lucide-react";
 import { photoURL, subscribePhotos } from "../store/photos";
 import type { ItemStatus } from "../types";
 import { STATUS_LABEL } from "../lib/constants";
@@ -37,7 +38,9 @@ export function Modal({
         <div className="modal-h">
           <h2>{title}</h2>
           <div className="spacer" />
-          <button className="btn ghost" onClick={onClose} aria-label="Fermer">✕</button>
+          <button className="btn ghost" onClick={onClose} aria-label="Fermer le dialogue">
+            <X size={18} />
+          </button>
         </div>
         <div className="modal-b">{children}</div>
         {footer && <div className="modal-f">{footer}</div>}
@@ -94,7 +97,6 @@ export function Kpi({
   meta?: string;
   tone?: "ok" | "warn" | "info";
   featured?: boolean;
-  /** Destination ouverte au clic — le chiffre mène à la liste qu'il résume. */
   to?: string;
   hint?: string;
   onClick?: () => void;
@@ -102,7 +104,11 @@ export function Kpi({
   const className = `kpi${tone ? " " + tone : ""}${featured ? " featured" : ""}`;
   const body = (
     <>
-      {(to || onClick) && <span className="go" aria-hidden="true">{hint ?? "Ouvrir"} →</span>}
+      {(to || onClick) && (
+        <span className="go" aria-hidden="true" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          {hint ?? "Ouvrir"} <ArrowRight size={13} />
+        </span>
+      )}
       <div className="lbl">{label}</div>
       <div className="val">{value}</div>
       {meta && <div className="meta">{meta}</div>}
@@ -159,10 +165,19 @@ export function Segmented<T extends string>({
 }
 
 /* ---------- État vide ---------- */
-export function Empty({ glyph, title, children }: { glyph: string; title: string; children?: ReactNode }) {
+export function Empty({
+  glyph, icon: Icon, title, children,
+}: {
+  glyph?: string;
+  icon?: LucideIcon;
+  title: string;
+  children?: ReactNode;
+}) {
   return (
     <div className="empty">
-      <div className="glyph">{glyph}</div>
+      <div className="glyph" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {Icon ? <Icon size={28} /> : glyph ?? "📦"}
+      </div>
       <h3>{title}</h3>
       {children && <div>{children}</div>}
     </div>
@@ -178,15 +193,32 @@ function usePhoto(id: string | null | undefined): string | null {
   );
 }
 
-export function Photo({ id, className = "thumb", alt = "", style }: { id: string | null; className?: string; alt?: string; style?: React.CSSProperties }) {
+export function Photo({
+  id, className = "thumb", alt = "", style,
+}: {
+  id: string | null;
+  className?: string;
+  alt?: string;
+  style?: React.CSSProperties;
+}) {
   const url = usePhoto(id);
-  if (!url) return <div className={`${className} placeholder`} style={style} aria-hidden="true">◫</div>;
+  if (!url) {
+    return (
+      <div
+        className={`${className} placeholder`}
+        style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", ...style }}
+        aria-hidden="true"
+      >
+        <ImageOff size={16} style={{ opacity: 0.5 }} />
+      </div>
+    );
+  }
   return <img className={className} src={url} alt={alt} style={style} />;
 }
 
 export function PhotoCover({ id }: { id: string | null }) {
   const url = usePhoto(id);
-  return url ? <img src={url} alt="" /> : <>◫</>;
+  return url ? <img src={url} alt="" /> : <ImageOff size={16} style={{ opacity: 0.5 }} />;
 }
 
 /* ---------- Liste de barres ---------- */
@@ -197,23 +229,33 @@ export function BarList({
 }) {
   const max = rows.reduce((m, r) => Math.max(m, r.value), 0);
   return (
-    <div className="bars">
-      {rows.map((r) => (
-        <div className="bar-row" key={r.key}>
-          {r.to ? (
-            <Link className="bl linkish" to={r.to} title={r.label}>{r.label}</Link>
-          ) : (
-            <div className="bl" title={r.label}>{r.label}</div>
-          )}
-          <div className="bar-track">
-            <div className="bar-fill" style={{ width: `${max > 0 ? Math.max(1.5, (r.value / max) * 100) : 1.5}%` }} />
+    <div className="bars" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {rows.map((r) => {
+        const pct = max > 0 ? (r.value / max) * 100 : 0;
+        const inner = (
+          <>
+            <div className="b-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 4 }}>
+              <span className="b-lbl" style={{ fontWeight: 600, color: "var(--ink)" }}>{r.label}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: "auto" }}>
+                {r.note && <span className="b-note" style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{r.note}</span>}
+                <span className="b-val" style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums", color: "var(--accent)" }}>{r.display}</span>
+              </div>
+            </div>
+            <div className="b-track" style={{ height: 6, borderRadius: 99, background: "var(--surface-2)", overflow: "hidden" }}>
+              <div className="b-fill" style={{ width: `${pct}%`, height: "100%", borderRadius: 99, background: "var(--accent)" }} />
+            </div>
+          </>
+        );
+        return r.to ? (
+          <Link key={r.key} to={r.to} className="bar-row" style={{ textDecoration: "none", display: "block" }}>
+            {inner}
+          </Link>
+        ) : (
+          <div key={r.key} className="bar-row" style={{ display: "block" }}>
+            {inner}
           </div>
-          <div className="bv">
-            {r.display}
-            {r.note && <span style={{ color: "var(--ink-3)" }}> · {r.note}</span>}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

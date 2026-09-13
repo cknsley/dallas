@@ -1,14 +1,13 @@
 import { useMemo, useRef, useState } from "react";
-import { Field, Modal, Photo, Segmented } from "../components/ui";
-import TrackingLink from "../components/TrackingLink";
+import { Field, Modal, Photo } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { compressImage, deletePhoto, savePhoto } from "../store/photos";
-import { ARTICLE_TYPES, PLATFORMS, STATUS_LABEL } from "../lib/constants";
+import { ARTICLE_TYPES, PLATFORMS } from "../lib/constants";
 import { eur2, num, pct, today } from "../lib/format";
 import { uid } from "../lib/id";
 import { HINT, LABEL, eurLabel } from "../lib/lexicon";
-import type { Item, ItemStatus, PackagingKind } from "../types";
+import type { Item, PackagingKind } from "../types";
 
 export const blankItem = (): Item => ({
   id: uid(),
@@ -86,8 +85,11 @@ export default function ItemModal({
     };
   }, [state.items]);
 
+  const existingLots = useMemo(() => {
+    return [...new Set(state.items.map((i) => i.lotTag).filter(Boolean))].sort();
+  }, [state.items]);
+
   const isSold = draft.status === "vendu";
-  const isArrivage = draft.status === "arrivage";
 
   const qty = Math.max(1, Math.round(num(draft.quantity)) || 1);
   const totalCost = (num(draft.cost) + num(draft.fees)) * qty;
@@ -185,7 +187,6 @@ export default function ItemModal({
 
     const sizes = parseSizes(draft.size);
     if (isNew && sizes.length > 1) {
-      // Plusieurs tailles saisies d'un coup : on génère des fiches indépendantes pour chaque taille
       const createdItems: Item[] = [];
       for (const sizeVal of sizes) {
         const generatedSku = draft.sku ? `${draft.sku}-${sizeVal}` : undefined;
@@ -283,21 +284,106 @@ export default function ItemModal({
         </>
       }
     >
-      <div className="fgrid">
-        <Field label="Nom de l’article" span>
+      {/* Top Header: Photo en haut à gauche + Informations principales */}
+      <div style={{ display: "flex", gap: 16, alignItems: "flex-start", marginBottom: 16 }}>
+        {/* Photo dropzone à gauche */}
+        <div style={{ flexShrink: 0, width: 120 }}>
+          <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-2)", marginBottom: 4, display: "block" }}>Photo</label>
+          <div
+            className="dropzone-compact"
+            onClick={() => fileRef.current?.click()}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              const f = e.dataTransfer.files[0];
+              if (f) void pickPhoto(f);
+            }}
+            style={{
+              width: 120,
+              height: 120,
+              borderRadius: 12,
+              border: "2px dashed var(--line-2)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              overflow: "hidden",
+              position: "relative",
+              background: "var(--surface-sub)",
+            }}
+          >
+            {pendingURL ? (
+              <img src={pendingURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : cleared || !draft.photoId ? (
+              <div style={{ textAlign: "center", color: "var(--ink-3)", padding: 4 }}>
+                <div style={{ fontSize: 24, lineHeight: 1 }}>📷</div>
+                <div style={{ fontSize: 10, marginTop: 4 }}>+ Photo</div>
+              </div>
+            ) : (
+              <Photo id={draft.photoId} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            )}
+            {(pendingURL || (draft.photoId && !cleared)) && (
+              <button
+                type="button"
+                className="btn sm"
+                style={{
+                  position: "absolute",
+                  bottom: 4,
+                  right: 4,
+                  fontSize: 10,
+                  padding: "2px 6px",
+                  background: "rgba(0,0,0,0.7)",
+                  color: "#fff",
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPending(null);
+                  setPendingURL((old) => { if (old) URL.revokeObjectURL(old); return null; });
+                  setCleared(true);
+                }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
           <input
-            type="text"
-            value={draft.name}
-            placeholder="Ex. Dunk Low UNC, AJ1 Low Travis Scott..."
-            onChange={(e) => set("name", e.target.value)}
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void pickPhoto(f);
+              e.target.value = "";
+            }}
           />
-        </Field>
-        <Field label="Marque">
-          <input type="text" list="dl-brand" value={draft.brand} placeholder="Ex. Nike, Jordan, Carhartt" onChange={(e) => set("brand", e.target.value)} />
-        </Field>
-        <Field label="Type / Modèle">
-          <input type="text" list="dl-type" value={draft.type} placeholder="Ex. Sneakers, Veste, Sweat" onChange={(e) => set("type", e.target.value)} />
-        </Field>
+        </div>
+
+        {/* Détails de base à droite */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
+          <Field label="Nom de l’article">
+            <input
+              type="text"
+              value={draft.name}
+              placeholder="Ex. Dunk Low UNC, AJ1 Low Travis Scott..."
+              onChange={(e) => set("name", e.target.value)}
+              autoFocus
+            />
+          </Field>
+
+          <div className="fgrid" style={{ gridTemplateColumns: "1fr 1fr" }}>
+            <Field label="Marque">
+              <input type="text" list="dl-brand" value={draft.brand} placeholder="Ex. Nike, Jordan, Carhartt" onChange={(e) => set("brand", e.target.value)} />
+            </Field>
+            <Field label="Type / Modèle">
+              <input type="text" list="dl-type" value={draft.type} placeholder="Ex. Sneakers, Veste, Sweat" onChange={(e) => set("type", e.target.value)} />
+            </Field>
+          </div>
+        </div>
+      </div>
+
+      <div className="fgrid">
         <Field label="Code SKU / Référence">
           <div style={{ display: "flex", gap: 6 }}>
             <input type="text" value={draft.sku} placeholder="Ex. SKU-NK-42-01" onChange={(e) => set("sku", e.target.value)} />
@@ -306,6 +392,7 @@ export default function ItemModal({
             </button>
           </div>
         </Field>
+
         <Field label="Quantité">
           <input
             type="number"
@@ -315,12 +402,13 @@ export default function ItemModal({
             onChange={(e) => set("quantity", e.target.value)}
           />
         </Field>
+
         <Field label="Taille(s)">
           <input
             type="text"
             list="dl-size"
             value={draft.size}
-            placeholder="Ex. 42 (ou '38, 39, 40' pour créer 3 fiches)"
+            placeholder="Ex. 42 (ou '38, 39, 40')"
             onChange={(e) => set("size", e.target.value)}
           />
           {isNew && draft.size.includes(",") && (
@@ -329,6 +417,7 @@ export default function ItemModal({
             </span>
           )}
         </Field>
+
         <Field label="Sexe">
           <select value={draft.gender || ""} onChange={(e) => set("gender", e.target.value as Item["gender"])}>
             <option value="">Non précisé</option>
@@ -338,59 +427,97 @@ export default function ItemModal({
             <option value="enfant">Enfant</option>
           </select>
         </Field>
+
         <Field label="Source">
           <input type="text" list="dl-source" value={draft.source} placeholder="Ex. Vinted, friperie, grossiste" onChange={(e) => set("source", e.target.value)} />
         </Field>
+
+        <Field label="Fait partie d'un lot ?">
+          <select value={draft.lotTag || ""} onChange={(e) => set("lotTag", e.target.value)}>
+            <option value="">Non (Article solo)</option>
+            {existingLots.map((lot) => (
+              <option key={lot} value={lot}>{lot}</option>
+            ))}
+          </select>
+        </Field>
       </div>
 
-      <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 14 }}>
+        {/* État / Condition de l'article - Boutons carrés interactifs SANS champ texte qui répète */}
         <Field label="État / Condition de l'article">
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4, marginBottom: 6 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 8, marginTop: 4 }}>
             {[
               "✨ Neuf avec étiquette",
               "🏷️ Neuf sans étiquette",
               "⭐ Très bon état",
               "👍 Bon état",
               "👌 Satisfaisant",
-            ].map((cond) => (
-              <button
-                key={cond}
-                type="button"
-                className={`btn sm${draft.condition === cond ? " primary" : " ghost"}`}
-                onClick={() => set("condition", cond)}
-                style={{ fontSize: 11.5 }}
-              >
-                {cond}
-              </button>
-            ))}
+            ].map((cond) => {
+              const active = draft.condition === cond;
+              return (
+                <button
+                  key={cond}
+                  type="button"
+                  onClick={() => set("condition", cond)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "10px 8px",
+                    borderRadius: 8,
+                    border: active ? "2px solid var(--accent)" : "1px solid var(--line-2)",
+                    background: active ? "var(--accent-sub)" : "var(--surface-sub)",
+                    color: active ? "var(--accent-glow)" : "var(--ink)",
+                    fontWeight: active ? 600 : 400,
+                    fontSize: 12,
+                    cursor: "pointer",
+                    textAlign: "center",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {cond}
+                </button>
+              );
+            })}
           </div>
-          <input
-            type="text"
-            value={draft.condition}
-            placeholder="Précisions sur l'état (ex. Très bon état avec légères traces)..."
-            onChange={(e) => set("condition", e.target.value)}
-          />
         </Field>
 
+        {/* Boîte & Accessoires - Boutons carrés interactifs */}
         <Field label="Boîte & Accessoires">
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 8, marginTop: 4 }}>
             {([
               ["tout", "📦+🎒 Tout complet"],
               ["boite", "📦 Boîte d'origine"],
               ["dustbag", "🎒 Dustbag seul"],
               ["remplacement", "📦 Boîte remplacement"],
               ["rien", "🚫 Sans boîte"],
-            ] as [PackagingKind, string][]).map(([k, lbl]) => (
-              <button
-                key={k}
-                type="button"
-                className={`btn sm${(draft.packaging || "boite") === k ? " primary" : " ghost"}`}
-                onClick={() => set("packaging", k)}
-                style={{ fontSize: 11.5 }}
-              >
-                {lbl}
-              </button>
-            ))}
+            ] as [PackagingKind, string][]).map(([k, lbl]) => {
+              const active = (draft.packaging || "boite") === k;
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => set("packaging", k)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "10px 8px",
+                    borderRadius: 8,
+                    border: active ? "2px solid var(--accent)" : "1px solid var(--line-2)",
+                    background: active ? "var(--accent-sub)" : "var(--surface-sub)",
+                    color: active ? "var(--accent-glow)" : "var(--ink)",
+                    fontWeight: active ? 600 : 400,
+                    fontSize: 12,
+                    cursor: "pointer",
+                    textAlign: "center",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {lbl}
+                </button>
+              );
+            })}
           </div>
         </Field>
       </div>
@@ -399,57 +526,6 @@ export default function ItemModal({
       <datalist id="dl-type">{suggestions.type.map((v) => <option key={v} value={v} />)}</datalist>
       <datalist id="dl-size">{suggestions.size.map((v) => <option key={v} value={v} />)}</datalist>
       <datalist id="dl-source">{suggestions.source.map((v) => <option key={v} value={v} />)}</datalist>
-      <hr className="sep" />
-
-      <Field label="Photo">
-        <div
-          className="dropzone"
-          onClick={() => fileRef.current?.click()}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            const f = e.dataTransfer.files[0];
-            if (f) void pickPhoto(f);
-          }}
-        >
-          {pendingURL ? (
-            <img src={pendingURL} alt="" />
-          ) : cleared || !draft.photoId ? (
-            <div className="thumb placeholder" style={{ width: 62, height: 78, fontSize: 22 }}>◫</div>
-          ) : (
-            <Photo id={draft.photoId} className="thumb" />
-          )}
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 600 }}>Ajouter une photo</div>
-            <div className="hint">Glissez un fichier ou cliquez — l'image est redimensionnée automatiquement.</div>
-          </div>
-          {(pendingURL || (draft.photoId && !cleared)) && (
-            <button
-              type="button"
-              className="btn sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                setPending(null);
-                setPendingURL((old) => { if (old) URL.revokeObjectURL(old); return null; });
-                setCleared(true);
-              }}
-            >
-              Retirer
-            </button>
-          )}
-        </div>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          style={{ display: "none" }}
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void pickPhoto(f);
-            e.target.value = "";
-          }}
-        />
-      </Field>
 
       <hr className="sep" />
       <div className="fgrid">
@@ -457,7 +533,25 @@ export default function ItemModal({
           <input type="number" step="0.01" value={draft.cost} placeholder="0,00" onChange={(e) => set("cost", e.target.value)} />
         </Field>
         <Field label={eurLabel(LABEL.fees)}>
-          <input type="number" step="0.01" value={draft.fees} placeholder={HINT.fees} onChange={(e) => set("fees", e.target.value)} />
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <input type="number" step="0.01" value={draft.fees} placeholder={HINT.fees} onChange={(e) => set("fees", e.target.value)} />
+            {num(draft.fees) > 0 && (
+              <button
+                type="button"
+                className="btn sm ghost"
+                title="Intégrer les frais au coût d'achat"
+                onClick={() => {
+                  const newCost = (num(draft.cost) + num(draft.fees)).toFixed(2);
+                  set("cost", newCost);
+                  set("fees", "");
+                  toast(`Frais intégrés au coût d'achat (${newCost} €)`);
+                }}
+                style={{ fontSize: 10, whiteSpace: "nowrap" }}
+              >
+                + Coût
+              </button>
+            )}
+          </div>
         </Field>
         <Field label={eurLabel(isSold ? LABEL.price : "Prix estimé")}>
           <input
@@ -495,49 +589,9 @@ export default function ItemModal({
         </div>
       </div>
 
-      {isArrivage && (
-        <>
-          <hr className="sep" />
-          <div className="field"><span>Livraison</span></div>
-          <div className="fgrid">
-            <Field label="Lot">
-              <input type="text" value={draft.lotTag} placeholder="Nom du lot / de la commande" onChange={(e) => set("lotTag", e.target.value)} />
-            </Field>
-            <Field label="Transporteur">
-              <input type="text" value={draft.carrier} placeholder="Colissimo, Chronopost…" onChange={(e) => set("carrier", e.target.value)} />
-            </Field>
-            <Field label="Code de suivi">
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <input type="text" value={draft.tracking} placeholder="—" onChange={(e) => set("tracking", e.target.value)} />
-                {draft.tracking && <TrackingLink carrier={draft.carrier} code={draft.tracking} />}
-              </div>
-            </Field>
-            <Field label="Arrivée prévue">
-              <input type="date" value={draft.expectedDate} onChange={(e) => set("expectedDate", e.target.value)} />
-            </Field>
-          </div>
-        </>
-      )}
-
       <hr className="sep" />
-      <div className="field">
-        <span>Statut de l'article</span>
-        <div className="status-row" style={{ marginTop: 6 }}>
-          {isSold ? (
-            <span className="pill vendu">{STATUS_LABEL.vendu}</span>
-          ) : (
-            <Segmented<ItemStatus>
-              value={draft.status}
-              onChange={(s) => set("status", s)}
-              options={[
-                { value: "arrivage", label: STATUS_LABEL.arrivage },
-                { value: "stock", label: STATUS_LABEL.stock },
-              ]}
-            />
-          )}
-        </div>
-      </div>
 
+      {/* Dates d'achat et de réception */}
       <div className="fgrid">
         <Field label="Date d'achat">
           <input type="date" value={draft.buyDate} onChange={(e) => set("buyDate", e.target.value)} />
@@ -547,6 +601,7 @@ export default function ItemModal({
         </Field>
       </div>
 
+      {/* Notes & Description de l'annonce */}
       <Field label="Notes & Description de l'annonce">
         <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
           <button type="button" className="btn sm primary" onClick={copyDescription}>

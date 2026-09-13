@@ -29,14 +29,31 @@ export default function ExpenseModal({
   );
   const [amount, setAmount] = useState(expense?.amount ? String(expense.amount) : "");
   const [date, setDate] = useState(expense?.date ?? today());
-  const initialMonths = expense?.amortizeMonths ?? 1;
-  const [unit, setUnit] = useState<"mois" | "ans">(initialMonths >= 12 && initialMonths % 12 === 0 ? "ans" : "mois");
-  const [duration, setDuration] = useState(String(unit === "ans" ? initialMonths / 12 : initialMonths));
+  
+  const initialDays = expense ? Math.min(365, Math.max(1, Math.round(expense.amortizeMonths * 30))) : 1;
+  const [days, setDays] = useState<number>(initialDays);
   const [notes, setNotes] = useState(expense?.notes ?? "");
+  const [unit, setUnit] = useState<"jours" | "mois">("jours");
 
-  const months = Math.max(1, Math.round(num(duration) * (unit === "ans" ? 12 : 1)) || 1);
-  const share = num(amount) / months;
-  const perYear = share * 12;
+  const months = unit === "mois"
+    ? Math.max(0.033, days)
+    : Math.max(0.033, Math.round((days / 30) * 100) / 100);
+  const totalDays = unit === "mois" ? days * 30 : days;
+  const costPerDay = num(amount) / Math.max(1, totalDays);
+  const costPerMonth = unit === "mois" ? num(amount) / Math.max(1, days) : costPerDay * 30;
+
+  const handleDaysChange = (valStr: string) => {
+    const parsed = parseInt(valStr) || 1;
+    if (unit === "jours" && parsed > 365) {
+      setDays(365);
+      toast("Durée maximale : 365 jours");
+    } else if (unit === "mois" && parsed > 120) {
+      setDays(120);
+      toast("Durée maximale : 120 mois");
+    } else {
+      setDays(Math.max(1, parsed));
+    }
+  };
 
   const submit = () => {
     if (!label.trim()) { toast("Donnez un nom à la charge"); return; }
@@ -97,58 +114,111 @@ export default function ExpenseModal({
         <Field label="Date d'achat">
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
-        <Field label="Durée d'utilisation">
-          <div style={{ display: "flex", gap: 8 }}>
+      </div>
+
+      <Field label="Durée d'étalement">
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <input
               type="number"
               step="1"
               min="1"
-              value={duration}
-              style={{ flex: 1 }}
-              onChange={(e) => setDuration(e.target.value)}
+              max={unit === "mois" ? 120 : 365}
+              value={days}
+              style={{ width: 110 }}
+              onChange={(e) => handleDaysChange(e.target.value)}
             />
-            <select value={unit} style={{ width: "auto" }} onChange={(e) => setUnit(e.target.value as "mois" | "ans")}>
-              <option value="mois">mois</option>
-              <option value="ans">ans</option>
-            </select>
+            {/* Toggle jours / mois */}
+            <div className="seg" role="group" style={{ fontSize: 12 }}>
+              <button
+                type="button"
+                className={unit === "jours" ? "on" : ""}
+                onClick={() => {
+                  if (unit === "mois") {
+                    // Convert current value from months to days
+                    setDays(Math.min(365, Math.round(days * 30)));
+                    setUnit("jours");
+                  }
+                }}
+              >
+                Jours
+              </button>
+              <button
+                type="button"
+                className={unit === "mois" ? "on" : ""}
+                onClick={() => {
+                  if (unit === "jours") {
+                    // Convert current value from days to months
+                    setDays(Math.max(1, Math.round(days / 30)));
+                    setUnit("mois");
+                  }
+                }}
+              >
+                Mois
+              </button>
+            </div>
+            {days === 1 && unit === "jours" && (
+              <span className="hint" style={{ fontSize: 11 }}>= charge ponctuelle</span>
+            )}
           </div>
-        </Field>
-      </div>
-
-      <div className="duration-presets">
-        <span className="hint">Combien de temps allez-vous l'utiliser ?</span>
-        {([
-          ["Une seule fois", 1, "mois"],
-          ["6 mois", 6, "mois"],
-          ["1 an", 1, "ans"],
-          ["2 ans", 2, "ans"],
-          ["3 ans", 3, "ans"],
-        ] as [string, number, "mois" | "ans"][]).map(([lbl, v, u]) => (
-          <button
-            key={lbl}
-            type="button"
-            className={`btn sm${months === v * (u === "ans" ? 12 : 1) ? " primary" : ""}`}
-            onClick={() => { setUnit(u); setDuration(String(v)); }}
-          >
-            {lbl}
-          </button>
-        ))}
-      </div>
+          {/* Presets adaptés à l'unité */}
+          <div className="duration-presets" style={{ marginTop: 2, display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {unit === "jours"
+              ? [
+                  { label: "1 j", value: 1 },
+                  { label: "7 j", value: 7 },
+                  { label: "30 j", value: 30 },
+                  { label: "90 j", value: 90 },
+                  { label: "180 j", value: 180 },
+                  { label: "365 j", value: 365 },
+                ].map((preset) => (
+                  <button
+                    key={preset.value}
+                    type="button"
+                    className={`btn sm${days === preset.value ? " primary" : ""}`}
+                    onClick={() => setDays(preset.value)}
+                  >
+                    {preset.label}
+                  </button>
+                ))
+              : [
+                  { label: "1 mois", value: 1 },
+                  { label: "3 mois", value: 3 },
+                  { label: "6 mois", value: 6 },
+                  { label: "12 mois", value: 12 },
+                  { label: "24 mois", value: 24 },
+                  { label: "36 mois", value: 36 },
+                ].map((preset) => (
+                  <button
+                    key={preset.value}
+                    type="button"
+                    className={`btn sm${days === preset.value ? " primary" : ""}`}
+                    onClick={() => setDays(preset.value)}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+          </div>
+        </div>
+      </Field>
 
       <div className="note info">
         <span className="glyph">◈</span>
         <div>
-          {months > 1 ? (
+          {(unit === "jours" ? days : days * 30) > 1 ? (
             <>
-              <b className="num">{eur2(num(amount))}</b> sur {months} mois d'utilisation, soit{" "}
-              <b className="num">{eur2(share)}</b> par mois
-              {months > 12 && <> (<span className="num">{eur2(perYear)}</span> par an)</>}.
+              <b className="num">{eur2(num(amount))}</b> étalé sur{" "}
+              {unit === "mois"
+                ? `${days} mois (≈ ${days * 30} jours)`
+                : `${days} jour${days > 1 ? "s" : ""}`}
+              , soit <b className="num">{eur2(costPerDay)}</b> par jour
+              {months >= 1 && <> · <b className="num">{eur2(costPerMonth)}</b> par mois</>}.
               <br />
-              Seuls les mois écoulés pèsent sur la marge : la charge se répartit au fil du temps.
+              Seuls les jours écoulés pèsent sur la rentabilité.
             </>
           ) : (
             <>
-              <b className="num">{eur2(num(amount))}</b> comptés en une fois, sur le mois de l'achat.
+              <b className="num">{eur2(num(amount))}</b> comptés sur 1 jour (charge ponctuelle).
             </>
           )}
         </div>

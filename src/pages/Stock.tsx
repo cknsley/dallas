@@ -11,9 +11,71 @@ import { costOf, qtyOf } from "../lib/calc";
 import { dshort, eur, eur2 } from "../lib/format";
 import { STATUS_LABEL } from "../lib/constants";
 import { downloadText, itemsToCSV, stockFilename } from "../lib/csv";
+import { Download, Plus, Pencil, Trash2 } from "lucide-react";
 import ItemModal from "../modals/ItemModal";
 import SellModal from "../modals/SellModal";
 import type { Item } from "../types";
+
+export type StockCategoryTab = "vetements" | "chaussures" | "sacs" | "accessoires" | "emballages" | "total";
+
+export function getStockCategory(i: Item): "vetements" | "chaussures" | "sacs" | "accessoires" | "emballages" {
+  const t = (i.type || "").toLowerCase().trim();
+  const n = (i.name || "").toLowerCase().trim();
+  const c = ((i as any).category || "").toLowerCase().trim();
+
+  // Emballages (Cartons, sachets, papier bulle, scotch, fournitures d'envoi)
+  if (
+    t.includes("emballage") || t.includes("carton") || t.includes("bulle") ||
+    t.includes("sachet") || t.includes("pochette d'envoi") || t.includes("pochette d’envoi") ||
+    t.includes("fourniture") || t.includes("consommable") || t.includes("scotch") ||
+    n.includes("emballage") || n.includes("carton") || n.includes("sachet d'envoi") ||
+    n.includes("papier bulle") || c.includes("emballage")
+  ) {
+    return "emballages";
+  }
+
+  // Chaussures & Sneakers
+  if (
+    t.includes("sneaker") || t.includes("chaussure") || t.includes("basket") ||
+    t.includes("botte") || t.includes("claquette") || t.includes("sandale") ||
+    t.includes("mule") || t.includes("crampon") ||
+    n.includes("sneaker") || n.includes("jordan") || n.includes("dunk") || n.includes("yeezy")
+  ) {
+    return "chaussures";
+  }
+
+  // Sacs
+  if (
+    t.includes("sac") || t.includes("maroquinerie") || t.includes("sacoche") ||
+    t.includes("cabas") || t.includes("valise") || t.includes("tote") ||
+    n.includes("sacoche") || n.includes("backpack")
+  ) {
+    return "sacs";
+  }
+
+  // Accessoires
+  if (
+    t.includes("ceinture") || t.includes("casquette") || t.includes("bijou") ||
+    t.includes("lunette") || t.includes("montre") || t.includes("accessoire") ||
+    t.includes("bonnet") || t.includes("chapeau") || t.includes("echarpe") ||
+    t.includes("écharpe") || t.includes("gant") || t.includes("bob") ||
+    t.includes("portefeuille") || t.includes("porte-carte")
+  ) {
+    return "accessoires";
+  }
+
+  // Vêtements par défaut
+  return "vetements";
+}
+
+const STOCK_TABS: { key: StockCategoryTab; label: string; icon: string }[] = [
+  { key: "vetements", label: "Vêtements", icon: "👕" },
+  { key: "chaussures", label: "Chaussures", icon: "👟" },
+  { key: "sacs", label: "Sacs", icon: "👜" },
+  { key: "accessoires", label: "Accessoires", icon: "🧢" },
+  { key: "emballages", label: "Emballages", icon: "📦" },
+  { key: "total", label: "Total", icon: "📊" },
+];
 
 type SortKey = "name" | "brand" | "type" | "size" | "source" | "status" | "cost" | "buyDate" | "quantity";
 
@@ -48,6 +110,9 @@ export default function Stock() {
   const navigate = useNavigate();
 
   const [view, setView] = usePref<"table" | "grid">("stockView", "table");
+  const [catRaw, setCatRaw] = useQueryState("cat", "total");
+  const categoryTab = (catRaw as StockCategoryTab) || "total";
+  const setCategoryTab = (val: StockCategoryTab) => setCatRaw(val);
   const [q, setQ] = useQueryState("q");
   const [brand, setBrand] = useQueryState("brand");
   const [type, setType] = useQueryState("type");
@@ -60,14 +125,40 @@ export default function Stock() {
   const [selling, setSelling] = useState<Item | null>(null);
   const [confirming, setConfirming] = useState<Item | null>(null);
 
+  const held = useMemo(() => state.items.filter((i) => i.status === "stock"), [state.items]);
+
+  const tabCounts = useMemo(() => {
+    const counts = {
+      vetements: 0,
+      chaussures: 0,
+      sacs: 0,
+      accessoires: 0,
+      emballages: 0,
+      total: 0,
+    };
+    for (const i of held) {
+      const cat = getStockCategory(i);
+      const qty = qtyOf(i);
+      counts[cat] += qty;
+      if (cat !== "emballages") {
+        counts.total += qty;
+      }
+    }
+    return counts;
+  }, [held]);
+
   const uniq = (k: "brand" | "type" | "size") =>
     [...new Set(held.map((i) => i[k]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
-
-  const held = useMemo(() => state.items.filter((i) => i.status === "stock"), [state.items]);
 
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const filtered = held.filter((i) => {
+      const cat = getStockCategory(i);
+      if (categoryTab === "total") {
+        if (cat === "emballages") return false; // Emballage exclu du Total
+      } else {
+        if (cat !== categoryTab) return false;
+      }
       if (brand && i.brand !== brand) return false;
       if (type && i.type !== type) return false;
       if (size && i.size !== size) return false;
@@ -84,7 +175,7 @@ export default function Stock() {
       if (x === y) return b.createdAt - a.createdAt;
       return (x > y ? 1 : -1) * dir;
     });
-  }, [held, brand, type, size, q, sortKey, sortDir]);
+  }, [held, categoryTab, brand, type, size, q, sortKey, sortDir]);
 
   const toggleSort = (k: SortKey) => {
     if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -96,14 +187,18 @@ export default function Stock() {
 
   const hasFilters = !!brand || !!type || !!size || !!q;
   const linkedDoc = (i: Item) => state.docs.find((d) => d.itemIds.includes(i.id));
-  // Le capital immobilisé ne compte que les pièces encore en stock : une pièce vendue
-  // n'immobilise plus rien, l'additionner gonflerait artificiellement le total.
+
+  // Le capital immobilisé ne compte que les pièces encore en stock pour l'onglet actif.
   const heldCost = list.reduce((a, i) => a + costOf(i), 0);
 
   const actions = (i: Item) => (
     <div className={`rowact${view === "grid" ? " always" : ""}`}>
-      <button className="iconbtn" title="Éditer" onClick={() => setEditing({ item: i })}>✎</button>
-      <button className="iconbtn del" title="Supprimer" onClick={() => setConfirming(i)}>✕</button>
+      <button className="iconbtn" title="Éditer" onClick={() => setEditing({ item: i })}>
+        <Pencil size={14} />
+      </button>
+      <button className="iconbtn del" title="Supprimer" onClick={() => setConfirming(i)}>
+        <Trash2 size={14} />
+      </button>
     </div>
   );
 
@@ -139,10 +234,51 @@ export default function Stock() {
           ]}
         />
         <button className="btn" onClick={() => downloadText(stockFilename(), itemsToCSV(list))}>
-          ↓ Export CSV
+          <Download size={14} /> Export CSV
         </button>
-        <button className="btn primary" onClick={() => setEditing({ item: null })}>+ Nouvel article</button>
+        <button className="btn primary" onClick={() => setEditing({ item: null })}>
+          <Plus size={14} /> Nouvel article
+        </button>
       </HeaderActions>
+
+      {/* Onglets de catégories du Stock */}
+      <div className="stock-tabs-bar" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        {STOCK_TABS.map((tab) => {
+          const active = categoryTab === tab.key;
+          const count = tabCounts[tab.key];
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              className={`btn${active ? " primary" : " ghost"}`}
+              onClick={() => setCategoryTab(tab.key)}
+              style={{
+                borderRadius: 20,
+                padding: "6px 14px",
+                fontSize: 13,
+                fontWeight: active ? 600 : 500,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <span>{tab.icon} {tab.label}</span>
+              <span
+                className="badge"
+                style={{
+                  background: active ? "rgba(255, 255, 255, 0.25)" : "var(--surface-sub)",
+                  padding: "2px 8px",
+                  borderRadius: 10,
+                  fontSize: 11,
+                  fontWeight: 600,
+                }}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
       <div className="toolbar">
         <select value={brand} onChange={(e) => setBrand(e.target.value)} style={{ width: "auto", minWidth: 130 }}>
@@ -169,16 +305,19 @@ export default function Stock() {
           <button className="btn ghost sm" onClick={clearFilters}>Réinitialiser</button>
         )}
       </div>
+
       <div className="hint num" style={{ margin: "-6px 0 16px" }}>
         {list.reduce((a, i) => a + qtyOf(i), 0)} article
         {list.reduce((a, i) => a + qtyOf(i), 0) > 1 ? "s" : ""} sur {list.length} ligne{list.length > 1 ? "s" : ""} ·{" "}
         {eur(heldCost)} immobilisés
+        {categoryTab === "total" && " (hors emballages)"}
+        {categoryTab === "emballages" && " (fournitures & emballages)"}
       </div>
 
       {list.length === 0 ? (
         <div className="card">
           <Empty glyph="◫" title="Aucun article ici">
-            {held.length ? "Aucun résultat pour ces filtres." : "Ajoutez votre premier article pour démarrer le suivi."}
+            {held.length ? "Aucun résultat pour ces filtres ou cet onglet." : "Ajoutez votre premier article pour démarrer le suivi."}
           </Empty>
         </div>
       ) : view === "table" ? (

@@ -54,6 +54,8 @@ export interface Item {
   tracking: string;       // numéro de suivi
   expectedDate: string;   // arrivée prévue (colis entrant)
   shipDate: string;       // date d'expédition (colis sortant)
+  shipDeadline?: string;  // date limite d'expédition si connue
+  shippingLabelUrl?: string; // lien vers le bordereau de livraison
   shippingVideo?: string; // vidéo/preuve d'envoi, encodée localement
   shippingVideoName?: string;
   validationDate?: string; // Date de validation SAV (YYYY-MM-DD)
@@ -94,6 +96,12 @@ export interface Todo {
   clientId?: string;     // ID du client lié
   clientName?: string;   // Nom du client / acheteur lié
   dueDate?: string;      // YYYY-MM-DD
+  isSourcing?: boolean;   // Indique s'il s'agit d'un article à sourcer
+  sourcingBrand?: string; // Marque de l'article à sourcer
+  sourcingSize?: string;  // Taille de l'article à sourcer
+  sourcingPrice?: number; // Budget / Prix cible d'achat
+  ordered?: boolean;      // Passé en commande dans la centrale d'achat
+  orderId?: string;       // ID de la commande rattachée dans la centrale d'achat
 }
 
 export interface DocLine {
@@ -216,8 +224,10 @@ export interface SupplierRecord {
   address: string;
   /** Délai de paiement accordé, en jours. */
   terms: number;
-  /** Appréciation de 1 à 5, 0 si non notée. */
+  /** Appréciation de 1 à 5, 0 si non notée — se met à jour à chaque interaction. */
   rating: number;
+  /** Spécialités libres (ex. "Sneakers", "Vintage") — filtrables sur la liste. */
+  tags: string[];
   notes: string;
   createdAt: number;
 }

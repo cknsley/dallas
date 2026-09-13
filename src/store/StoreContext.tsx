@@ -202,12 +202,9 @@ const withLogistics = (i: Item): Item => ({
 function loadLocal(): AppState {
   try {
     const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return DEMO_STATE;
+    if (!raw) return EMPTY_STATE;
     const parsed = JSON.parse(raw) as Partial<AppState>;
     const loadedItems = parsed.items ?? [];
-    if (loadedItems.length === 0) {
-      return DEMO_STATE;
-    }
     return {
       ...EMPTY_STATE,
       ...parsed,
@@ -226,12 +223,12 @@ function loadLocal(): AppState {
       personalLitiges: parsed.personalLitiges ?? [],
       expenses: parsed.expenses ?? [],
       suppliers: parsed.suppliers ?? [],
-      clients: parsed.clients ?? DEMO_STATE.clients,
+      clients: parsed.clients ?? [],
       requests: parsed.requests ?? [],
       seq: parsed.seq ?? {},
     };
   } catch {
-    return DEMO_STATE;
+    return EMPTY_STATE;
   }
 }
 

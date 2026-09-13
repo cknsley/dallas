@@ -14,10 +14,12 @@ const LEGAL: { value: LegalStatus; label: string; hint: string }[] = [
   { value: "sasu", label: "SASU", hint: "Société unipersonnelle assujettie à la TVA" },
 ];
 
-const MODULES: { key: OptionalModule; label: string; hint: string; icon: string }[] = [
-  { key: "clients", label: "Clients", hint: "Base acheteurs et historique des ventes", icon: "☻" },
-  { key: "sav", label: "SAV", hint: "Litiges, retours clients et remboursements fournisseurs", icon: "🛠" },
-  { key: "facturation", label: "Facturation", hint: "Factures, reçus, TVA et impayés", icon: "§" },
+import { Users, HelpCircle, FileText } from "lucide-react";
+
+const MODULES: { key: OptionalModule; label: string; hint: string; icon: any }[] = [
+  { key: "clients", label: "Clients", hint: "Base acheteurs et historique des ventes", icon: Users },
+  { key: "sav", label: "SAV & Litiges", hint: "Litiges, retours clients et remboursements fournisseurs", icon: HelpCircle },
+  { key: "facturation", label: "Facturation", hint: "Factures, reçus, TVA et impayés", icon: FileText },
 ];
 
 export default function Reglages() {
@@ -153,21 +155,26 @@ export default function Reglages() {
             </div>
           </div>
           <div className="card-b module-switches">
-            {MODULES.map((module) => (
-              <label key={module.key} className={`module-switch ${s.enabledModules[module.key] ? "on" : ""}`}>
-                <span className="module-icon">{module.icon}</span>
-                <span className="module-copy">
-                  <strong>{module.label}</strong>
-                  <small>{module.hint}</small>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={s.enabledModules[module.key]}
-                  onChange={() => toggleModule(module.key)}
-                />
-                <span className="switch-track" aria-hidden="true"><i /></span>
-              </label>
-            ))}
+            {MODULES.map((module) => {
+              const IconComponent = module.icon;
+              return (
+                <label key={module.key} className={`module-switch ${s.enabledModules[module.key] ? "on" : ""}`}>
+                  <span className="module-icon" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <IconComponent size={18} />
+                  </span>
+                  <span className="module-copy">
+                    <strong>{module.label}</strong>
+                    <small>{module.hint}</small>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={s.enabledModules[module.key]}
+                    onChange={() => toggleModule(module.key)}
+                  />
+                  <span className="switch-track" aria-hidden="true"><i /></span>
+                </label>
+              );
+            })}
           </div>
         </div>
       </div>

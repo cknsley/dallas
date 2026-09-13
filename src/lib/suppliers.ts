@@ -165,6 +165,7 @@ export const blankSupplierRecord = (name: string, id: string): SupplierRecord =>
   address: "",
   terms: 0,
   rating: 0,
+  tags: [],
   notes: "",
   createdAt: Date.now(),
 });
