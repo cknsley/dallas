@@ -30,8 +30,8 @@ import { CommandPalette } from "./CommandPalette";
 import { SidebarMiniMenu } from "./SidebarMiniMenu";
 
 /**
- * Le secteur suit la navigation partout sauf sur l'Accueil, qui est le retour à la vue générale.
- * Les sections transverses (charges, sourcing) ignorent le paramètre mais gardent le contexte.
+ * Le secteur suit la navigation partout sauf sur la vue générale, qui agrège les deux.
+ * Les sections transverses ignorent le paramètre mais gardent le contexte affiché.
  */
 export const SECTOR_TRANSVERSE_PATHS = new Set(["/charges", "/sourcing", "/reglages"]);
 
@@ -58,7 +58,7 @@ export const NAV_GROUPS: { label: string; routes: NavRoute[] }[] = [
   {
     label: "Pilotage",
     routes: [
-      { path: "/", label: "Accueil", icon: LayoutDashboard, subtitle: "Toutes vos sections, accessibles ici", end: true },
+      { path: "/dashboard", label: "Vue générale", icon: LayoutDashboard, subtitle: "Les chiffres de l'activité, tous secteurs confondus", end: true },
       { path: "/todo", label: "Todo", icon: CheckSquare, subtitle: "Tâches, rappels & à faire" },
       { path: "/sourcing", label: "Sourcing", icon: Sparkles, subtitle: "Articles à acheter/trouver, vue kanban & commande" },
       { path: "/deal", label: "Deal", icon: Scale, subtitle: "Négocier un achat ou une vente, simulation de marge" },
@@ -136,7 +136,7 @@ export default function Layout() {
   const badges = activeSecteur ? computeSectorNavBadges(state, activeSecteur) : computeNavBadges(state);
 
   const navTarget = (r: NavRoute) =>
-    activeSecteur && r.path !== "/" ? `${r.path}?secteur=${activeSecteur}` : r.path;
+    activeSecteur && r.path !== "/dashboard" ? `${r.path}?secteur=${activeSecteur}` : r.path;
 
   return (
     <div className="app">
@@ -144,13 +144,15 @@ export default function Layout() {
 
       <aside className={`sidebar ${mobOpen ? "open" : ""}`}>
         <div className="brand">
-          <div className="brand-logo">
-            <Package size={20} className="brand-icon" />
-          </div>
-          <div>
-            <b>RESELL</b>
-            <span>Cockpit ERP</span>
-          </div>
+          <Link to="/" className="brand-home" title="Revenir à l'accueil" onClick={() => setMobOpen(false)}>
+            <div className="brand-logo">
+              <Package size={20} className="brand-icon" />
+            </div>
+            <div>
+              <b>RESELL</b>
+              <span>Cockpit ERP</span>
+            </div>
+          </Link>
           <button className="mob-close" onClick={() => setMobOpen(false)}>
             <X size={18} />
           </button>
@@ -164,7 +166,7 @@ export default function Layout() {
         </button>
 
         {activeSecteur && (
-          <Link to="/" className="sector-pill" onClick={() => setMobOpen(false)}>
+          <Link to="/dashboard" className="sector-pill" onClick={() => setMobOpen(false)}>
             <span>{DOMAIN_META[activeSecteur].icon} {DOMAIN_META[activeSecteur].label}</span>
             <X size={13} />
           </Link>

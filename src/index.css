@@ -191,6 +191,8 @@ a { color: var(--accent); }
   position: sticky; top: 0; height: 100vh; overflow-y: auto;
 }
 .brand { display: flex; flex-direction: column; gap: 2px; padding: 0 8px 18px; }
+.brand-home { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
+.brand-home:hover b { color: var(--accent); }
 .brand b { font-family: var(--ff-display); font-size: 21px; font-weight: 700; letter-spacing: -0.035em; }
 .brand span { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); }
 .nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
@@ -424,6 +426,85 @@ a.kpi:hover, button.kpi:hover { transform: translateY(-2px); box-shadow: var(--s
   opacity: 0; transition: opacity 0.14s, transform 0.14s; transform: translateX(-3px);
 }
 a.kpi:hover .go, button.kpi:hover .go { opacity: 1; transform: none; }
+
+/* =========================================================
+   Écran d'accueil — interface autonome, avant le cockpit
+   ========================================================= */
+.home {
+  min-height: 100vh;
+  display: flex; flex-direction: column; justify-content: center;
+  gap: 30px; max-width: 940px; margin: 0 auto; padding: 56px 24px;
+}
+.home-head { text-align: center; }
+.home-brand { display: inline-flex; align-items: center; gap: 12px; text-align: left; }
+.home-brand-logo {
+  display: flex; align-items: center; justify-content: center; width: 44px; height: 44px;
+  border-radius: 13px; color: var(--accent-ink);
+  background: linear-gradient(140deg, var(--accent), var(--accent-2));
+  box-shadow: var(--shadow);
+}
+.home-brand b {
+  display: block; font-family: var(--ff-display); font-size: 25px;
+  font-weight: 700; letter-spacing: -0.04em; line-height: 1.1;
+}
+.home-brand span {
+  font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3);
+}
+.home-baseline { margin: 22px 0 0; font-size: 17px; color: var(--ink-2); }
+
+.home-sectors { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 18px; }
+.home-sector {
+  position: relative; display: flex; flex-direction: column; padding: 28px;
+  border-radius: var(--r-lg); text-decoration: none; color: inherit;
+  background: var(--surface); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  box-shadow: var(--shadow);
+  transition: transform 0.16s, box-shadow 0.16s;
+}
+.home-sector::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+  background: var(--grad-border); pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+.home-sector:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+.home-sector-ic { font-size: 34px; line-height: 1; }
+.home-sector h2 { margin: 14px 0 0; font-size: 21px; letter-spacing: -0.03em; }
+.home-sector p { margin: 5px 0 0; font-size: 13px; color: var(--ink-3); }
+.home-sector-stats { display: flex; gap: 26px; margin: 20px 0 0; }
+.home-sector-stats dt {
+  font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 700;
+}
+.home-sector-stats dd {
+  margin: 3px 0 0; font-family: var(--ff-mono); font-size: 16px; font-weight: 600;
+}
+.home-sector-go {
+  display: flex; align-items: center; gap: 6px; margin-top: 22px;
+  font-weight: 600; font-size: 13.5px; color: var(--accent);
+}
+.home-sector:hover .home-sector-go svg { transform: translateX(3px); }
+.home-sector-go svg { transition: transform 0.16s; }
+
+.home-global {
+  display: flex; align-items: center; gap: 12px; align-self: center;
+  padding: 13px 20px; border-radius: var(--r); text-decoration: none; color: inherit;
+  background: var(--surface); border: 1px solid var(--line);
+  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  transition: border-color 0.16s, background 0.16s;
+}
+.home-global:hover { background: var(--surface-strong); border-color: var(--line-2); }
+.home-global b { display: block; font-size: 13.5px; }
+.home-global span { font-size: 12px; color: var(--ink-3); }
+.home-global > svg:first-child { color: var(--accent); }
+.home-global > svg:last-child { color: var(--ink-3); }
+
+@media (max-width: 560px) {
+  .home { justify-content: flex-start; padding: 36px 18px; }
+  .home-sector { padding: 22px; }
+  .home-sector-stats { gap: 18px; }
+}
 
 /* Frontpage : les deux secteurs de vente, porte d'entrée vers leur hub respectif */
 .sector-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }

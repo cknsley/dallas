@@ -18,12 +18,16 @@ import Sourcing from "./pages/Sourcing";
 import Facturation from "./pages/Facturation";
 import Reglages from "./pages/Reglages";
 import SecteurHub from "./pages/SecteurHub";
+import Home from "./pages/Home";
 
 export default function App() {
   return (
     <Routes>
+      {/* L'accueil est une interface à part : pas de cockpit, on y choisit son univers. */}
+      <Route index element={<Home />} />
+
       <Route element={<Layout />}>
-        <Route index element={<Dashboard />} />
+        <Route path="dashboard" element={<Dashboard />} />
         <Route path="secteur" element={<SecteurHub />} />
         <Route path="performance" element={<PerformancePage />} />
         <Route path="stock" element={<Stock />} />
