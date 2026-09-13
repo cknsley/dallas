@@ -17,20 +17,27 @@ export function Modal({
   wide?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
     };
     document.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    ref.current?.querySelector<HTMLElement>("input,select,textarea,button")?.focus();
+
+    // Focus sur le 1er élément du corps du modal (.modal-b) et jamais sur la croix dans l'en-tête
+    const bodyEl = ref.current?.querySelector<HTMLElement>(".modal-b");
+    const targetEl = bodyEl?.querySelector<HTMLElement>("[autofocus], input, select, textarea, button");
+    targetEl?.focus();
+
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [onClose]);
+  }, []);
 
   return createPortal(
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -38,7 +45,7 @@ export function Modal({
         <div className="modal-h">
           <h2>{title}</h2>
           <div className="spacer" />
-          <button className="btn ghost" onClick={onClose} aria-label="Fermer le dialogue">
+          <button type="button" className="btn ghost" onClick={onClose} aria-label="Fermer le dialogue">
             <X size={18} />
           </button>
         </div>
