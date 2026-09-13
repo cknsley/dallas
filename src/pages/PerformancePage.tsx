@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Zap,
   ShoppingBag,
@@ -38,6 +38,15 @@ export default function PerformancePage() {
   const navigate = useNavigate();
   const [period, setPeriod] = usePref<Period>("perf_period", "month");
   const [domain, setDomain] = usePref<"all" | "fashion" | "tcg">("perfDomain", "all");
+  const [searchParams] = useSearchParams();
+
+  // Arrivée depuis le hub d'un secteur (?secteur=tcg|fashion) : on pré-sélectionne ce domaine.
+  useEffect(() => {
+    const secteur = searchParams.get("secteur");
+    if (secteur === "tcg" || secteur === "fashion") setDomain(secteur);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   const [activeTab, setActiveTab] = useState<PerfTab>("sales_list");
   const [selectedDim, setSelectedDim] = useState<Dimension>("brand");
   const [searchQuery, setSearchQuery] = useState("");

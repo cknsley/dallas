@@ -8,7 +8,7 @@ import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
 import { links } from "../lib/links";
-import { costOf, qtyOf, revenueOf } from "../lib/calc";
+import { costOf, filterItemsByDomain, qtyOf, revenueOf, type Domain } from "../lib/calc";
 import { dshort, eur, eur2, today } from "../lib/format";
 import { SHIPPING_LABEL } from "../lib/constants";
 import { useQueryState } from "../lib/useQueryState";
@@ -33,6 +33,9 @@ export default function Livraison() {
   const navigate = useNavigate();
 
   const [tab, setTab] = useQueryState("tab", "a_partir");
+  const [secteurRaw] = useQueryState("secteur");
+  const domain: Domain = secteurRaw === "tcg" || secteurRaw === "fashion" ? secteurRaw : "all";
+  const items = useMemo(() => filterItemsByDomain(state.items, domain), [state.items, domain]);
   const [viewMode, setViewMode] = usePref<"kanban" | "table">("livraisonView", "kanban");
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<Shipping | null>(null);
@@ -47,27 +50,27 @@ export default function Livraison() {
   /* --- OUTGOING (À PARTIR) — VENTES À EXPÉDIER --- */
   const outgoing = useMemo(
     () =>
-      state.items
+      items
         .filter((i) => i.status === "vendu" && i.delivery === "commandee")
         .sort((a, b) => a.saleDate.localeCompare(b.saleDate)),
-    [state.items],
+    [items],
   );
 
   const toShip = outgoing;
   const sleeping = toShip.reduce((a, i) => a + revenueOf(i), 0);
-  const unpaid = state.items.filter((i) => i.status === "vendu" && i.delivery === "non_payee");
-  const delivered = state.items.filter((i) => i.status === "vendu" && i.delivery === "livree");
+  const unpaid = items.filter((i) => i.status === "vendu" && i.delivery === "non_payee");
+  const delivered = items.filter((i) => i.status === "vendu" && i.delivery === "livree");
 
   /* --- INCOMING (À VENIR) — ARRIVAGES CENTRALE D'ACHAT --- */
   const incomingItems = useMemo(
-    () => state.items.filter((i) => i.status === "arrivage"),
-    [state.items],
+    () => items.filter((i) => i.status === "arrivage"),
+    [items],
   );
 
   /* --- RETURNS (RETOURS & LITIGES SAV) --- */
   const returnItems = useMemo(
-    () => state.items.filter((i) => Boolean(i.litigeState)),
-    [state.items],
+    () => items.filter((i) => Boolean(i.litigeState)),
+    [items],
   );
 
   const incomingParcels = useMemo(() => {

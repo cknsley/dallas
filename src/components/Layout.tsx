@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useSearchParams } from "react-router-dom";
 import {
   LayoutDashboard,
   CheckSquare,
@@ -23,9 +23,18 @@ import {
   LucideIcon,
 } from "lucide-react";
 import { useStore } from "../store/StoreContext";
-import { computeNavBadges } from "../lib/badges";
+import { computeNavBadges, computeSectorNavBadges } from "../lib/badges";
+import { DOMAIN_META } from "../lib/calc";
+import type { SectorDomain } from "../lib/links";
 import { CommandPalette } from "./CommandPalette";
 import { SidebarMiniMenu } from "./SidebarMiniMenu";
+
+/** Routes dont les données sont filtrées par secteur ; le paramètre `secteur` les suit dans la nav. */
+export const SECTOR_SCOPED_PATHS = new Set(["/stock", "/ventes", "/livraison", "/achats", "/bilan", "/performance"]);
+
+export function isSectorDomain(v: string | null): v is SectorDomain {
+  return v === "fashion" || v === "tcg";
+}
 
 export interface NavRoute {
   path: string;
@@ -89,11 +98,18 @@ export function HeaderActions({ children }: { children: ReactNode }) {
 export default function Layout() {
   const { state } = useStore();
   const { pathname } = useLocation();
+  const [searchParams] = useSearchParams();
   const [cmdOpen, setCmdOpen] = useState(false);
   const [mobOpen, setMobOpen] = useState(false);
 
-  const current = ROUTES.find((r) => (r.end ? pathname === r.path : pathname.startsWith(r.path))) ?? ROUTES[0];
-  
+  const secteurParam = searchParams.get("secteur");
+  const activeSecteur = isSectorDomain(secteurParam) ? secteurParam : null;
+
+  const current =
+    pathname === "/secteur" && activeSecteur
+      ? { label: DOMAIN_META[activeSecteur].label, subtitle: `Pilotage, activité & comptes — ${DOMAIN_META[activeSecteur].label}` }
+      : ROUTES.find((r) => (r.end ? pathname === r.path : pathname.startsWith(r.path))) ?? ROUTES[0];
+
   const routeIsEnabled = (route: NavRoute) => {
     const module = MODULE_BY_PATH[route.path as keyof typeof MODULE_BY_PATH];
     return !module || state.settings.enabledModules[module];
@@ -114,7 +130,10 @@ export default function Layout() {
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, []);
 
-  const badges = computeNavBadges(state);
+  const badges = activeSecteur ? computeSectorNavBadges(state, activeSecteur) : computeNavBadges(state);
+
+  const navTarget = (r: NavRoute) =>
+    activeSecteur && r.path !== "/" && SECTOR_SCOPED_PATHS.has(r.path) ? `${r.path}?secteur=${activeSecteur}` : r.path;
 
   return (
     <div className="app">
@@ -141,6 +160,13 @@ export default function Layout() {
           <kbd>⌘K</kbd>
         </button>
 
+        {activeSecteur && (
+          <Link to="/" className="sector-pill" onClick={() => setMobOpen(false)}>
+            <span>{DOMAIN_META[activeSecteur].icon} {DOMAIN_META[activeSecteur].label}</span>
+            <X size={13} />
+          </Link>
+        )}
+
         <nav className="nav">
           {visibleGroups.map((group) => (
             <div className="nav-group" key={group.label}>
@@ -150,7 +176,7 @@ export default function Layout() {
                 return (
                   <NavLink
                     key={r.path}
-                    to={r.path}
+                    to={navTarget(r)}
                     end={r.end}
                     onClick={() => setMobOpen(false)}
                     className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}

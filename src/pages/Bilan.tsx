@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
 import CashFlowCard from "../components/CashFlowCard";
 import RentabilitePanel from "../components/RentabilitePanel";
@@ -60,6 +60,14 @@ export default function Bilan() {
   const { state } = useStore();
   const [period, setPeriod] = usePref<Period>("period", "month");
   const [domain, setDomain] = usePref<"all" | "fashion" | "tcg">("bilanDomain", "all");
+  const [searchParams] = useSearchParams();
+
+  // Arrivée depuis le hub d'un secteur (?secteur=tcg|fashion) : on pré-sélectionne ce domaine.
+  useEffect(() => {
+    const secteur = searchParams.get("secteur");
+    if (secteur === "tcg" || secteur === "fashion") setDomain(secteur);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const domainItems = useMemo(() => filterItemsByDomain(state.items, domain), [state.items, domain]);
   const range = useMemo(() => periodRange(period), [period]);

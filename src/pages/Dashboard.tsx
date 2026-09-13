@@ -16,13 +16,12 @@ import {
   Clock,
   Sparkles,
 } from "lucide-react";
-import { HeaderActions, MODULE_BY_PATH, NAV_GROUPS } from "../components/Layout";
+import { HeaderActions } from "../components/Layout";
 import StockValueCard from "../components/StockValueCard";
 import { Kpi, Segmented } from "../components/ui";
 import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
-import { computeNavBadges } from "../lib/badges";
-import { caOfYear, computeStats, periodRange } from "../lib/calc";
+import { caOfYear, computeStats, DOMAIN_META, periodRange } from "../lib/calc";
 import { eur, num, pct } from "../lib/format";
 import { links } from "../lib/links";
 import { vatRegime } from "../lib/vat";
@@ -59,15 +58,9 @@ export default function Dashboard() {
   );
   const repeatRate = clients.length ? (repeatBuyers / buyerCounts.size) * 100 : 0;
 
-  const navBadges = useMemo(() => computeNavBadges(state), [state]);
-  const visibleGroups = NAV_GROUPS.map((group) => ({
-    ...group,
-    routes: group.routes.filter((r) => {
-      if (r.path === "/") return false;
-      const module = MODULE_BY_PATH[r.path as keyof typeof MODULE_BY_PATH];
-      return !module || state.settings.enabledModules[module];
-    }),
-  })).filter((group) => group.routes.length > 0);
+  const allTime = useMemo(() => periodRange("all"), []);
+  const fashionStats = useMemo(() => computeStats(state, allTime, "fashion"), [state, allTime]);
+  const tcgStats = useMemo(() => computeStats(state, allTime, "tcg"), [state, allTime]);
 
   return (
     <>
@@ -102,37 +95,39 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* HUB — accès à toutes les sections depuis la frontpage */}
-      <div className="hub" style={{ marginBottom: 18 }}>
-        {visibleGroups.map((group) => (
-          <div className="hub-group" key={group.label}>
-            <div className="hub-group-label">{group.label}</div>
-            <div className="hub-grid">
-              {group.routes.map((r) => {
-                const IconComponent = r.icon;
-                const count = navBadges[r.path];
-                return (
-                  <button
-                    key={r.path}
-                    type="button"
-                    className="kpi hub-tile"
-                    onClick={() => navigate(r.path)}
-                  >
-                    <span className="hub-tile-ic">
-                      <IconComponent size={20} />
-                    </span>
-                    <div className="hub-tile-lbl">{r.label}</div>
-                    <div className="hub-tile-sub">{r.subtitle}</div>
-                    {!!count && <span className="hub-tile-badge">{count}</span>}
-                    <span className="go">
-                      <ArrowRight size={14} />
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+      {/* Deux secteurs : chacun ouvre son propre hub Pilotage / Activité / Comptes */}
+      <div className="sector-grid" style={{ marginBottom: 18 }}>
+        {([
+          { domain: "fashion" as const, stats: fashionStats },
+          { domain: "tcg" as const, stats: tcgStats },
+        ]).map(({ domain, stats: s }) => {
+          const meta = DOMAIN_META[domain];
+          return (
+            <button
+              key={domain}
+              type="button"
+              className="kpi sector-card"
+              onClick={() => navigate(links.secteur(domain))}
+            >
+              <span className="sector-card-ic">{meta.icon}</span>
+              <div className="sector-card-lbl">{meta.label}</div>
+              <div className="sector-card-sub">{meta.subtitle}</div>
+              <div className="sector-card-stats">
+                <div>
+                  <span className="lbl">Stock</span>
+                  <span className="val">{eur(s.stockEstimate)}</span>
+                </div>
+                <div>
+                  <span className="lbl">Marge ({allTime.label})</span>
+                  <span className="val">{eur(s.margeNette)}</span>
+                </div>
+              </div>
+              <span className="go">
+                <ArrowRight size={14} />
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       <StockValueCard state={state} />

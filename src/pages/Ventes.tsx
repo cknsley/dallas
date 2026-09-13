@@ -8,7 +8,7 @@ import { usePref } from "../lib/usePref";
 import { useClearQuery, useQueryState } from "../lib/useQueryState";
 import { links } from "../lib/links";
 import { LABEL } from "../lib/lexicon";
-import { canFileLitige, costOf, marginOf, periodRange, qtyOf, revenueOf, saleCostsOf, soldItems } from "../lib/calc";
+import { canFileLitige, costOf, filterItemsByDomain, marginOf, periodRange, qtyOf, revenueOf, saleCostsOf, soldItems, type Domain } from "../lib/calc";
 import { dshort, eur, eur2, pct, today } from "../lib/format";
 import { DELIVERY_LABEL, DELIVERY_ORDER } from "../lib/constants";
 import { downloadText, itemsToCSV } from "../lib/csv";
@@ -30,6 +30,8 @@ export default function Ventes() {
   const toast = useToast();
   const navigate = useNavigate();
   const [period, setPeriod] = usePref<Period>("period", "month");
+  const [secteurRaw] = useQueryState("secteur");
+  const domain: Domain = secteurRaw === "tcg" || secteurRaw === "fashion" ? secteurRaw : "all";
   const [deliveryParam, setDelivery] = useQueryState("delivery", "all");
   const [platform, setPlatform] = useQueryState("platform");
   const [brand, setBrand] = useQueryState("brand");
@@ -46,19 +48,20 @@ export default function Ventes() {
   const [addingExpense, setAddingExpense] = useState(false);
 
   const range = useMemo(() => periodRange(period), [period]);
+  const items = useMemo(() => filterItemsByDomain(state.items, domain), [state.items, domain]);
   const list = useMemo(
     () =>
-      soldItems(state.items, range)
+      soldItems(items, range)
         .filter((i) => deliveryParam === "all" || i.delivery === deliveryParam)
         .filter((i) => !platform || i.platform === platform)
         .filter((i) => !brand || i.brand === brand)
         .filter((i) => !type || i.type === type)
         .filter((i) => !size || i.size === size)
         .sort((a, b) => b.saleDate.localeCompare(a.saleDate)),
-    [state.items, range, deliveryParam, platform, brand, type, size],
+    [items, range, deliveryParam, platform, brand, type, size],
   );
 
-  const allSold = useMemo(() => soldItems(state.items, range), [state.items, range]);
+  const allSold = useMemo(() => soldItems(items, range), [items, range]);
   const uniq = (k: "platform" | "brand" | "type" | "size") =>
     [...new Set(allSold.map((i) => i[k]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
   const hasFilters = deliveryParam !== "all" || !!platform || !!brand || !!type || !!size;

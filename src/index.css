@@ -194,6 +194,15 @@ a { color: var(--accent); }
 .brand b { font-family: var(--ff-display); font-size: 21px; font-weight: 700; letter-spacing: -0.035em; }
 .brand span { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); }
 .nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.sector-pill {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin: 4px 0 12px; padding: 8px 12px; border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--ink); text-decoration: none; font-weight: 600; font-size: 13px;
+  transition: background 0.14s;
+}
+.sector-pill:hover { background: color-mix(in srgb, var(--accent) 26%, transparent); }
+.sector-pill svg { opacity: 0.7; }
 .nav-group { display: flex; flex-direction: column; gap: 2px; }
 .nav-group + .nav-group { margin-top: 14px; }
 .nav-group-label {
@@ -416,7 +425,23 @@ a.kpi:hover, button.kpi:hover { transform: translateY(-2px); box-shadow: var(--s
 }
 a.kpi:hover .go, button.kpi:hover .go { opacity: 1; transform: none; }
 
+/* Frontpage : les deux secteurs de vente, porte d'entrée vers leur hub respectif */
+.sector-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.sector-card { padding: 20px 22px; }
+.sector-card-ic { font-size: 30px; }
+.sector-card-lbl { font-weight: 700; font-size: 18px; margin-top: 10px; }
+.sector-card-sub { font-size: 12.5px; color: var(--ink-3); margin-top: 3px; }
+.sector-card-stats { display: flex; gap: 22px; margin-top: 14px; }
+.sector-card-stats .lbl { display: block; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); font-weight: 700; }
+.sector-card-stats .val { display: block; font-family: var(--ff-mono); font-size: 16px; font-weight: 600; margin-top: 3px; }
+
 /* Hub d'accueil : accès à toutes les sections depuis la frontpage */
+.hub-header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.hub-header-ic {
+  font-size: 30px; width: 54px; height: 54px; display: flex; align-items: center; justify-content: center;
+  border-radius: 14px; background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.hub-header h2 { font-size: 20px; margin: 0; }
 .hub-group + .hub-group { margin-top: 16px; }
 .hub-group-label {
   font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;

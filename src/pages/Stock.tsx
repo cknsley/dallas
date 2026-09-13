@@ -7,7 +7,7 @@ import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
 import { useClearQuery, useQueryState } from "../lib/useQueryState";
 import { links } from "../lib/links";
-import { costOf, qtyOf } from "../lib/calc";
+import { costOf, filterItemsByDomain, qtyOf, type Domain } from "../lib/calc";
 import { dshort, eur, eur2 } from "../lib/format";
 import { STATUS_LABEL } from "../lib/constants";
 import { downloadText, itemsToCSV, stockFilename } from "../lib/csv";
@@ -127,6 +127,8 @@ export default function Stock() {
   const [catRaw, setCatRaw] = useQueryState("cat", "total");
   const categoryTab = (catRaw as StockCategoryTab) || "total";
   const setCategoryTab = (val: StockCategoryTab) => setCatRaw(val);
+  const [secteurRaw] = useQueryState("secteur");
+  const domain: Domain = secteurRaw === "tcg" || secteurRaw === "fashion" ? secteurRaw : "all";
   const [q, setQ] = useQueryState("q");
   const [brand, setBrand] = useQueryState("brand");
   const [type, setType] = useQueryState("type");
@@ -140,7 +142,10 @@ export default function Stock() {
   const [confirming, setConfirming] = useState<Item | null>(null);
   const [revealingItem, setRevealingItem] = useState<Item | null>(null);
 
-  const held = useMemo(() => state.items.filter((i) => i.status === "stock"), [state.items]);
+  const held = useMemo(
+    () => filterItemsByDomain(state.items.filter((i) => i.status === "stock"), domain),
+    [state.items, domain],
+  );
 
   const tabCounts = useMemo(() => {
     const counts = {

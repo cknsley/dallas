@@ -17,12 +17,14 @@ import Todo from "./pages/Todo";
 import Sourcing from "./pages/Sourcing";
 import Facturation from "./pages/Facturation";
 import Reglages from "./pages/Reglages";
+import SecteurHub from "./pages/SecteurHub";
 
 export default function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<Dashboard />} />
+        <Route path="secteur" element={<SecteurHub />} />
         <Route path="performance" element={<PerformancePage />} />
         <Route path="stock" element={<Stock />} />
         <Route path="tcg" element={<TcgPage />} />

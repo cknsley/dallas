@@ -89,6 +89,14 @@ export interface Stats {
   engaged: number;
 }
 
+export type Domain = "all" | "fashion" | "tcg";
+
+/** Les deux secteurs de vente de l'activité, tels qu'affichés sur la frontpage. */
+export const DOMAIN_META: Record<"fashion" | "tcg", { label: string; icon: string; subtitle: string }> = {
+  fashion: { label: "Vêtements & Fashion", icon: "👕", subtitle: "Vêtements, chaussures, sacs & accessoires" },
+  tcg: { label: "TCG & Cartes", icon: "🃏", subtitle: "Cartes gradées, scellé & booster boxes" },
+};
+
 export function isTcgItem(i: Item): boolean {
   if (i.isTcg) return true;
   const t = (i.type || "").toLowerCase().trim();
@@ -102,13 +110,13 @@ export function isTcgItem(i: Item): boolean {
   );
 }
 
-export function filterItemsByDomain(items: Item[], domain: "all" | "fashion" | "tcg"): Item[] {
+export function filterItemsByDomain(items: Item[], domain: Domain): Item[] {
   if (domain === "all") return items;
   if (domain === "tcg") return items.filter((i) => isTcgItem(i));
   return items.filter((i) => !isTcgItem(i));
 }
 
-export function computeStats(state: AppState, r: Range, domain: "all" | "fashion" | "tcg" = "all"): Stats {
+export function computeStats(state: AppState, r: Range, domain: Domain = "all"): Stats {
   const domainItems = filterItemsByDomain(state.items, domain);
   const sold = soldItems(domainItems, r);
   const ca = sold.reduce((a, i) => a + num(i.price) * qtyOf(i), 0);
