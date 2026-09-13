@@ -22,7 +22,7 @@ export const links = {
   todo: () => "/todo",
   sourcing: () => "/sourcing",
   performance: () => "/performance",
-  tcg: (f: { category?: "raw" | "graded" | "sealed" | "grading" | "all"; game?: string } = {}) => withQuery("/tcg", f),
+  tcg: (f: { category?: "raw" | "graded" | "sealed" | "grading" | "blister" | "case" | "all"; game?: string } = {}) => withQuery("/tcg", f),
   reglages: () => "/reglages",
 };
 

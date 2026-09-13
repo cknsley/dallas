@@ -89,7 +89,7 @@ export default function OrderModal({
   /* Support TCG & Cartes */
   const [isTcgOrder, setIsTcgOrder] = useState(false);
   const [tcgGameOrder, setTcgGameOrder] = useState("Pokémon");
-  const [tcgCategoryOrder, setTcgCategoryOrder] = useState<"raw" | "graded" | "sealed" | "grading">("raw");
+  const [tcgCategoryOrder, setTcgCategoryOrder] = useState<"raw" | "graded" | "sealed" | "grading" | "blister" | "case">("raw");
   const [tcgSetOrder, setTcgSetOrder] = useState("");
   const [tcgGradeOrder, setTcgGradeOrder] = useState("PSA 10 Gem Mint");
   const [gradingCompanyOrder, setGradingCompanyOrder] = useState("PSA");
@@ -530,7 +530,9 @@ export default function OrderModal({
                 <option value="raw">🃏 Cartes Raw / Brut</option>
                 <option value="grading">⏳ En gradation chez PSA/BGS (Note à découvrir ✨)</option>
                 <option value="graded">🏆 Cartes Gradées (Note connue)</option>
-                <option value="sealed">📦 Coffrets / Display scellés</option>
+                <option value="blister">🟡 Blister / Artsets (Boosters sous blister)</option>
+                <option value="sealed">📦 Displays / ETB / Coffrets scellés</option>
+                <option value="case">🧱 Cases / Cartons Scellés (Cases Displays/Blisters)</option>
               </select>
             </Field>
 

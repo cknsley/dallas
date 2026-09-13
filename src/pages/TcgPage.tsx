@@ -47,7 +47,7 @@ export default function TcgPage() {
   const toast = useToast();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<"inventory" | "grading" | "sealed" | "sales">("inventory");
+  const [activeTab, setActiveTab] = useState<"inventory" | "grading" | "blister" | "sealed" | "case" | "sales">("inventory");
   const [selectedGame, setSelectedGame] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -57,7 +57,7 @@ export default function TcgPage() {
 
   // New TCG item form state
   const [game, setGame] = useState("Pokémon");
-  const [category, setCategory] = useState<"graded" | "raw" | "sealed" | "grading">("graded");
+  const [category, setCategory] = useState<"graded" | "raw" | "sealed" | "grading" | "blister" | "case">("graded");
   const [cardName, setCardName] = useState("");
   const [setName, setSetName] = useState("");
   const [cardNumber, setCardNumber] = useState("");
@@ -113,6 +113,8 @@ export default function TcgPage() {
   const stockItems = useMemo(() => filteredItems.filter((i) => i.status === "stock" || i.status === "arrivage"), [filteredItems]);
   const gradingItems = useMemo(() => stockItems.filter((i) => i.tcgCategory === "grading" || (i.tcgGrade && i.tcgGrade.toLowerCase().includes("gradation"))), [stockItems]);
   const gradedStock = useMemo(() => stockItems.filter((i) => i.tcgCategory === "graded" || (i.tcgGrade && i.tcgGrade.includes("PSA"))), [stockItems]);
+  const blisterStock = useMemo(() => stockItems.filter((i) => i.tcgCategory === "blister" || (i.name && i.name.toLowerCase().includes("blister")) || (i.type && i.type.toLowerCase().includes("blister"))), [stockItems]);
+  const caseStock = useMemo(() => stockItems.filter((i) => i.tcgCategory === "case" || (i.name && i.name.toLowerCase().includes("case")) || (i.type && i.type.toLowerCase().includes("case"))), [stockItems]);
   const sealedStock = useMemo(() => stockItems.filter((i) => i.tcgCategory === "sealed" || (i.type && i.type.match(/(display|etb|booster|coffret)/i))), [stockItems]);
   const soldItems = useMemo(() => filteredItems.filter((i) => i.status === "vendu"), [filteredItems]);
 
@@ -273,14 +275,16 @@ export default function TcgPage() {
             alignItems: "center",
           }}
         >
-          <Segmented<"inventory" | "grading" | "sealed" | "sales">
+          <Segmented<"inventory" | "grading" | "blister" | "sealed" | "case" | "sales">
             value={activeTab}
             onChange={setActiveTab}
             options={[
-              { value: "inventory", label: `🃏 Toutes les Cartes (${stockItems.length})` },
-              { value: "grading", label: `⏳ En Gradation (${gradingItems.length})` },
-              { value: "sealed", label: `📦 Displays & Scellé (${sealedStock.length})` },
-              { value: "sales", label: `🏷️ Historique Ventes (${soldItems.length})` },
+              { value: "inventory", label: `🃏 Cartes (${stockItems.length})` },
+              { value: "grading", label: `⏳ Gradation (${gradingItems.length})` },
+              { value: "blister", label: `🟡 Blisters (${blisterStock.length})` },
+              { value: "sealed", label: `📦 Displays (${sealedStock.length})` },
+              { value: "case", label: `🧱 Cases (${caseStock.length})` },
+              { value: "sales", label: `🏷️ Ventes (${soldItems.length})` },
             ]}
           />
 
@@ -472,6 +476,55 @@ export default function TcgPage() {
           </div>
         )}
 
+        {/* TAB BLISTERS & ARTSETS */}
+        {activeTab === "blister" && (
+          <div className="card-b">
+            {blisterStock.length === 0 ? (
+              <Empty glyph="🟡" title="Aucun blister ou artset en stock">
+                Vous n'avez actuellement aucun booster sous blister rigide ou artset enregistré.
+              </Empty>
+            ) : (
+              <div className="twrap">
+                <table className="table-compact">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 44 }}>Photo</th>
+                      <th>Blister / Artset</th>
+                      <th>Licence</th>
+                      <th>Set / Extension</th>
+                      <th className="r">Qté</th>
+                      <th className="r">Coût d'Achat</th>
+                      <th className="r">Prix Vente / Estimé</th>
+                      <th className="r">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {blisterStock.map((item) => (
+                      <tr key={item.id}>
+                        <td className="shrink"><Photo id={item.photoId} /></td>
+                        <td>
+                          <div style={{ fontWeight: 700 }}>{item.name}</div>
+                          {item.notes && <div className="hint" style={{ fontSize: 11 }}>{item.notes}</div>}
+                        </td>
+                        <td><span className="pill info" style={{ fontSize: 11 }}>{item.tcgGame || item.brand || "TCG"}</span></td>
+                        <td>{item.tcgSet || "—"}</td>
+                        <td className="r num">{qtyOf(item)}</td>
+                        <td className="r num">{eur2(costOf(item))}</td>
+                        <td className="r num" style={{ fontWeight: 700, color: "var(--accent)" }}>{eur(item.price || item.estimatedPrice || costOf(item))}</td>
+                        <td className="r">
+                          <button type="button" className="btn sm ok" onClick={() => setSellingItem(item)}>
+                            Vendre
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* TAB 2: DISPLAYS ET SCELLÉ */}
         {activeTab === "sealed" && (
           <div className="card-b">
@@ -509,6 +562,55 @@ export default function TcgPage() {
                         <td className="r num" style={{ fontWeight: 700, color: "var(--accent)" }}>
                           {eur(item.price || item.estimatedPrice || costOf(item))}
                         </td>
+                        <td className="r">
+                          <button type="button" className="btn sm ok" onClick={() => setSellingItem(item)}>
+                            Vendre
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB CASES & CARTONS SCELLÉS */}
+        {activeTab === "case" && (
+          <div className="card-b">
+            {caseStock.length === 0 ? (
+              <Empty glyph="🧱" title="Aucune case ou carton scellé en stock">
+                Vous n'avez actuellement aucune case scellée de displays ou blisters enregistrée.
+              </Empty>
+            ) : (
+              <div className="twrap">
+                <table className="table-compact">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 44 }}>Photo</th>
+                      <th>Case / Carton Scellé</th>
+                      <th>Licence</th>
+                      <th>Set / Extension</th>
+                      <th className="r">Qté Cases</th>
+                      <th className="r">Coût d'Achat</th>
+                      <th className="r">Prix Vente / Estimé</th>
+                      <th className="r">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {caseStock.map((item) => (
+                      <tr key={item.id}>
+                        <td className="shrink"><Photo id={item.photoId} /></td>
+                        <td>
+                          <div style={{ fontWeight: 700 }}>{item.name}</div>
+                          {item.notes && <div className="hint" style={{ fontSize: 11 }}>{item.notes}</div>}
+                        </td>
+                        <td><span className="pill info" style={{ fontSize: 11 }}>{item.tcgGame || item.brand || "TCG"}</span></td>
+                        <td>{item.tcgSet || "—"}</td>
+                        <td className="r num">{qtyOf(item)}</td>
+                        <td className="r num">{eur2(costOf(item))}</td>
+                        <td className="r num" style={{ fontWeight: 700, color: "var(--accent)" }}>{eur(item.price || item.estimatedPrice || costOf(item))}</td>
                         <td className="r">
                           <button type="button" className="btn sm ok" onClick={() => setSellingItem(item)}>
                             Vendre
@@ -609,7 +711,9 @@ export default function TcgPage() {
                   <option value="graded">🏆 Carte Gradée (PSA, BGS, PCA)</option>
                   <option value="grading">⏳ En gradation chez PSA/BGS (Note à découvrir ✨)</option>
                   <option value="raw">🃏 Carte Raw / À l'unité</option>
+                  <option value="blister">🟡 Blister / Artset (Booster sous blister)</option>
                   <option value="sealed">📦 Display / ETB / Scellé</option>
+                  <option value="case">🧱 Case / Carton Scellé (Case Displays/Blisters)</option>
                 </select>
               </label>
 

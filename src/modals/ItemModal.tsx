@@ -520,7 +520,9 @@ export default function ItemModal({
                 <option value="raw">🃏 Carte Raw / Brut</option>
                 <option value="grading">⏳ En gradation chez PSA/BGS (Note à découvrir ✨)</option>
                 <option value="graded">🏆 Carte Gradée (Note connue)</option>
-                <option value="sealed">📦 Coffret / Booster / Display scellé</option>
+                <option value="blister">🟡 Blister / Artset (Booster protégé)</option>
+                <option value="sealed">📦 Coffret / Booster Box / ETB scellé</option>
+                <option value="case">🧱 Case / Carton Scellé (Case Displays/Blisters)</option>
               </select>
             </Field>
 
