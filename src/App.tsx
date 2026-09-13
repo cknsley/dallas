@@ -19,13 +19,15 @@ import Facturation from "./pages/Facturation";
 import Reglages from "./pages/Reglages";
 import SecteurHub from "./pages/SecteurHub";
 import Home from "./pages/Home";
+import Comptabilite from "./pages/Comptabilite";
 
 export default function App() {
   return (
     <Routes>
-      {/* L'accueil et les hubs secteur sont des interfaces à part : pas de sidebar. */}
+      {/* L'accueil et les hubs (secteur, comptabilité) sont des interfaces à part : pas de sidebar. */}
       <Route index element={<Home />} />
       <Route path="secteur" element={<SecteurHub />} />
+      <Route path="comptabilite" element={<Comptabilite />} />
 
       <Route element={<Layout />}>
         <Route path="dashboard" element={<Dashboard />} />

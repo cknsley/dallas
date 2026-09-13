@@ -1,21 +1,21 @@
-import { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { Plus, ShoppingCart, Scale, ArrowRight } from "lucide-react";
+import { useMemo, useState } from "react";
+import { BarChart3, ArrowRight } from "lucide-react";
 import { HeaderActions } from "../components/Layout";
 import { Segmented } from "../components/ui";
+import DetailStatsModal from "../components/DetailStatsModal";
 import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
 import { computeStats, periodRange } from "../lib/calc";
 import { eur } from "../lib/format";
-import { links } from "../lib/links";
 import type { Period } from "../types";
 
 /**
- * Vue générale simplifée : 4 KPIs principales + bouton pour le détail complet.
+ * Vue générale simplifée : 4 KPIs principales + bouton qui ouvre le détail
+ * en popup sur place (pas de navigation vers une autre page/route).
  */
 export default function Dashboard() {
   const { state } = useStore();
-  const navigate = useNavigate();
+  const [detailOpen, setDetailOpen] = useState(false);
   const [period, setPeriod] = usePref<Period>("period", "month");
 
   const range = useMemo(() => periodRange(period), [period]);
@@ -34,8 +34,8 @@ export default function Dashboard() {
   return (
     <>
       <HeaderActions>
-        <button className="btn primary" onClick={() => navigate(links.performance())}>
-          <Plus size={15} /> Voir le détail complet
+        <button className="btn primary" onClick={() => setDetailOpen(true)}>
+          <BarChart3 size={15} /> Voir le détail complet
         </button>
         <Segmented<Period>
           value={period}
@@ -82,12 +82,14 @@ export default function Dashboard() {
       <div style={{ textAlign: "center", marginTop: 32 }}>
         <button
           className="btn primary"
-          onClick={() => navigate(links.performance())}
+          onClick={() => setDetailOpen(true)}
           style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 24px" }}
         >
           Accéder au détail complet <ArrowRight size={16} />
         </button>
       </div>
+
+      {detailOpen && <DetailStatsModal period={period} onClose={() => setDetailOpen(false)} />}
     </>
   );
 }

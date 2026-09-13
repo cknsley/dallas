@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, BarChart3, CheckSquare, LayoutDashboard, Package, Truck } from "lucide-react";
+import { ArrowRight, BarChart3, CheckSquare, LayoutDashboard, Package, Scale, Truck } from "lucide-react";
 import { useStore } from "../store/StoreContext";
 import { computeNavBadges } from "../lib/badges";
 import { DOMAIN_META, computeStats, periodRange } from "../lib/calc";
@@ -32,6 +32,7 @@ export default function Home() {
     { to: "/dashboard", icon: LayoutDashboard, label: "Vue générale", meta: `${eur(global.stockEstimate)} de stock` },
     { to: links.performance(), icon: BarChart3, label: "Performances", meta: `${eur(global.margeNette)} de marge` },
     { to: links.todo(), icon: CheckSquare, label: "Todo collectif", meta: `${badges["/todo"] || 0} tâche(s) en cours` },
+    { to: "/comptabilite", icon: Scale, label: "Comptabilité", meta: `${eur(global.stockEstimate)} de patrimoine` },
     { to: links.livraison(), icon: Truck, label: "Livraisons", meta: `${badges["/livraison"] || 0} colis à expédier` },
   ];
 

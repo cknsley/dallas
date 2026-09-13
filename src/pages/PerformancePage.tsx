@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { ArrowRight, BarChart3 } from "lucide-react";
 import { HeaderActions } from "../components/Layout";
 import { Segmented } from "../components/ui";
+import DetailStatsModal from "../components/DetailStatsModal";
 import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
 import { computeStats, periodRange } from "../lib/calc";
@@ -11,10 +11,11 @@ import type { Period } from "../types";
 
 /**
  * Vue Performances : 4 KPIs principales comme Dashboard, mais on peut changer les préférences de période.
+ * Le détail s'ouvre en popup sur place — jamais de navigation vers une autre page.
  */
 export default function PerformancePage() {
   const { state } = useStore();
-  const navigate = useNavigate();
+  const [detailOpen, setDetailOpen] = useState(false);
   const [period, setPeriod] = usePref<Period>("perf_period", "month");
 
   const range = useMemo(() => periodRange(period), [period]);
@@ -78,12 +79,14 @@ export default function PerformancePage() {
       <div style={{ textAlign: "center", marginTop: 32 }}>
         <button
           className="btn primary"
-          onClick={() => navigate("/performance/details")}
+          onClick={() => setDetailOpen(true)}
           style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 24px" }}
         >
           <BarChart3 size={16} /> Voir les détails complets <ArrowRight size={16} />
         </button>
       </div>
+
+      {detailOpen && <DetailStatsModal period={period} onClose={() => setDetailOpen(false)} />}
     </>
   );
 }
