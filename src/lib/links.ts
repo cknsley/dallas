@@ -1,7 +1,8 @@
 import type { Delivery, ItemStatus } from "../types";
 
-/** Les deux secteurs métier (hors "all", qui n'a de sens que dans les pages avec sélecteur interne). */
-export type SectorDomain = "fashion" | "tcg";
+/** Un secteur métier : "fashion"/"tcg", ou l'id d'un univers personnalisé ajouté par
+ *  l'utilisateur (hors "all", qui n'a de sens que dans les pages avec sélecteur interne). */
+export type SectorDomain = string;
 
 /** Toutes les destinations inter-sections passent par ici : un seul endroit à relire. */
 export const links = {

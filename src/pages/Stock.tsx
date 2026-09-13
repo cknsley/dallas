@@ -127,12 +127,15 @@ export default function Stock() {
   const [view, setView] = usePref<"table" | "grid">("stockView", "table");
   const [catRaw, setCatRaw] = useQueryState("cat", "total");
   const secteur = useSecteur();
-  // Dans l'espace TCG tout est déjà une carte : les catégories vêtement n'ont plus lieu
-  // d'être, et l'onglet TCG disparaît symétriquement de l'espace Vêtements.
-  const visibleTabs =
-    secteur.domain === "tcg" ? [] : STOCK_TABS.filter((t) => secteur.domain === "all" || t.key !== "tcg");
+  // Dans l'espace TCG comme dans un univers personnalisé, tout appartient déjà à ce
+  // secteur : les catégories vêtement n'ont plus lieu d'être. L'onglet TCG, lui, ne
+  // sort que dans la vue générale et dans l'espace Vêtements.
+  const isBuiltinFashionOrAll = secteur.domain === "all" || secteur.domain === "fashion";
+  const visibleTabs = isBuiltinFashionOrAll
+    ? STOCK_TABS.filter((t) => secteur.domain === "all" || t.key !== "tcg")
+    : [];
   const categoryTab: StockCategoryTab =
-    secteur.domain === "tcg" ? "total" : ((catRaw as StockCategoryTab) || "total");
+    isBuiltinFashionOrAll ? ((catRaw as StockCategoryTab) || "total") : "total";
   const setCategoryTab = (val: StockCategoryTab) => setCatRaw(val);
   const [q, setQ] = useQueryState("q");
   const [brand, setBrand] = useQueryState("brand");

@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { useStore } from "../store/StoreContext";
 import { computeNavBadges, computeSectorNavBadges } from "../lib/badges";
-import { DOMAIN_META } from "../lib/calc";
+import { sectorMeta } from "../lib/calc";
 import type { SectorDomain } from "../lib/links";
 import { CommandPalette } from "./CommandPalette";
 import { SidebarMiniMenu } from "./SidebarMiniMenu";
@@ -36,8 +36,9 @@ import { SidebarMiniMenu } from "./SidebarMiniMenu";
  */
 export const SECTOR_TRANSVERSE_PATHS = new Set(["/charges", "/sourcing", "/reglages"]);
 
-export function isSectorDomain(v: string | null): v is SectorDomain {
-  return v === "fashion" || v === "tcg";
+/** customIds vient de state.settings.customSectors : la liste des univers ajoutés à la volée. */
+export function isSectorDomain(v: string | null, customIds: string[] = []): v is SectorDomain {
+  return v === "fashion" || v === "tcg" || (!!v && customIds.includes(v));
 }
 
 export interface NavRoute {
@@ -106,17 +107,18 @@ export default function Layout() {
   const [cmdOpen, setCmdOpen] = useState(false);
   const [mobOpen, setMobOpen] = useState(false);
 
+  const customSectorIds = (state.settings.customSectors ?? []).map((s) => s.id);
   const secteurParam = searchParams.get("secteur");
-  const activeSecteur = isSectorDomain(secteurParam) ? secteurParam : null;
+  const activeSecteur = isSectorDomain(secteurParam, customSectorIds) ? secteurParam : null;
 
   const current =
     pathname === "/secteur" && activeSecteur
-      ? { label: DOMAIN_META[activeSecteur].label, subtitle: `Pilotage, activité & comptes — ${DOMAIN_META[activeSecteur].label}` }
+      ? { label: sectorMeta(activeSecteur, state.settings.customSectors).label, subtitle: `Pilotage, activité & comptes — ${sectorMeta(activeSecteur, state.settings.customSectors).label}` }
       : ROUTES.find((r) => (r.end ? pathname === r.path : pathname.startsWith(r.path))) ?? ROUTES[0];
 
   const routeIsEnabled = (route: NavRoute) => {
-    // La section cartes n'a rien à faire dans l'espace Vêtements.
-    if (route.path === "/tcg" && activeSecteur === "fashion") return false;
+    // La section cartes n'a de sens que dans l'univers TCG (jamais sur Fashion ou un univers personnalisé).
+    if (route.path === "/tcg" && activeSecteur !== "tcg" && activeSecteur !== null) return false;
     const module = MODULE_BY_PATH[route.path as keyof typeof MODULE_BY_PATH];
     return !module || state.settings.enabledModules[module];
   };
@@ -174,7 +176,7 @@ export default function Layout() {
 
         {activeSecteur && (
           <Link to="/dashboard" className="sector-pill" onClick={() => setMobOpen(false)}>
-            <span>{DOMAIN_META[activeSecteur].icon} {DOMAIN_META[activeSecteur].label}</span>
+            <span>{sectorMeta(activeSecteur, state.settings.customSectors).icon} {sectorMeta(activeSecteur, state.settings.customSectors).label}</span>
             <X size={13} />
           </Link>
         )}

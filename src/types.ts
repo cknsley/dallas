@@ -68,6 +68,8 @@ export interface Item {
   lotTag: string;
   /** Entre en stock tout seul dès que la date d'arrivée est atteinte. */
   autoReceive: boolean;
+  /** Univers personnalisé (id de CustomSector) — laissé vide pour Vêtements/TCG, déduits automatiquement. */
+  sector?: string;
   /* TCG & Cartes */
   isTcg?: boolean;
   tcgGame?: string;       // Pokémon, Yu-Gi-Oh!, Magic, One Piece, Lorcana, Dragon Ball
@@ -280,6 +282,16 @@ export interface Settings {
   nonSuppliers: string[];
   /** Coffre-fort / Trésorerie sécurisée (argent mis de côté). */
   vaultAmount?: number;
+  /** Univers ajoutés par l'utilisateur en plus de Vêtements & Fashion / TCG & Cartes. */
+  customSectors?: CustomSector[];
+}
+
+/** Un univers personnalisé : nom + icône, réutilise les champs génériques des articles. */
+export interface CustomSector {
+  id: string;
+  label: string;
+  icon: string;
+  subtitle: string;
 }
 
 export interface AppState {

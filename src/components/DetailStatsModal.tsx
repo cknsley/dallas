@@ -1,9 +1,8 @@
 import { Modal } from "./ui";
-import { DOMAIN_META, computeStats, type Stats } from "../lib/calc";
+import { computeStats, periodRange, sectorMeta, type Stats } from "../lib/calc";
 import { eur } from "../lib/format";
 import { useStore } from "../store/StoreContext";
 import type { Period } from "../types";
-import { periodRange } from "../lib/calc";
 import { useMemo } from "react";
 
 function Row({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -41,15 +40,19 @@ export default function DetailStatsModal({ period, onClose }: { period: Period; 
   const { state } = useStore();
   const range = useMemo(() => periodRange(period), [period]);
   const global = useMemo(() => computeStats(state, range), [state, range]);
-  const fashion = useMemo(() => computeStats(state, range, "fashion"), [state, range]);
-  const tcg = useMemo(() => computeStats(state, range, "tcg"), [state, range]);
+  const customSectors = state.settings.customSectors ?? [];
+  const sectorIds = useMemo(() => ["fashion", "tcg", ...customSectors.map((s) => s.id)], [customSectors]);
+  const bySector = useMemo(
+    () => sectorIds.map((id) => ({ id, meta: sectorMeta(id, customSectors), s: computeStats(state, range, id) })),
+    [sectorIds, customSectors, state, range],
+  );
   const marginPct = global.ca ? Math.round((global.margeNette / global.ca) * 100) : 0;
 
   return (
     <Modal title="Détail des chiffres" onClose={onClose} wide>
       <div className="modal-b" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div style={{ padding: 16, borderRadius: "var(--r)", background: "var(--accent-soft)", border: "1px solid var(--line-2)" }}>
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Les deux secteurs réunis</div>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>Tous les secteurs réunis</div>
           <Row label="Chiffre d'affaires" value={eur(global.ca)} />
           <Row label="Marge réalisée" value={eur(global.margeNette)} sub={`${marginPct}%`} />
           <Row label="Valeur estimée du stock" value={eur(global.stockEstimate)} />
@@ -57,8 +60,9 @@ export default function DetailStatsModal({ period, onClose }: { period: Period; 
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-          <SectorBlock label={DOMAIN_META.fashion.label} icon={DOMAIN_META.fashion.icon} s={fashion} />
-          <SectorBlock label={DOMAIN_META.tcg.label} icon={DOMAIN_META.tcg.icon} s={tcg} />
+          {bySector.map(({ id, meta, s }) => (
+            <SectorBlock key={id} label={meta.label} icon={meta.icon} s={s} />
+          ))}
         </div>
       </div>
     </Modal>

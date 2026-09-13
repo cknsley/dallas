@@ -9,7 +9,7 @@ import {
 } from "../components/Layout";
 import { useStore } from "../store/StoreContext";
 import { computeSectorNavBadges } from "../lib/badges";
-import { DOMAIN_META, computeStats, periodRange } from "../lib/calc";
+import { computeStats, periodRange, sectorMeta } from "../lib/calc";
 import { eur } from "../lib/format";
 
 /** Étape intermédiaire entre l'Accueil général et une section : le même hub, mais limité à un secteur. */
@@ -17,15 +17,16 @@ export default function SecteurHub() {
   const { state } = useStore();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const customSectorIds = (state.settings.customSectors ?? []).map((s) => s.id);
 
   const secteurParam = searchParams.get("secteur");
-  const secteur = isSectorDomain(secteurParam) ? secteurParam : "fashion";
-  const meta = DOMAIN_META[secteur];
+  const secteur = isSectorDomain(secteurParam, customSectorIds) ? secteurParam : "fashion";
+  const meta = sectorMeta(secteur, state.settings.customSectors);
 
   const navBadges = useMemo(() => computeSectorNavBadges(state, secteur), [state, secteur]);
   const stats = useMemo(() => computeStats(state, periodRange("all"), secteur), [state, secteur]);
 
-  if (!isSectorDomain(secteurParam)) return <Navigate to="/" replace />;
+  if (!isSectorDomain(secteurParam, customSectorIds)) return <Navigate to="/" replace />;
 
   // Le groupe "Comptes" est retiré du hub secteur : il fait déjà double emploi avec
   // le hub Comptabilité de l'accueil, qui regroupe ces mêmes pages en un seul endroit.
@@ -34,7 +35,7 @@ export default function SecteurHub() {
       ...group,
       routes: group.routes.filter((r) => {
         if (r.path === "/dashboard") return false;
-        if (r.path === "/tcg" && secteur === "fashion") return false;
+        if (r.path === "/tcg" && secteur !== "tcg") return false;
         const module = MODULE_BY_PATH[r.path as keyof typeof MODULE_BY_PATH];
         return !module || state.settings.enabledModules[module];
       }),

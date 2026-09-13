@@ -89,13 +89,26 @@ export interface Stats {
   engaged: number;
 }
 
-export type Domain = "all" | "fashion" | "tcg";
+/** "all", "fashion", "tcg", ou l'id d'un univers personnalisé ajouté depuis l'accueil. */
+export type Domain = string;
 
-/** Les deux secteurs de vente de l'activité, tels qu'affichés sur la frontpage. */
+/** Les deux univers d'origine, tels qu'affichés sur la frontpage. Les univers ajoutés
+ *  par l'utilisateur vivent dans state.settings.customSectors et se combinent à ceux-ci. */
 export const DOMAIN_META: Record<"fashion" | "tcg", { label: string; icon: string; subtitle: string }> = {
   fashion: { label: "Vêtements & Fashion", icon: "👕", subtitle: "Vêtements, chaussures, sacs & accessoires" },
   tcg: { label: "TCG & Cartes", icon: "🃏", subtitle: "Cartes gradées, scellé & booster boxes" },
 };
+
+/** Renvoie label/icône/sous-titre d'un secteur, qu'il soit natif (fashion/tcg) ou
+ *  personnalisé (cherché dans la liste passée). Retombe sur un libellé générique sinon. */
+export function sectorMeta(
+  id: string,
+  customSectors: { id: string; label: string; icon: string; subtitle: string }[] = [],
+): { label: string; icon: string; subtitle: string } {
+  if (id === "fashion" || id === "tcg") return DOMAIN_META[id];
+  const custom = customSectors.find((s) => s.id === id);
+  return custom ?? { label: id, icon: "📦", subtitle: "" };
+}
 
 export function isTcgItem(i: Item): boolean {
   if (i.isTcg) return true;
@@ -113,7 +126,9 @@ export function isTcgItem(i: Item): boolean {
 export function filterItemsByDomain(items: Item[], domain: Domain): Item[] {
   if (domain === "all") return items;
   if (domain === "tcg") return items.filter((i) => isTcgItem(i));
-  return items.filter((i) => !isTcgItem(i));
+  if (domain === "fashion") return items.filter((i) => !isTcgItem(i) && !i.sector);
+  // Univers personnalisé : uniquement les articles explicitement rattachés à cet id.
+  return items.filter((i) => i.sector === domain);
 }
 
 export function computeStats(state: AppState, r: Range, domain: Domain = "all"): Stats {

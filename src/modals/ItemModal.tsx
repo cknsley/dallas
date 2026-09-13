@@ -442,6 +442,18 @@ export default function ItemModal({
         </Field>
       </div>
 
+      {/* Univers personnalisé : uniquement si l'utilisateur en a créé depuis l'accueil */}
+      {!!(state.settings.customSectors ?? []).length && (
+        <Field label="Univers">
+          <select value={draft.sector || ""} onChange={(e) => set("sector", e.target.value)}>
+            <option value="">🧭 Automatique (Vêtements / TCG)</option>
+            {(state.settings.customSectors ?? []).map((s) => (
+              <option key={s.id} value={s.id}>{s.icon} {s.label}</option>
+            ))}
+          </select>
+        </Field>
+      )}
+
       {/* Section TCG / Cartes à collectionner */}
       <div
         style={{

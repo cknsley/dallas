@@ -23,7 +23,8 @@ export function useSecteur(): SecteurScope {
   const { state } = useStore();
   const [searchParams] = useSearchParams();
   const raw = searchParams.get("secteur");
-  const domain: Domain = raw === "tcg" || raw === "fashion" ? raw : "all";
+  const customIds = (state.settings.customSectors ?? []).map((s) => s.id);
+  const domain: Domain = raw === "tcg" || raw === "fashion" || (raw && customIds.includes(raw)) ? raw : "all";
 
   return useMemo(() => {
     const items = filterItemsByDomain(state.items, domain);
