@@ -28,9 +28,12 @@ export function Modal({
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
-    // Focus sur le 1er élément du corps du modal (.modal-b) et jamais sur la croix dans l'en-tête
+    // Focus sur le 1er champ texte du modal (.modal-b), en donnant la priorité aux inputs texte sur les sélecteurs fléchés
     const bodyEl = ref.current?.querySelector<HTMLElement>(".modal-b");
-    const targetEl = bodyEl?.querySelector<HTMLElement>("[autofocus], input, select, textarea, button");
+    const targetEl =
+      bodyEl?.querySelector<HTMLElement>("[autofocus]") ||
+      bodyEl?.querySelector<HTMLElement>("input[type='text'], input[type='search'], input:not([type='hidden']), textarea") ||
+      bodyEl?.querySelector<HTMLElement>("select, button");
     targetEl?.focus();
 
     return () => {
