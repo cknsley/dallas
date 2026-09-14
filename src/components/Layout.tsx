@@ -54,16 +54,15 @@ export const HOME_NAV_GROUPS: { label: string; routes: NavRoute[] }[] = [
     label: "Accueil & Vues Générales",
     routes: [
       { path: "/dashboard", label: "Vue générale", icon: LayoutDashboard, subtitle: "Indicateurs et chiffres consolidés", end: true },
-      { path: "/performance", label: "Performance générale", icon: BarChart3, subtitle: "Bilan global de rentabilité" },
       { path: "/livraison", label: "Livraison générale", icon: Truck, subtitle: "Suivi global des réceptions et expéditions" },
       { path: "/charges", label: "Charges", icon: DollarSign, subtitle: "Matériel, emballages et abonnements" },
+      { path: "/bilan", label: "Bilan", icon: Scale, subtitle: "Ce que vous possédez et ce que l'activité dégage" },
     ],
   },
   {
     label: "Comptabilité",
     routes: [
       { path: "/fournisseurs", label: "Fournisseurs", icon: Building2, subtitle: "Achats, dettes fournisseurs et créances clients" },
-      { path: "/bilan", label: "Bilan", icon: Scale, subtitle: "Ce que vous possédez et ce que l'activité dégage" },
       { path: "/facturation", label: "Facturation", icon: FileText, subtitle: "Factures, reçus et régime de TVA" },
       { path: "/clients", label: "Clients", icon: Users, subtitle: "Acheteurs et historique d'achat" },
     ],
@@ -82,7 +81,6 @@ export const SECTOR_NAV_GROUPS: { label: string; routes: NavRoute[] }[] = [
     label: "Pilotage",
     routes: [
       { path: "/achats", label: "Centrale", icon: Building2, subtitle: "Centrale d'achat, commandes & réceptions" },
-      { path: "/performance", label: "Performance", icon: BarChart3, subtitle: "Indicateurs et KPIs du secteur" },
       { path: "/todo", label: "Todo", icon: CheckSquare, subtitle: "Tâches, rappels & à faire" },
       { path: "/arrivage", label: "Arrivage", icon: Package, subtitle: "Colis en transit & réceptions" },
       { path: "/stock", label: "Stock", icon: Layers, subtitle: "Articles et pièces en stock" },
@@ -236,13 +234,6 @@ export default function Layout() {
           <div className="topbar-shop-name">{state.settings.business?.trim() || "Ma Boutique Resell"}</div>
 
           <div className="spacer" />
-
-          {/* Quick Cmd+K search trigger in topbar */}
-          <button className="btn ghost sm topbar-cmd" onClick={() => setCmdOpen(true)}>
-            <Search size={14} />
-            <span className="topbar-cmd-text">Recherche</span>
-            <kbd>⌘K</kbd>
-          </button>
 
           <div className="topbar-actions" id="topbar-actions" />
         </header>

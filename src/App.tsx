@@ -1,7 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
-import PerformancePage from "./pages/PerformancePage";
 import Stock from "./pages/Stock";
 import TcgPage from "./pages/TcgPage";
 import CentraleAchat from "./pages/CentraleAchat";
@@ -29,7 +28,7 @@ export default function App() {
       <Route element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="dashboard" element={<Dashboard />} />
-        <Route path="performance" element={<PerformancePage />} />
+        <Route path="performance" element={<Navigate to="/dashboard" replace />} />
         <Route path="comptabilite" element={<Comptabilite />} />
         <Route path="stock" element={<Stock />} />
         <Route path="tcg" element={<TcgPage />} />

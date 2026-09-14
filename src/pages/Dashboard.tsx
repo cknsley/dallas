@@ -13,11 +13,21 @@ import {
   computeStats, filterItemsByDomain, marginOf,
   qtyOf, revenueOf, sectorMeta, soldItems,
 } from "../lib/calc";
-import { eur, pct } from "../lib/format";
+import { dshort, eur, pct } from "../lib/format";
 
 type SectorSort = "ca" | "marge" | "stock" | "articles" | "nom";
 type ChartView = "ca" | "marge" | "stock" | "repartition";
 type TopSort = "marge" | "ca" | "roi" | "rapide" | "quantite";
+type VenteSort = "recent" | "ancien" | "marge_desc" | "prix_desc" | "roi_desc" | "delai_asc";
+
+const VENTE_LABELS: Record<VenteSort, string> = {
+  recent: "Plus récentes",
+  ancien: "Plus anciennes",
+  marge_desc: "Marge la plus forte",
+  prix_desc: "Prix le plus élevé",
+  roi_desc: "Meilleur ROI",
+  delai_asc: "Vendu le plus vite",
+};
 
 const TOP_LABELS: Record<TopSort, string> = {
   marge: "Meilleure marge (€)",
@@ -51,6 +61,7 @@ export default function Dashboard() {
   const [sectorSort, setSectorSort] = useState<SectorSort>("ca");
   const [chartView, setChartView] = useState<ChartView>("ca");
   const [topSort, setTopSort] = useState<TopSort>("marge");
+  const [venteSort, setVenteSort] = useState<VenteSort>("recent");
 
   const customSectors = state.settings.customSectors ?? [];
   const sectorIds = useMemo(
@@ -118,6 +129,33 @@ export default function Dashboard() {
     });
     return withMetrics.slice(0, 10);
   }, [state.items, range, topSort, sectorIds]);
+
+  /* Toutes les ventes de la période, quel que soit l'univers. */
+  const ventes = useMemo(() => {
+    const rows = soldItems(state.items, range).map((i) => {
+      const cost = i.cost ? (i.cost + (i.fees || 0)) * qtyOf(i) : 0;
+      const delai = i.buyDate && i.saleDate
+        ? Math.max(0, Math.round((new Date(i.saleDate).getTime() - new Date(i.buyDate).getTime()) / 86400000))
+        : null;
+      const marge = marginOf(i);
+      return {
+        item: i, rev: revenueOf(i), marge, delai,
+        roi: cost > 0 ? (marge / cost) * 100 : 0,
+        sectorId: sectorIds.find((id) => filterItemsByDomain([i], id).length > 0),
+      };
+    });
+    rows.sort((a, b) => {
+      switch (venteSort) {
+        case "ancien": return (a.item.saleDate || "").localeCompare(b.item.saleDate || "");
+        case "marge_desc": return b.marge - a.marge;
+        case "prix_desc": return b.rev - a.rev;
+        case "roi_desc": return b.roi - a.roi;
+        case "delai_asc": return (a.delai ?? Infinity) - (b.delai ?? Infinity);
+        default: return (b.item.saleDate || "").localeCompare(a.item.saleDate || "");
+      }
+    });
+    return rows;
+  }, [state.items, range, venteSort, sectorIds]);
 
   const chartData = useMemo(() => {
     const key = chartView === "repartition" ? "ca" : chartView;
@@ -275,6 +313,62 @@ export default function Dashboard() {
                       <td className={`r num ${r.marge >= 0 ? "pos" : "neg"}`} style={{ fontWeight: 700 }}>{eur(r.marge)}</td>
                       <td className="r num">{pct(r.roi)}</td>
                       <td className="r num">{r.delai !== null ? `${r.delai} j` : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </Section>
+
+      {/* ── VENTES, TOUS UNIVERS CONFONDUS ── */}
+      <Section
+        title={`Ventes (${ventes.length})`}
+        right={
+          <select value={venteSort} onChange={(e) => setVenteSort(e.target.value as VenteSort)} style={{ width: "auto" }}>
+            {(Object.keys(VENTE_LABELS) as VenteSort[]).map((k) => (
+              <option key={k} value={k}>Trier : {VENTE_LABELS[k]}</option>
+            ))}
+          </select>
+        }
+      >
+        <div className="card-b">
+          {ventes.length === 0 ? (
+            <Empty glyph="🛒" title="Aucune vente">Rien de vendu sur cette période.</Empty>
+          ) : (
+            <div className="twrap">
+              <table className="table-compact">
+                <thead>
+                  <tr>
+                    <th>Article</th>
+                    <th>Univers</th>
+                    <th>Date</th>
+                    <th>Canal</th>
+                    <th className="r">Prix</th>
+                    <th className="r">Marge</th>
+                    <th className="r">ROI</th>
+                    <th className="r">Délai</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ventes.map((v) => (
+                    <tr key={v.item.id}>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{v.item.name || "Sans nom"}</div>
+                        <div className="hint" style={{ fontSize: 11 }}>
+                          {v.item.brand || "—"}{v.item.size ? ` · ${v.item.size}` : ""}
+                        </div>
+                      </td>
+                      <td style={{ fontSize: 12 }}>
+                        {v.sectorId ? `${sectorMeta(v.sectorId, customSectors).icon} ${sectorMeta(v.sectorId, customSectors).label}` : "—"}
+                      </td>
+                      <td className="nowrap" style={{ fontSize: 12 }}>{dshort(v.item.saleDate)}</td>
+                      <td><span className="pill ghost" style={{ fontSize: 11 }}>{v.item.platform || "Direct"}</span></td>
+                      <td className="r num" style={{ fontWeight: 700, color: "var(--accent)" }}>{eur(v.rev)}</td>
+                      <td className={`r num ${v.marge >= 0 ? "pos" : "neg"}`} style={{ fontWeight: 700 }}>{eur(v.marge)}</td>
+                      <td className="r num">{pct(v.roi)}</td>
+                      <td className="r num">{v.delai !== null ? `${v.delai} j` : "—"}</td>
                     </tr>
                   ))}
                 </tbody>

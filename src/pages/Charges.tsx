@@ -1,18 +1,18 @@
 import { useMemo, useState } from "react";
 import { HeaderActions } from "../components/Layout";
-import { Confirm, Empty, Kpi } from "../components/ui";
+import { Confirm, Empty, Kpi, RangePicker } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import {
   chargesInRange, expenseKind, expenseMonthlyShare,
   expenseMonths, periodRange, remainingToAmortize,
 } from "../lib/calc";
-import { usePref } from "../lib/usePref";
+import { useDateRange } from "../lib/useDateRange";
 import { dfr, eur, eur2, num, today } from "../lib/format";
 import { uid } from "../lib/id";
 import { EXPENSE_CATEGORIES } from "../lib/constants";
 import ExpenseModal from "../modals/ExpenseModal";
-import type { Expense, Period } from "../types";
+import type { Expense } from "../types";
 
 const thisMonth = () => new Date().toISOString().slice(0, 7);
 
@@ -50,7 +50,7 @@ export default function Charges() {
   const { state, dispatch } = useStore();
   const toast = useToast();
 
-  const [period, setPeriod] = usePref<Period>("chargePeriod", "month");
+  const { range, from: dateFrom, to: dateTo, setRange } = useDateRange("charges");
   const [kindFilter, setKindFilter] = useState<KindVal | "all">("all");
   const [catFilter, setCatFilter] = useState("");
   const [editing, setEditing] = useState<{ expense: Expense | null } | null>(null);
@@ -64,15 +64,13 @@ export default function Charges() {
 
   const remaining = useMemo(() => remainingToAmortize(state.expenses), [state.expenses]);
 
-  // Total charges ce mois
-  const monthRange = useMemo(() => periodRange("month"), []);
-  const monthTotal = useMemo(() => chargesInRange(state.expenses, monthRange), [state.expenses, monthRange]);
-
-  // Total charges ce trimestre
-  const quarterRange = useMemo(() => periodRange("quarter"), []);
-  const quarterTotal = useMemo(() => chargesInRange(state.expenses, quarterRange), [state.expenses, quarterRange]);
-
-  // Total annuel
+  // Total sur la plage choisie
+  const periodTotal = useMemo(() => chargesInRange(state.expenses, range), [state.expenses, range]);
+  const periodCount = useMemo(
+    () => state.expenses.filter((e) => e.date >= range.from && e.date <= range.to).length,
+    [state.expenses, range],
+  );
+  // Total annuel, repère fixe à côté de la plage
   const yearRange = useMemo(() => periodRange("year"), []);
   const yearTotal = useMemo(() => chargesInRange(state.expenses, yearRange), [state.expenses, yearRange]);
 
@@ -89,10 +87,11 @@ export default function Charges() {
   // Filtered list
   const filtered = useMemo(() => {
     return state.expenses
+      .filter((e) => e.date >= range.from && e.date <= range.to)
       .filter((e) => kindFilter === "all" || expenseKind(e) === kindFilter)
       .filter((e) => !catFilter || (e.category || "Autre") === catFilter)
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [state.expenses, kindFilter, catFilter]);
+  }, [state.expenses, kindFilter, catFilter, range]);
 
   const pCategories = useMemo(() => {
     const map = new Map<string, number>();
@@ -123,30 +122,10 @@ export default function Charges() {
     setAdding(false);
   };
 
-  const PERIODS: { value: Period; label: string }[] = [
-    { value: "month", label: "Ce mois" },
-    { value: "quarter", label: "Trimestre" },
-    { value: "year", label: "Cette année" },
-    { value: "all", label: "Tout" },
-  ];
-
   return (
     <>
       <HeaderActions>
-        {/* Period selector */}
-        <div className="seg" role="group">
-          {PERIODS.map((p) => (
-            <button
-              key={p.value}
-              type="button"
-              className={period === p.value ? "on" : ""}
-              aria-pressed={period === p.value}
-              onClick={() => setPeriod(p.value)}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
+        <RangePicker from={dateFrom} to={dateTo} onChange={setRange} />
         <button className="btn primary" onClick={() => setEditing({ expense: null })}>
           + Nouvelle charge
         </button>
@@ -155,16 +134,10 @@ export default function Charges() {
       {/* ── KPIs ── */}
       <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
         <Kpi
-          label="Ce mois"
-          value={eur(monthTotal)}
-          meta={`${state.expenses.filter((e) => e.date.slice(0, 7) === new Date().toISOString().slice(0, 7)).length} charge(s)`}
-          tone={monthTotal > 0 ? "warn" : "ok"}
-        />
-        <Kpi
-          label="Ce trimestre"
-          value={eur(quarterTotal)}
-          meta="Charges imputées"
-          tone="info"
+          label="Sur la période"
+          value={eur(periodTotal)}
+          meta={`${periodCount} charge(s) · ${range.label}`}
+          tone={periodTotal > 0 ? "warn" : "ok"}
         />
         <Kpi
           label="Cette année"

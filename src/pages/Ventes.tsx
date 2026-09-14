@@ -324,8 +324,8 @@ export default function Ventes() {
       <div className="note info" style={{ marginTop: 16 }}>
         <span className="glyph">📊</span>
         <div>
-          Pipeline, classements et évolution mensuelle des ventes sont dans{" "}
-          <a href={`#${links.performance()}`}>Performance</a>.
+          Classements, tops produits et évolution mensuelle sont dans{" "}
+          <a href="#/dashboard">Vue générale</a>.
         </div>
       </div>
 
