@@ -1,7 +1,7 @@
-import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { X, ArrowRight, ImageOff, LucideIcon } from "lucide-react";
+import { X, ArrowRight, ChevronDown, ImageOff, LucideIcon } from "lucide-react";
 import { photoURL, subscribePhotos } from "../store/photos";
 import type { ItemStatus } from "../types";
 import { STATUS_LABEL } from "../lib/constants";
@@ -266,6 +266,34 @@ export function BarList({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** Bloc repliable : un titre cliquable, des actions à droite, un contenu qu'on masque. */
+export function Section({
+  title, children, defaultOpen = true, right,
+}: { title: string; children: ReactNode; defaultOpen?: boolean; right?: ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div className="card-h">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="linkish"
+          style={{ display: "flex", alignItems: "center", gap: 7, fontWeight: 700, fontSize: 14 }}
+        >
+          <ChevronDown
+            size={15}
+            style={{ transform: open ? "none" : "rotate(-90deg)", transition: "transform 0.15s" }}
+          />
+          {title}
+        </button>
+        <div className="spacer" />
+        {open && right}
+      </div>
+      {open && children}
     </div>
   );
 }

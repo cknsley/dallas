@@ -1,805 +1,375 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import {
-  Zap,
-  ShoppingBag,
-  Target,
-  Award,
-  Layers,
-  ShoppingCart as ShoppingIcon,
-  Search,
-  ArrowUpDown,
-  Clock,
-  DollarSign,
-} from "lucide-react";
+  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from "recharts";
 import { HeaderActions } from "../components/Layout";
-import { BarList, Empty, Kpi, Photo, Segmented } from "../components/ui";
+import { Empty, Section } from "../components/ui";
 import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
 import {
-  chargesByCategory,
-  chargesInRange,
-  costOf,
-  filterItemsByDomain,
-  marginOf,
-  periodRange,
-  qtyOf,
-  revenueOf,
-  saleCostsOf,
-  soldItems,
-  type Dimension,
+  chargesByCategory, chargesInRange, costOf, filterItemsByDomain, marginOf,
+  monthlySeries, periodRange, qtyOf, revenueOf, saleCostsOf, sectorMeta, soldItems,
 } from "../lib/calc";
 import { dshort, eur, eur2, pct } from "../lib/format";
-import { links } from "../lib/links";
 import type { Item, Period } from "../types";
 
-type PerfTab = "sales_list" | "channels" | "categories" | "charges";
-type SalesSortKey = "saleDate" | "marge" | "price" | "cost" | "daysInStock";
+type ChartView = "evolution" | "univers" | "marques" | "canaux" | "charges";
+type SortKey =
+  | "recent" | "ancien" | "marge_desc" | "marge_asc"
+  | "prix_desc" | "prix_asc" | "roi_desc" | "delai_asc" | "delai_desc";
+
+const PALETTE = ["#a78fff", "#5fd3ab", "#7fd4ee", "#f0c069", "#ec4899", "#8b5cf6", "#34d399"];
+
+const SORT_LABELS: Record<SortKey, string> = {
+  recent: "Plus récentes",
+  ancien: "Plus anciennes",
+  marge_desc: "Marge la plus forte",
+  marge_asc: "Marge la plus faible",
+  prix_desc: "Prix le plus élevé",
+  prix_asc: "Prix le plus bas",
+  roi_desc: "Meilleur ROI",
+  delai_asc: "Vendu le plus vite",
+  delai_desc: "Resté le plus longtemps",
+};
+
+const CHART_LABELS: Record<ChartView, string> = {
+  evolution: "Évolution CA & marge (12 mois)",
+  univers: "Répartition par univers",
+  marques: "Top marques",
+  canaux: "Canaux de vente",
+  charges: "Charges par catégorie",
+};
+
+const daysInStock = (i: Item): number | null => {
+  if (!i.buyDate || !i.saleDate) return null;
+  const d = (new Date(i.saleDate).getTime() - new Date(i.buyDate).getTime()) / 86400000;
+  return Math.max(0, Math.round(d));
+};
 
 export default function PerformancePage() {
   const { state } = useStore();
-  const navigate = useNavigate();
-  const [period, setPeriod] = usePref<Period>("perf_period", "month");
-  const [domain, setDomain] = usePref<"all" | "fashion" | "tcg">("perfDomain", "all");
   const [searchParams] = useSearchParams();
+  const [period, setPeriod] = usePref<Period>("perf_period", "month");
+  const [domain, setDomain] = usePref<string>("perfDomain", "all");
+  const [chartView, setChartView] = useState<ChartView>("univers");
+  const [sortKey, setSortKey] = useState<SortKey>("recent");
 
-  // Le domaine suit l'URL : un secteur le pré-sélectionne, son absence rétablit la vue
-  // d'ensemble — sinon la préférence mémorisée filtrerait encore une vue dite collective.
+  const customSectors = state.settings.customSectors ?? [];
+  const sectorIds = useMemo(
+    () => ["fashion", "tcg", ...customSectors.map((s) => s.id)],
+    [customSectors],
+  );
+
+  // Le secteur suit l'URL : sans paramètre, on retombe sur la vue tous univers.
   useEffect(() => {
     const secteur = searchParams.get("secteur");
-    setDomain(secteur === "tcg" || secteur === "fashion" ? secteur : "all");
+    setDomain(secteur && sectorIds.includes(secteur) ? secteur : "all");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, sectorIds.join(",")]);
 
-  const [activeTab, setActiveTab] = useState<PerfTab>("sales_list");
-  const [selectedDim, setSelectedDim] = useState<Dimension>("brand");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortKey, setSortKey] = useState<SalesSortKey>("saleDate");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-
-  const domainItems = useMemo(() => filterItemsByDomain(state.items, domain), [state.items, domain]);
   const range = useMemo(() => periodRange(period), [period]);
-  const list = useMemo(() => soldItems(domainItems, range), [domainItems, range]);
+  const domainItems = useMemo(() => filterItemsByDomain(state.items, domain), [state.items, domain]);
+  const sold = useMemo(() => soldItems(domainItems, range), [domainItems, range]);
 
-  // Overall Stock Sell-Through Metrics
-  const totalStockCount = useMemo(
-    () => domainItems.reduce((a, i) => a + qtyOf(i), 0),
-    [domainItems]
-  );
-  const totalSoldAllTime = useMemo(
-    () => domainItems.filter((i) => i.status === "vendu").reduce((a, i) => a + qtyOf(i), 0),
-    [domainItems]
-  );
-  const sellThroughRate = totalStockCount > 0 ? (totalSoldAllTime / totalStockCount) * 100 : 0;
-
-  // Key Financial Metrics
-  const ca = useMemo(() => list.reduce((a, i) => a + revenueOf(i), 0), [list]);
-  const grossMarge = useMemo(() => list.reduce((a, i) => a + marginOf(i), 0), [list]);
-  // Les charges d'activité (matériel, abonnements) sont transverses : on ne les impute
-  // pas au secteur TCG seul, comme pour le reste des calculs de stats.
-  const charges = useMemo(
-    () => (domain === "tcg" ? 0 : chargesInRange(state.expenses, range)),
-    [state.expenses, range, domain],
-  );
+  /* ── Indicateurs clés ── */
+  const ca = useMemo(() => sold.reduce((a, i) => a + revenueOf(i), 0), [sold]);
+  const grossMarge = useMemo(() => sold.reduce((a, i) => a + marginOf(i), 0), [sold]);
+  const charges = useMemo(() => chargesInRange(state.expenses, range), [state.expenses, range]);
   const netMarge = grossMarge - charges;
-  const margePct = ca > 0 ? (netMarge / ca) * 100 : 0;
-  const totalQty = useMemo(() => list.reduce((a, i) => a + qtyOf(i), 0), [list]);
-  const avgBasket = totalQty > 0 ? ca / totalQty : 0;
-  const avgProfitPerPiece = totalQty > 0 ? netMarge / totalQty : 0;
+  const qty = useMemo(() => sold.reduce((a, i) => a + qtyOf(i), 0), [sold]);
+  const avgDays = useMemo(() => {
+    const valid = sold.map(daysInStock).filter((d): d is number => d !== null);
+    return valid.length ? Math.round(valid.reduce((a, d) => a + d, 0) / valid.length) : null;
+  }, [sold]);
 
-  const chargeRows = useMemo(() => chargesByCategory(state.expenses, range), [state.expenses, range]);
+  /* ── Données des graphiques ── */
+  const evolutionData = useMemo(
+    () => monthlySeries(domainItems, 12).map((m) => ({ mois: m.label, CA: Math.round(m.ca), Marge: Math.round(m.marge) })),
+    [domainItems],
+  );
 
-  // Average days to sell
-  const averageDaysToSell = useMemo(() => {
-    const valid = list.filter((i) => i.buyDate && i.saleDate);
-    if (valid.length === 0) return null;
-    const totalDays = valid.reduce((a, i) => {
-      const bTime = new Date(i.buyDate).getTime();
-      const sTime = new Date(i.saleDate).getTime();
-      const diff = Math.max(0, (sTime - bTime) / (1000 * 60 * 60 * 24));
-      return a + diff;
-    }, 0);
-    return Math.round(totalDays / valid.length);
-  }, [list]);
+  const universData = useMemo(
+    () => sectorIds
+      .map((id) => {
+        const items = soldItems(filterItemsByDomain(state.items, id), range);
+        return {
+          name: sectorMeta(id, customSectors).label,
+          ca: Math.round(items.reduce((a, i) => a + revenueOf(i), 0)),
+          marge: Math.round(items.reduce((a, i) => a + marginOf(i), 0)),
+        };
+      })
+      .filter((r) => r.ca > 0 || r.marge !== 0),
+    [sectorIds, state.items, range, customSectors],
+  );
 
-  // Helper for single item days in stock
-  const getDaysInStock = (i: Item): number | null => {
-    if (!i.buyDate || !i.saleDate) return null;
-    const bTime = new Date(i.buyDate).getTime();
-    const sTime = new Date(i.saleDate).getTime();
-    return Math.max(0, Math.round((sTime - bTime) / (1000 * 60 * 60 * 24)));
-  };
-
-  // Filtered & Sorted Sales List
-  const processedSalesList = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    const filtered = list.filter((i) => {
-      if (!q) return true;
-      const haystack = [i.name, i.brand, i.buyer, i.platform, i.type, i.sku]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(q);
-    });
-
-    const dir = sortDir === "asc" ? 1 : -1;
-    return filtered.sort((a, b) => {
-      let valA: number | string = 0;
-      let valB: number | string = 0;
-
-      if (sortKey === "saleDate") {
-        valA = a.saleDate || "";
-        valB = b.saleDate || "";
-      } else if (sortKey === "marge") {
-        valA = marginOf(a);
-        valB = marginOf(b);
-      } else if (sortKey === "price") {
-        valA = revenueOf(a);
-        valB = revenueOf(b);
-      } else if (sortKey === "cost") {
-        valA = costOf(a);
-        valB = costOf(b);
-      } else if (sortKey === "daysInStock") {
-        valA = getDaysInStock(a) ?? -1;
-        valB = getDaysInStock(b) ?? -1;
-      }
-
-      if (valA === valB) return b.createdAt - a.createdAt;
-      return (valA > valB ? 1 : -1) * dir;
-    });
-  }, [list, searchQuery, sortKey, sortDir]);
-
-  const toggleSort = (key: SalesSortKey) => {
-    if (sortKey === key) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      setSortDir("desc");
-    }
-  };
-
-  // Breakdown by Platform
-  const platformStats = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        platform: string;
-        qty: number;
-        ca: number;
-        marge: number;
-        fees: number;
-        avgPrice: number;
-        margeRate: number;
-      }
-    >();
-    list.forEach((i) => {
-      const p = i.platform?.trim() || "Vente Directe";
-      const cur = map.get(p) || {
-        platform: p,
-        qty: 0,
-        ca: 0,
-        marge: 0,
-        fees: 0,
-        avgPrice: 0,
-        margeRate: 0,
-      };
-      const q = qtyOf(i);
-      const rev = revenueOf(i);
-      const m = marginOf(i);
-      const f = saleCostsOf(i);
-      cur.qty += q;
-      cur.ca += rev;
-      cur.marge += m;
-      cur.fees += f;
-      map.set(p, cur);
-    });
-
-    return Array.from(map.values())
-      .map((p) => ({
-        ...p,
-        avgPrice: p.qty > 0 ? p.ca / p.qty : 0,
-        margeRate: p.ca > 0 ? (p.marge / p.ca) * 100 : 0,
-      }))
-      .sort((a, b) => b.ca - a.ca);
-  }, [list]);
-
-  const topPlatform = platformStats.length > 0 ? platformStats[0] : null;
-
-  // Breakdown by Brand / Category / Type
-  const dimensionStats = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        key: string;
-        qty: number;
-        ca: number;
-        marge: number;
-        margePct: number;
-        shareOfCa: number;
-      }
-    >();
-
-    list.forEach((i) => {
-      let key = "";
-      if (selectedDim === "brand") key = i.brand?.trim() || "Sans Marque";
-      else if (selectedDim === "type") key = i.type?.trim() || "Autre Produit";
-      else if (selectedDim === "size") key = i.size?.trim() || "Taille Unique";
-      else key = i.name?.trim() || "Article";
-
-      const cur = map.get(key) || {
-        key,
-        qty: 0,
-        ca: 0,
-        marge: 0,
-        margePct: 0,
-        shareOfCa: 0,
-      };
-      const q = qtyOf(i);
-      cur.qty += q;
+  const marquesData = useMemo(() => {
+    const m = new Map<string, { name: string; ca: number; marge: number; qty: number }>();
+    sold.forEach((i) => {
+      const key = i.brand?.trim() || "Sans marque";
+      const cur = m.get(key) ?? { name: key, ca: 0, marge: 0, qty: 0 };
       cur.ca += revenueOf(i);
       cur.marge += marginOf(i);
-      map.set(key, cur);
+      cur.qty += qtyOf(i);
+      m.set(key, cur);
     });
+    return [...m.values()]
+      .map((r) => ({ ...r, ca: Math.round(r.ca), marge: Math.round(r.marge) }))
+      .sort((a, b) => b.ca - a.ca)
+      .slice(0, 8);
+  }, [sold]);
 
-    return Array.from(map.values())
-      .map((r) => ({
-        ...r,
-        margePct: r.ca > 0 ? (r.marge / r.ca) * 100 : 0,
-        shareOfCa: ca > 0 ? (r.ca / ca) * 100 : 0,
-      }))
+  const canauxData = useMemo(() => {
+    const m = new Map<string, { name: string; ca: number; marge: number; frais: number; qty: number }>();
+    sold.forEach((i) => {
+      const key = i.platform?.trim() || "Vente directe";
+      const cur = m.get(key) ?? { name: key, ca: 0, marge: 0, frais: 0, qty: 0 };
+      cur.ca += revenueOf(i);
+      cur.marge += marginOf(i);
+      cur.frais += saleCostsOf(i);
+      cur.qty += qtyOf(i);
+      m.set(key, cur);
+    });
+    return [...m.values()]
+      .map((r) => ({ ...r, ca: Math.round(r.ca), marge: Math.round(r.marge), frais: Math.round(r.frais) }))
       .sort((a, b) => b.ca - a.ca);
-  }, [list, selectedDim, ca]);
+  }, [sold]);
+
+  const chargesData = useMemo(
+    () => chargesByCategory(state.expenses, range).map((c) => ({ name: c.key, value: Math.round(c.total) })),
+    [state.expenses, range],
+  );
+
+  /* ── Table des ventes, triée via le menu déroulant ── */
+  const sortedSales = useMemo(() => {
+    const rows = [...sold];
+    rows.sort((a, b) => {
+      const roi = (i: Item) => (costOf(i) > 0 ? (marginOf(i) / costOf(i)) * 100 : 0);
+      switch (sortKey) {
+        case "ancien": return (a.saleDate || "").localeCompare(b.saleDate || "");
+        case "marge_desc": return marginOf(b) - marginOf(a);
+        case "marge_asc": return marginOf(a) - marginOf(b);
+        case "prix_desc": return revenueOf(b) - revenueOf(a);
+        case "prix_asc": return revenueOf(a) - revenueOf(b);
+        case "roi_desc": return roi(b) - roi(a);
+        case "delai_asc": return (daysInStock(a) ?? Infinity) - (daysInStock(b) ?? Infinity);
+        case "delai_desc": return (daysInStock(b) ?? -1) - (daysInStock(a) ?? -1);
+        default: return (b.saleDate || "").localeCompare(a.saleDate || "");
+      }
+    });
+    return rows;
+  }, [sold, sortKey]);
+
+  const axisProps = { stroke: "var(--ink-3)", fontSize: 11, tickLine: false };
+  const tooltipStyle = {
+    background: "var(--surface-solid)",
+    border: "1px solid var(--line-2)",
+    borderRadius: 10,
+    fontSize: 12,
+  };
 
   return (
     <>
       <HeaderActions>
-        <Segmented<"all" | "fashion" | "tcg">
-          value={domain}
-          onChange={setDomain}
-          options={[
-            { value: "all", label: "🌐 Tout" },
-            { value: "fashion", label: "👕 Vêtements & Fashion" },
-            { value: "tcg", label: "🃏 TCG & Cartes" },
-          ]}
-        />
-        <Segmented<Period>
-          value={period}
-          onChange={setPeriod}
-          options={[
-            { value: "month", label: "Mois en cours" },
-            { value: "quarter", label: "Ce trimestre" },
-            { value: "year", label: "Année en cours" },
-            { value: "all", label: "Depuis le début" },
-          ]}
-        />
+        <select value={domain} onChange={(e) => setDomain(e.target.value)} style={{ width: "auto" }}>
+          <option value="all">🌐 Tous les univers</option>
+          {sectorIds.map((id) => {
+            const meta = sectorMeta(id, customSectors);
+            return <option key={id} value={id}>{meta.icon} {meta.label}</option>;
+          })}
+        </select>
+        <select value={period} onChange={(e) => setPeriod(e.target.value as Period)} style={{ width: "auto" }}>
+          <option value="month">Mois en cours</option>
+          <option value="quarter">Ce trimestre</option>
+          <option value="year">Année en cours</option>
+          <option value="all">Depuis le début</option>
+        </select>
       </HeaderActions>
 
-      {/* ── HIGH LEVEL SALES KPIS ── */}
-      <div className="kpi-grid" style={{ marginBottom: 16 }}>
-        <Kpi
-          label="Chiffre d'Affaires Ventes"
-          value={eur(ca)}
-          meta={`${totalQty} pièce(s) vendue(s) · ${range.label}`}
-          tone="info"
-          to={links.ventes()}
-          hint="Ventes"
-        />
-        <Kpi
-          label="Marge Nette (après charges)"
-          value={eur(netMarge)}
-          meta={`${pct(margePct)} du CA · dont ${eur(charges)} de charges`}
-          tone={netMarge >= 0 ? "ok" : "warn"}
-          to={links.bilan()}
-          hint="Bilan"
-        />
-        <Kpi
-          label="Délai Moyen d'Écoulement"
-          value={averageDaysToSell !== null ? `${averageDaysToSell} jours` : "–"}
-          meta={`Taux d'écoulement : ${pct(sellThroughRate)}`}
-          tone="ok"
-        />
-        <Kpi
-          label="Panier Moyen & Gain / Pièce"
-          value={eur(avgBasket)}
-          meta={`Marge moyenne : +${eur(avgProfitPerPiece)} / art.`}
-          tone="info"
-        />
+      {/* ── INDICATEURS CLÉS ── */}
+      <div className="perf-kpis">
+        <div className="perf-kpi">
+          <span className="lbl">Chiffre d'affaires</span>
+          <b className="val">{eur(ca)}</b>
+          <span className="meta">{qty} pièce(s) · {range.label}</span>
+        </div>
+        <div className="perf-kpi">
+          <span className="lbl">Marge nette</span>
+          <b className={`val ${netMarge >= 0 ? "pos" : "neg"}`}>{eur(netMarge)}</b>
+          <span className="meta">{pct(ca > 0 ? (netMarge / ca) * 100 : 0)} du CA · {eur(charges)} de charges</span>
+        </div>
+        <div className="perf-kpi">
+          <span className="lbl">Panier moyen</span>
+          <b className="val">{eur(qty > 0 ? ca / qty : 0)}</b>
+          <span className="meta">{eur(qty > 0 ? netMarge / qty : 0)} de marge / pièce</span>
+        </div>
+        <div className="perf-kpi">
+          <span className="lbl">Délai d'écoulement</span>
+          <b className="val">{avgDays !== null ? `${avgDays} j` : "–"}</b>
+          <span className="meta">Entre l'achat et la vente</span>
+        </div>
       </div>
 
-      {/* ── SYNTHÈSE SMART STRATÉGIQUE DES VENTEMENT ── */}
-      {list.length > 0 && (
-        <div
-          className="note ok"
-          style={{
-            marginBottom: 18,
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "12px 16px",
-            borderRadius: 10,
-          }}
-        >
-          <Zap size={20} style={{ color: "var(--ok)", flexShrink: 0 }} />
-          <div style={{ fontSize: 13, flex: 1 }}>
-            <b>Synthèse d'Activité :</b>{" "}
-            {topPlatform
-              ? `Canal dominant : ${topPlatform.platform} (${eur(topPlatform.ca)} CA, ${pct(topPlatform.margeRate)} de marge)`
-              : "Ventes actives"}
-            {" · "}
-            {averageDaysToSell !== null ? `Écoulement moyen en ${averageDaysToSell} jours` : ""}
-            {" · "}
-            Marge nette globale de {pct(margePct)} sur la période, charges déduites.
-          </div>
-        </div>
-      )}
-
-      {/* ── ONGLETS DE NAVIGATION DANS PERFORMANCES ── */}
-      <div
-        className="card"
-        style={{
-          marginBottom: 18,
-          padding: "8px 14px",
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          flexWrap: "wrap",
-        }}
+      {/* ── VENTES, TRI PAR MENU DÉROULANT ── */}
+      <Section
+        title={`Ventes (${sortedSales.length})`}
+        right={
+          <select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} style={{ width: "auto" }}>
+            {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+              <option key={k} value={k}>Trier : {SORT_LABELS[k]}</option>
+            ))}
+          </select>
+        }
       >
-        {[
-          { id: "sales_list", label: "📦 Liste des Ventes Conclues", icon: ShoppingIcon },
-          { id: "channels", label: "🛍️ Canaux & Plateformes", icon: ShoppingBag },
-          { id: "categories", label: "🏷️ Marque & Catégorie", icon: Layers },
-          { id: "charges", label: "💸 Charges & Frais", icon: DollarSign },
-        ].map((t) => {
-          const Icon = t.icon;
-          const active = activeTab === t.id;
-          return (
-            <button
-              key={t.id}
-              type="button"
-              className={`btn ${active ? "primary" : "ghost"}`}
-              onClick={() => setActiveTab(t.id as PerfTab)}
-              style={{
-                borderRadius: 20,
-                fontSize: 13,
-                fontWeight: active ? 600 : 500,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              <Icon size={15} />
-              <span>{t.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ── TAB 1 : LISTE DÉTAILLÉE DES VENTES PIÈCE PAR PIÈCE ── */}
-      {activeTab === "sales_list" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-          <div className="card">
-            <div className="card-h" style={{ flexWrap: "wrap", gap: 10 }}>
-              <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <ShoppingIcon size={18} style={{ color: "var(--accent)" }} /> Liste des Ventes Conclues ({processedSalesList.length})
-              </h3>
-              <div className="spacer" />
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ position: "relative", minWidth: 200 }}>
-                  <Search size={14} style={{ position: "absolute", left: 10, top: 9, color: "var(--ink-3)" }} />
-                  <input
-                    type="search"
-                    placeholder="Filtrer vente, client, marque..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    style={{ paddingLeft: 30, height: 32, fontSize: 12 }}
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="card-b">
-              {processedSalesList.length === 0 ? (
-                <Empty glyph="🛒" title="Aucune vente trouvée">
-                  {searchQuery ? "Aucune vente ne correspond à votre recherche." : "Aucune vente conclue sur la période sélectionnée."}
-                </Empty>
-              ) : (
-                <div className="twrap">
-                  <table className="table-compact">
-                    <thead>
-                      <tr>
-                        <th style={{ width: 44 }}>Photo</th>
-                        <th>Article / Produit</th>
-                        <th className="sortable" onClick={() => toggleSort("saleDate")}>
-                          Date Vente <ArrowUpDown size={11} />
-                        </th>
-                        <th>Canal / Plateforme</th>
-                        <th>Acheteur / Client</th>
-                        <th className="r sortable" onClick={() => toggleSort("price")}>
-                          Prix Vente <ArrowUpDown size={11} />
-                        </th>
-                        <th className="r sortable" onClick={() => toggleSort("cost")}>
-                          Coût Achat <ArrowUpDown size={11} />
-                        </th>
-                        <th className="r sortable" onClick={() => toggleSort("marge")}>
-                          Marge Nette <ArrowUpDown size={11} />
-                        </th>
-                        <th className="r sortable" onClick={() => toggleSort("daysInStock")}>
-                          Délai Stock <ArrowUpDown size={11} />
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {processedSalesList.map((item) => {
-                        const m = marginOf(item);
-                        const rev = revenueOf(item);
-                        const c = costOf(item);
-                        const mRate = rev > 0 ? (m / rev) * 100 : 0;
-                        const daysInStock = getDaysInStock(item);
-
-                        return (
-                          <tr key={item.id}>
-                            <td className="shrink">
-                              <Photo id={item.photoId} />
-                            </td>
-                            <td>
-                              <div style={{ fontWeight: 600, color: "var(--ink)" }}>
-                                {item.name || "Article sans nom"}
-                              </div>
-                              <div className="hint" style={{ fontSize: 11 }}>
-                                {item.brand || "—"}{item.size ? ` · ${item.size}` : ""}{qtyOf(item) > 1 ? ` · ×${qtyOf(item)}` : ""}
-                              </div>
-                            </td>
-                            <td className="nowrap" style={{ fontSize: 12 }}>
-                              {dshort(item.saleDate)}
-                            </td>
-                            <td>
-                              <span className="pill ghost" style={{ fontSize: 11 }}>
-                                {item.platform || "Direct"}
-                              </span>
-                            </td>
-                            <td>
-                              {item.buyer ? (
-                                <span style={{ fontWeight: 500 }}>{item.buyer}</span>
-                              ) : (
-                                <span className="hint" style={{ fontSize: 11 }}>—</span>
-                              )}
-                            </td>
-                            <td className="r num" style={{ fontWeight: 700, color: "var(--accent)" }}>
-                              {eur(rev)}
-                            </td>
-                            <td className="r num">−{eur2(c)}</td>
-                            <td className={`r num ${m >= 0 ? "pos" : "neg"}`} style={{ fontWeight: 700 }}>
-                              <div>{eur(m)}</div>
-                              <div style={{ fontSize: 10, opacity: 0.8 }}>{pct(mRate)}</div>
-                            </td>
-                            <td className="r num">
-                              {daysInStock !== null ? (
-                                <span className={`pill ${daysInStock <= 14 ? "ok" : daysInStock <= 45 ? "info" : "warn"}`} style={{ fontSize: 11 }}>
-                                  <Clock size={11} style={{ marginRight: 3 }} />
-                                  {daysInStock}j
-                                </span>
-                              ) : (
-                                <span className="hint">—</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="cols two">
-            {/* Card 1 : Record & Pépites de Ventes */}
-            <div className="card">
-              <div className="card-h">
-                <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Award size={18} style={{ color: "var(--warn)" }} /> Pépites & Records de Ventes
-                </h3>
-              </div>
-              <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {/* Plus forte marge */}
-                {(() => {
-                  const topMarginItem = list.reduce(
-                    (best, i) => (!best || marginOf(i) > marginOf(best) ? i : best),
-                    null as Item | null
-                  );
-                  const topRoiItem = list.reduce((best, i) => {
-                    const roi = costOf(i) > 0 ? (marginOf(i) / costOf(i)) * 100 : 0;
-                    const bestRoi = best && costOf(best) > 0 ? (marginOf(best) / costOf(best)) * 100 : -Infinity;
-                    return roi > bestRoi ? i : best;
-                  }, null as Item | null);
-                  const fastestItem = list
-                    .filter((i) => i.buyDate && i.saleDate)
-                    .reduce((best, i) => {
-                      const days = getDaysInStock(i);
-                      const bestDays = best ? getDaysInStock(best) : Infinity;
-                      return days !== null && days < (bestDays ?? Infinity) ? i : best;
-                    }, null as Item | null);
-
-                  return (
-                    <>
-                      {topMarginItem ? (
-                        <div style={{ padding: 10, borderRadius: 8, background: "var(--surface-2)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <div>
-                            <div style={{ fontSize: 11, color: "var(--ink-3)", textTransform: "uppercase" }}>🥇 Plus Forte Marge (€)</div>
-                            <div style={{ fontWeight: 600, fontSize: 13, color: "var(--ink)" }}>{topMarginItem.name || "Article"}</div>
-                            <div style={{ fontSize: 11, color: "var(--ink-3)" }}>{topMarginItem.brand || "—"} · vendu le {dshort(topMarginItem.saleDate)}</div>
-                          </div>
-                          <b style={{ fontSize: 16, color: "var(--ok)", fontVariantNumeric: "tabular-nums" }}>+{eur(marginOf(topMarginItem))}</b>
-                        </div>
-                      ) : null}
-
-                      {topRoiItem && costOf(topRoiItem) > 0 ? (
-                        <div style={{ padding: 10, borderRadius: 8, background: "var(--surface-2)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <div>
-                            <div style={{ fontSize: 11, color: "var(--ink-3)", textTransform: "uppercase" }}>🚀 Meilleur ROI (%)</div>
-                            <div style={{ fontWeight: 600, fontSize: 13, color: "var(--ink)" }}>{topRoiItem.name || "Article"}</div>
-                            <div style={{ fontSize: 11, color: "var(--ink-3)" }}>Achat {eur2(costOf(topRoiItem))} → Vente {eur(revenueOf(topRoiItem))}</div>
-                          </div>
-                          <b style={{ fontSize: 16, color: "var(--accent)", fontVariantNumeric: "tabular-nums" }}>+{pct((marginOf(topRoiItem) / costOf(topRoiItem)) * 100)}</b>
-                        </div>
-                      ) : null}
-
-                      {fastestItem ? (
-                        <div style={{ padding: 10, borderRadius: 8, background: "var(--surface-2)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <div>
-                            <div style={{ fontSize: 11, color: "var(--ink-3)", textTransform: "uppercase" }}>⚡ Vente la plus rapide</div>
-                            <div style={{ fontWeight: 600, fontSize: 13, color: "var(--ink)" }}>{fastestItem.name || "Article"}</div>
-                            <div style={{ fontSize: 11, color: "var(--ink-3)" }}>Écoulé sur {fastestItem.platform || "Canal"}</div>
-                          </div>
-                          <b style={{ fontSize: 14, color: "var(--warn)" }}>{getDaysInStock(fastestItem)} jour(s)</b>
-                        </div>
-                      ) : null}
-
-                      {!topMarginItem && !topRoiItem && (
-                        <Empty glyph="🏆" title="Pas encore de ventes">
-                          Les meilleures pépites apparaîtront avec vos premières ventes.
-                        </Empty>
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-
-            {/* Card 2 : Distribution par Tranche de Prix */}
-            <div className="card">
-              <div className="card-h">
-                <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Target size={18} style={{ color: "var(--accent)" }} /> Ventes par Tranche de Prix
-                </h3>
-              </div>
-              <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {(() => {
-                  const under100 = list.filter((i) => revenueOf(i) < 100);
-                  const between100And300 = list.filter((i) => revenueOf(i) >= 100 && revenueOf(i) <= 300);
-                  const above300 = list.filter((i) => revenueOf(i) > 300);
-
-                  const tiers = [
-                    { label: "Accessible (< 100 €)", items: under100, color: "#38bdf8" },
-                    { label: "Cœur de Gamme (100 – 300 €)", items: between100And300, color: "#a78fff" },
-                    { label: "Premium / Luxe (> 300 €)", items: above300, color: "#34d399" },
-                  ];
-
-                  return tiers.map((tier) => {
-                    const count = tier.items.length;
-                    const tierCa = tier.items.reduce((a, i) => a + revenueOf(i), 0);
-                    const tierMarge = tier.items.reduce((a, i) => a + marginOf(i), 0);
-                    const share = ca > 0 ? (tierCa / ca) * 100 : 0;
-
+        <div className="card-b">
+          {sortedSales.length === 0 ? (
+            <Empty glyph="🛒" title="Aucune vente">Rien de vendu sur cette période.</Empty>
+          ) : (
+            <div className="twrap">
+              <table className="table-compact">
+                <thead>
+                  <tr>
+                    <th>Article</th>
+                    <th>Univers</th>
+                    <th>Date</th>
+                    <th>Canal</th>
+                    <th className="r">Prix</th>
+                    <th className="r">Coût</th>
+                    <th className="r">Marge</th>
+                    <th className="r">Délai</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedSales.map((i) => {
+                    const m = marginOf(i);
+                    const rev = revenueOf(i);
+                    const d = daysInStock(i);
+                    const sectorId = sectorIds.find((id) => filterItemsByDomain([i], id).length > 0);
                     return (
-                      <div key={tier.label} style={{ padding: 10, borderRadius: 8, background: "var(--surface-2)" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                          <span style={{ fontWeight: 600, fontSize: 12.5, color: "var(--ink)" }}>{tier.label}</span>
-                          <b style={{ color: tier.color, fontVariantNumeric: "tabular-nums" }}>{eur(tierCa)} ({pct(share)})</b>
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--ink-3)" }}>
-                          <span>{count} article(s) vendu(s)</span>
-                          <span>Marge générée : <b style={{ color: tierMarge >= 0 ? "var(--ok)" : "var(--bad)" }}>{eur(tierMarge)}</b></span>
-                        </div>
-                      </div>
-                    );
-                  });
-                })()}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── TAB 2 : NIVEAU CANAUX ET PLATEFORMES DE VENTE ── */}
-      {activeTab === "channels" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-          <div className="card">
-            <div className="card-h">
-              <h3>Matrice de Performance par Plateforme</h3>
-              <div className="spacer" />
-              <span className="hint">Volume, Chiffre d'Affaires & Marge nette réelle</span>
-            </div>
-            {platformStats.length === 0 ? (
-              <Empty glyph="🛍️" title="Aucune vente">Pas de vente sur la période.</Empty>
-            ) : (
-              <div className="twrap">
-                <table className="table-compact">
-                  <thead>
-                    <tr>
-                      <th>Canal / Plateforme</th>
-                      <th className="r">Ventes (Qté)</th>
-                      <th className="r">CA Réalisé</th>
-                      <th className="r">Prix Moyen</th>
-                      <th className="r">Commissions</th>
-                      <th className="r">Marge Nette</th>
-                      <th className="r">Taux de Marge</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {platformStats.map((p) => (
-                      <tr key={p.platform}>
+                      <tr key={i.id}>
                         <td>
-                          <button
-                            className="linkish"
-                            onClick={() => navigate(links.ventes({ platform: p.platform }))}
-                            style={{ fontWeight: 600 }}
-                          >
-                            {p.platform}
-                          </button>
+                          <div style={{ fontWeight: 600 }}>{i.name || "Sans nom"}</div>
+                          <div className="hint" style={{ fontSize: 11 }}>{i.brand || "—"}{i.size ? ` · ${i.size}` : ""}</div>
                         </td>
-                        <td className="r num">{p.qty}</td>
-                        <td className="r num" style={{ color: "var(--accent)", fontWeight: 700 }}>
-                          {eur(p.ca)}
+                        <td style={{ fontSize: 12 }}>
+                          {sectorId ? `${sectorMeta(sectorId, customSectors).icon} ${sectorMeta(sectorId, customSectors).label}` : "—"}
                         </td>
-                        <td className="r num">{eur2(p.avgPrice)}</td>
-                        <td className="r num" style={{ color: "var(--warn)" }}>−{eur2(p.fees)}</td>
-                        <td className={`r num ${p.marge >= 0 ? "pos" : "neg"}`} style={{ fontWeight: 700 }}>
-                          {eur(p.marge)}
+                        <td className="nowrap" style={{ fontSize: 12 }}>{dshort(i.saleDate)}</td>
+                        <td><span className="pill ghost" style={{ fontSize: 11 }}>{i.platform || "Direct"}</span></td>
+                        <td className="r num" style={{ fontWeight: 700, color: "var(--accent)" }}>{eur(rev)}</td>
+                        <td className="r num">−{eur2(costOf(i))}</td>
+                        <td className={`r num ${m >= 0 ? "pos" : "neg"}`} style={{ fontWeight: 700 }}>
+                          <div>{eur(m)}</div>
+                          <div style={{ fontSize: 10, opacity: 0.8 }}>{pct(rev > 0 ? (m / rev) * 100 : 0)}</div>
                         </td>
-                        <td className="r num">
-                          <span className={`pill ${p.margeRate >= 20 ? "ok" : "warn"}`}>
-                            {pct(p.margeRate)}
-                          </span>
-                        </td>
+                        <td className="r num">{d !== null ? `${d} j` : "—"}</td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── TAB 3 : PAR MARQUE & CATÉGORIE ── */}
-      {activeTab === "categories" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-          <div className="card">
-            <div className="card-h" style={{ flexWrap: "wrap", gap: 8 }}>
-              <h3>Classement des Ventes par Marque & Catégorie</h3>
-              <div className="spacer" />
-              <Segmented<Dimension>
-                value={selectedDim}
-                onChange={setSelectedDim}
-                options={[
-                  { value: "brand", label: "Marque" },
-                  { value: "type", label: "Type Produit" },
-                  { value: "size", label: "Taille" },
-                ]}
-              />
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-            {dimensionStats.length === 0 ? (
-              <Empty glyph="📦" title="Aucune donnée">Pas de vente sur la période.</Empty>
+          )}
+        </div>
+      </Section>
+
+      {/* ── GRAPHIQUES, VUE AU CHOIX ── */}
+      <Section
+        title={CHART_LABELS[chartView]}
+        right={
+          <select value={chartView} onChange={(e) => setChartView(e.target.value as ChartView)} style={{ width: "auto" }}>
+            {(Object.keys(CHART_LABELS) as ChartView[]).map((v) => (
+              <option key={v} value={v}>{CHART_LABELS[v]}</option>
+            ))}
+          </select>
+        }
+      >
+        <div className="card-b" style={{ height: 300 }}>
+          {chartView === "evolution" && (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={evolutionData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
+                <XAxis dataKey="mois" {...axisProps} />
+                <YAxis {...axisProps} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => eur(v)} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Line type="monotone" dataKey="CA" stroke={PALETTE[0]} strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="Marge" stroke={PALETTE[1]} strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+
+          {chartView === "univers" && (
+            universData.length === 0 ? (
+              <Empty glyph="🌐" title="Aucune vente">Pas encore de vente sur la période.</Empty>
             ) : (
-              <div className="card-b">
-                <div className="twrap">
-                  <table className="table-compact">
-                    <thead>
-                      <tr>
-                        <th>Nom / Libellé</th>
-                        <th className="r">Qté</th>
-                        <th className="r">CA Total</th>
-                        <th className="r">Marge Nette</th>
-                        <th className="r">Taux Marge</th>
-                        <th className="r">Part du CA</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dimensionStats.map((r) => (
-                        <tr key={r.key}>
-                          <td style={{ fontWeight: 600 }}>{r.key}</td>
-                          <td className="r num">{r.qty}</td>
-                          <td className="r num">{eur(r.ca)}</td>
-                          <td className={`r num ${r.marge >= 0 ? "pos" : "neg"}`}>{eur(r.marge)}</td>
-                          <td className="r num">{pct(r.margePct)}</td>
-                          <td className="r num" style={{ color: "var(--accent)" }}>{pct(r.shareOfCa)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={universData} dataKey="ca" nameKey="name" innerRadius={60} outerRadius={110} paddingAngle={3}>
+                    {universData.map((_, idx) => <Cell key={idx} fill={PALETTE[idx % PALETTE.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => eur(v)} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            )
+          )}
 
-                <div style={{ marginTop: 20 }}>
-                  <h4 style={{ fontSize: 13, textTransform: "uppercase", color: "var(--ink-3)", marginBottom: 10 }}>
-                    Visualisation en barres (Volume de CA)
-                  </h4>
-                  <BarList
-                    rows={dimensionStats.slice(0, 10).map((r) => ({
-                      key: r.key,
-                      label: r.key,
-                      value: r.ca,
-                      display: eur(r.ca),
-                      note: `${r.qty} vente${r.qty > 1 ? "s" : ""} · ${pct(r.margePct)} de marge`,
-                    }))}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+          {chartView === "marques" && (
+            marquesData.length === 0 ? (
+              <Empty glyph="🏷️" title="Aucune vente">Pas encore de vente sur la période.</Empty>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={marquesData} layout="vertical" margin={{ left: 30 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" horizontal={false} />
+                  <XAxis type="number" {...axisProps} />
+                  <YAxis type="category" dataKey="name" width={100} {...axisProps} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => eur(v)} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Bar dataKey="ca" name="CA" fill={PALETTE[0]} radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="marge" name="Marge" fill={PALETTE[1]} radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )
+          )}
+
+          {chartView === "canaux" && (
+            canauxData.length === 0 ? (
+              <Empty glyph="🛍️" title="Aucune vente">Pas encore de vente sur la période.</Empty>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={canauxData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
+                  <XAxis dataKey="name" {...axisProps} />
+                  <YAxis {...axisProps} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => eur(v)} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Bar dataKey="ca" name="CA" fill={PALETTE[0]} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="marge" name="Marge" fill={PALETTE[1]} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="frais" name="Frais" fill={PALETTE[4]} radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )
+          )}
+
+          {chartView === "charges" && (
+            chargesData.length === 0 ? (
+              <Empty glyph="💸" title="Aucune charge">Pas de charge sur la période.</Empty>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={chargesData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={110} paddingAngle={3}>
+                    {chargesData.map((_, idx) => <Cell key={idx} fill={PALETTE[idx % PALETTE.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => eur(v)} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            )
+          )}
         </div>
-      )}
-
-      {/* ── TAB CHARGES : IMPACT DES FRAIS SUR LA MARGE ── */}
-      {activeTab === "charges" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-          <div className="card">
-            <div className="card-h">
-              <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <DollarSign size={18} style={{ color: "var(--warn)" }} /> Impact des Charges sur la Marge
-              </h3>
-              <div className="spacer" />
-              <span className="hint">{range.label}</span>
-            </div>
-            <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-                <div className="stat-box">
-                  <div className="stat-box-label">Marge Brute (Ventes)</div>
-                  <div className="stat-box-value">{eur(grossMarge)}</div>
-                </div>
-                <div className="stat-box">
-                  <div className="stat-box-label">Charges de la Période</div>
-                  <div className="stat-box-value" style={{ color: "var(--warn)" }}>−{eur(charges)}</div>
-                </div>
-                <div className="stat-box">
-                  <div className="stat-box-label">Marge Nette Finale</div>
-                  <div className="stat-box-value" style={{ color: netMarge >= 0 ? "var(--ok)" : "var(--bad)" }}>{eur(netMarge)}</div>
-                </div>
-              </div>
-
-              {chargeRows.length === 0 ? (
-                <Empty glyph="💸" title="Aucune charge sur la période">
-                  Ajoutez vos charges depuis la page Charges pour voir leur impact ici.
-                </Empty>
-              ) : (
-                <div className="twrap">
-                  <table className="table-compact">
-                    <thead>
-                      <tr>
-                        <th>Catégorie</th>
-                        <th className="r">Nombre</th>
-                        <th className="r">Montant</th>
-                        <th className="r">Part des charges</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {chargeRows.map((c) => (
-                        <tr key={c.key}>
-                          <td style={{ fontWeight: 600 }}>{c.key}</td>
-                          <td className="r num">{c.count}</td>
-                          <td className="r num" style={{ color: "var(--warn)" }}>{eur(c.total)}</td>
-                          <td className="r num">{pct(charges > 0 ? (c.total / charges) * 100 : 0)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
+      </Section>
     </>
   );
 }

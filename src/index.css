@@ -2433,3 +2433,24 @@ button.home-kpi-pill.clickable:hover {
 
 
 
+
+/* ── Performance & Vue générale : indicateurs et comparatif multi-univers ── */
+.perf-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+.perf-kpi {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 14px 16px; border-radius: var(--r);
+  background: var(--surface); border: 1px solid var(--line);
+  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+}
+.perf-kpi .lbl {
+  font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 700;
+}
+.perf-kpi .val { font-size: 23px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.perf-kpi .val.pos { color: var(--ok); }
+.perf-kpi .val.neg { color: var(--bad); }
+.perf-kpi .meta { font-size: 11px; color: var(--ink-3); }
