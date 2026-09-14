@@ -24,14 +24,13 @@ import Comptabilite from "./pages/Comptabilite";
 export default function App() {
   return (
     <Routes>
-      {/* L'accueil et les hubs (secteur, comptabilité) sont des interfaces à part : pas de sidebar. */}
-      <Route index element={<Home />} />
       <Route path="secteur" element={<SecteurHub />} />
-      <Route path="comptabilite" element={<Comptabilite />} />
 
       <Route element={<Layout />}>
+        <Route index element={<Home />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="performance" element={<PerformancePage />} />
+        <Route path="comptabilite" element={<Comptabilite />} />
         <Route path="stock" element={<Stock />} />
         <Route path="tcg" element={<TcgPage />} />
         <Route path="achats" element={<CentraleAchat />} />
