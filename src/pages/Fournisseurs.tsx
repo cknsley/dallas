@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
 import { HeaderActions } from "../components/Layout";
-import { Empty, Kpi, Segmented } from "../components/ui";
+import { Empty, Kpi, RangePicker, Segmented } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
+import { useDateRange } from "../lib/useDateRange";
 import { usePref } from "../lib/usePref";
 import { useQueryState } from "../lib/useQueryState";
 import { useSecteur } from "../lib/useSecteur";
 import { buildSuppliers, blankSupplierRecord, looksLikeRetail, type Supplier } from "../lib/suppliers";
-import { costOf, periodRange, revenueOf } from "../lib/calc";
+import { costOf, revenueOf } from "../lib/calc";
 import { dshort, eur, eur2 } from "../lib/format";
 import { links } from "../lib/links";
 import { uid } from "../lib/id";
@@ -15,7 +16,7 @@ import ItemModal from "../modals/ItemModal";
 import SupplierModal from "../modals/SupplierModal";
 import OrderModal from "../modals/OrderModal";
 import ExpenseModal from "../modals/ExpenseModal";
-import type { Item, Period, SupplierRecord } from "../types";
+import type { Item, SupplierRecord } from "../types";
 
 type Sort = "name" | "rating" | "purchases" | "debt" | "leadTime";
 
@@ -41,7 +42,7 @@ const Stars = ({ value, onChange }: { value: number; onChange: (n: number) => vo
 export default function Fournisseurs() {
   const { state, dispatch } = useStore();
   const toast = useToast();
-  const [period, setPeriod] = usePref<Period>("period", "month");
+  const { range, from: dateFrom, to: dateTo, setRange } = useDateRange("fourn");
   const [sort, setSort] = usePref<Sort>("supplierSort", "rating");
   const [q, setQ] = useQueryState("q");
   const secteur = useSecteur();
@@ -51,7 +52,6 @@ export default function Fournisseurs() {
   const [ordering, setOrdering] = useState<string | null>(null);
   const [addingExpense, setAddingExpense] = useState(false);
 
-  const range = useMemo(() => periodRange(period), [period]);
   const excluded = state.settings.nonSuppliers;
   const allSources = useMemo(
     () => buildSuppliers(secteur.items, state.suppliers),
@@ -126,16 +126,7 @@ export default function Fournisseurs() {
   return (
     <>
       <HeaderActions>
-        <Segmented<Period>
-          value={period}
-          onChange={setPeriod}
-          options={[
-            { value: "month", label: "Mois" },
-            { value: "quarter", label: "Trimestre" },
-            { value: "year", label: "Année" },
-            { value: "all", label: "Tout" },
-          ]}
-        />
+        <RangePicker from={dateFrom} to={dateTo} onChange={setRange} />
         <input type="search" value={q} placeholder="Rechercher un prestataire…" style={{ width: 190 }} onChange={(e) => setQ(e.target.value)} />
         <button className="btn" onClick={() => setRecordFor({ name: "", record: null })}>+ Nouveau fournisseur</button>
         <button className="btn primary" onClick={() => setOrdering("")}>+ Commande fournisseur</button>

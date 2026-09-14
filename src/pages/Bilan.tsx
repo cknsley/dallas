@@ -3,19 +3,20 @@ import { Link, useSearchParams } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
 import CashFlowCard from "../components/CashFlowCard";
 import RentabilitePanel from "../components/RentabilitePanel";
-import { BarList, Empty, Kpi, Segmented } from "../components/ui";
+import { BarList, Empty, Kpi, RangePicker, Segmented } from "../components/ui";
 import { useStore } from "../store/StoreContext";
+import { useDateRange } from "../lib/useDateRange";
 import { usePref } from "../lib/usePref";
 import {
   caOfYear, chargesInRange, chargesByKind, computeStats, costOf, expenseMonthlyShare,
-  filterItemsByDomain, groupBy, pendingDeliveryValue, periodRange, qtyOf, remainingToAmortize, revenueOf,
+  filterItemsByDomain, groupBy, pendingDeliveryValue, qtyOf, remainingToAmortize, revenueOf,
   soldItems,
 } from "../lib/calc";
 import { dshort, eur, eur2, num, pct } from "../lib/format";
 import { STATUS_LABEL } from "../lib/constants";
 import { vatDue, vatRegime } from "../lib/vat";
 import { links } from "../lib/links";
-import type { Item, Period } from "../types";
+import type { Item } from "../types";
 
 
 
@@ -58,7 +59,7 @@ function BalanceRow({
 
 export default function Bilan() {
   const { state } = useStore();
-  const [period, setPeriod] = usePref<Period>("period", "month");
+  const { range, from: dateFrom, to: dateTo, setRange } = useDateRange("bilan");
   const [domain, setDomain] = usePref<"all" | "fashion" | "tcg">("bilanDomain", "all");
   const [searchParams] = useSearchParams();
 
@@ -71,7 +72,6 @@ export default function Bilan() {
   }, [searchParams]);
 
   const domainItems = useMemo(() => filterItemsByDomain(state.items, domain), [state.items, domain]);
-  const range = useMemo(() => periodRange(period), [period]);
   const stats = useMemo(() => computeStats(state, range, domain), [state, range, domain]);
   const regime = useMemo(
     () => vatRegime(state.settings, caOfYear(domainItems, new Date().getFullYear())),
@@ -152,15 +152,7 @@ export default function Bilan() {
             { value: "tcg", label: "🃏 TCG & Cartes" },
           ]}
         />
-        <Segmented<Period>
-          value={period}
-          onChange={setPeriod}
-          options={[
-            { value: "month", label: "Mois en cours" },
-            { value: "year", label: "Année en cours" },
-            { value: "all", label: "Depuis le début" },
-          ]}
-        />
+        <RangePicker from={dateFrom} to={dateTo} onChange={setRange} />
       </HeaderActions>
 
       {/* ── TRÉSORERIE ── */}

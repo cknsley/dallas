@@ -1,14 +1,15 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
-import { Confirm, Empty, Kpi, Photo, Segmented } from "../components/ui";
+import { Confirm, Empty, Kpi, Photo, RangePicker } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
+import { useDateRange } from "../lib/useDateRange";
 import { usePref } from "../lib/usePref";
 import { useClearQuery, useQueryState } from "../lib/useQueryState";
 import { links } from "../lib/links";
 import { LABEL } from "../lib/lexicon";
-import { canFileLitige, costOf, marginOf, periodRange, qtyOf, revenueOf, saleCostsOf, soldItems } from "../lib/calc";
+import { canFileLitige, costOf, marginOf, qtyOf, revenueOf, saleCostsOf, soldItems } from "../lib/calc";
 import { useSecteur } from "../lib/useSecteur";
 import { dshort, eur, eur2, pct, today } from "../lib/format";
 import { DELIVERY_LABEL, DELIVERY_ORDER } from "../lib/constants";
@@ -17,7 +18,7 @@ import ItemModal from "../modals/ItemModal";
 import SellModal from "../modals/SellModal";
 import PickItemModal from "../modals/PickItemModal";
 import ExpenseModal from "../modals/ExpenseModal";
-import type { Delivery, Item, Period } from "../types";
+import type { Delivery, Item } from "../types";
 
 const isDirectOrSocialPlatform = (plat: string | undefined): boolean => {
   if (!plat) return true;
@@ -30,7 +31,7 @@ export default function Ventes() {
   const { state, dispatch, deleteItem } = useStore();
   const toast = useToast();
   const navigate = useNavigate();
-  const [period, setPeriod] = usePref<Period>("period", "month");
+  const { range, from: dateFrom, to: dateTo, setRange } = useDateRange("ventes");
   const secteur = useSecteur();
   const [deliveryParam, setDelivery] = useQueryState("delivery", "all");
   const [platform, setPlatform] = useQueryState("platform");
@@ -47,7 +48,6 @@ export default function Ventes() {
   const [picking, setPicking] = useState(false);
   const [addingExpense, setAddingExpense] = useState(false);
 
-  const range = useMemo(() => periodRange(period), [period]);
   const items = secteur.items;
   const list = useMemo(
     () =>
@@ -95,15 +95,7 @@ export default function Ventes() {
   return (
     <>
       <HeaderActions>
-        <Segmented<Period>
-          value={period}
-          onChange={setPeriod}
-          options={[
-            { value: "month", label: "Mois en cours" },
-            { value: "year", label: "Année en cours" },
-            { value: "all", label: "Depuis le début" },
-          ]}
-        />
+        <RangePicker from={dateFrom} to={dateTo} onChange={setRange} />
         <button className="btn" onClick={() => downloadText(`ventes-${today()}.csv`, itemsToCSV(list))}>
           ↓ Export CSV
         </button>

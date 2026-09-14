@@ -7,6 +7,7 @@ import {
 import { HeaderActions } from "../components/Layout";
 import { Empty, RangePicker, Section } from "../components/ui";
 import { useStore } from "../store/StoreContext";
+import { useDateRange } from "../lib/useDateRange";
 import { usePref } from "../lib/usePref";
 import {
   chargesByCategory, chargesInRange, costOf, filterItemsByDomain, marginOf,
@@ -51,8 +52,7 @@ const daysInStock = (i: Item): number | null => {
 export default function PerformancePage() {
   const { state } = useStore();
   const [searchParams] = useSearchParams();
-  const [dateFrom, setDateFrom] = usePref<string>("perfFrom", "");
-  const [dateTo, setDateTo] = usePref<string>("perfTo", "");
+  const { range, from: dateFrom, to: dateTo, setRange } = useDateRange("perf");
   const [domain, setDomain] = usePref<string>("perfDomain", "all");
   const [chartView, setChartView] = useState<ChartView>("univers");
   const [sortKey, setSortKey] = useState<SortKey>("recent");
@@ -70,20 +70,6 @@ export default function PerformancePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, sectorIds.join(",")]);
 
-  const monthDefaults = useMemo(() => {
-    const n = new Date();
-    const iso = (d: Date) => d.toISOString().slice(0, 10);
-    return { from: iso(new Date(n.getFullYear(), n.getMonth(), 1)), to: iso(new Date(n.getFullYear(), n.getMonth() + 1, 0)) };
-  }, []);
-
-  const range = useMemo(
-    () => {
-      const from = dateFrom || monthDefaults.from;
-      const to = dateTo || monthDefaults.to;
-      return { from, to, label: `du ${dshort(from)} au ${dshort(to)}`, bounded: true };
-    },
-    [dateFrom, dateTo, monthDefaults],
-  );
   const domainItems = useMemo(() => filterItemsByDomain(state.items, domain), [state.items, domain]);
   const sold = useMemo(() => soldItems(domainItems, range), [domainItems, range]);
 
@@ -193,7 +179,7 @@ export default function PerformancePage() {
             return <option key={id} value={id}>{meta.icon} {meta.label}</option>;
           })}
         </select>
-        <RangePicker from={dateFrom || monthDefaults.from} to={dateTo || monthDefaults.to} onChange={(r) => { setDateFrom(r.from); setDateTo(r.to); }} />
+        <RangePicker from={dateFrom} to={dateTo} onChange={setRange} />
       </HeaderActions>
 
       {/* ── INDICATEURS CLÉS ── */}
