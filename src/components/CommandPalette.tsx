@@ -52,7 +52,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
   const pages = useMemo(() => [
     { title: "Tableau de bord", path: "/dashboard", icon: LayoutDashboard, category: "Navigation" },
     { title: "Stock & Articles", path: "/stock", icon: Package, category: "Navigation" },
-    { title: "TCG & Cartes", path: "/tcg", icon: Layers, category: "Navigation" },
+    { title: "TCG & Cartes", path: "/achats?secteur=tcg", icon: Layers, category: "Navigation" },
     { title: "Sourcing & Achats", path: "/sourcing", icon: Sparkles, category: "Navigation" },
     { title: "Ventes & Commandes", path: "/ventes", icon: ShoppingCart, category: "Navigation" },
     { title: "Livraisons & Colis", path: "/livraison", icon: Truck, category: "Navigation" },

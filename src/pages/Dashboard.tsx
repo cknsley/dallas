@@ -4,19 +4,20 @@ import { ArrowRight } from "lucide-react";
 import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  AreaChart, Area,
 } from "recharts";
 import { HeaderActions } from "../components/Layout";
 import { Empty, RangePicker, Section } from "../components/ui";
 import { useStore } from "../store/StoreContext";
 import { useDateRange } from "../lib/useDateRange";
 import {
-  computeStats, filterItemsByDomain, marginOf,
+  computeStats, costOf, filterItemsByDomain, marginOf, monthlySeries,
   qtyOf, revenueOf, sectorMeta, soldItems,
 } from "../lib/calc";
 import { dshort, eur, pct } from "../lib/format";
 
 type SectorSort = "ca" | "marge" | "stock" | "articles" | "nom";
-type ChartView = "ca" | "marge" | "stock" | "repartition";
+type ChartView = "ca" | "marge" | "stock" | "repartition" | "evolution";
 type TopSort = "marge" | "ca" | "roi" | "rapide" | "quantite";
 type VenteSort = "recent" | "ancien" | "marge_desc" | "prix_desc" | "roi_desc" | "delai_asc";
 
@@ -52,6 +53,7 @@ const CHART_LABELS: Record<ChartView, string> = {
   marge: "Marge par univers",
   stock: "Valeur du stock par univers",
   repartition: "Répartition du CA",
+  evolution: "Évolution CA & marge (6 mois)",
 };
 
 export default function Dashboard() {
@@ -111,7 +113,7 @@ export default function Dashboard() {
     const withMetrics = sold.map((i) => {
       const rev = revenueOf(i);
       const marge = marginOf(i);
-      const cost = i.cost ? (i.cost + (i.fees || 0)) * qtyOf(i) : 0;
+      const cost = i.cost ? costOf(i) : 0;
       const delai = i.buyDate && i.saleDate
         ? Math.max(0, Math.round((new Date(i.saleDate).getTime() - new Date(i.buyDate).getTime()) / 86400000))
         : null;
@@ -133,7 +135,7 @@ export default function Dashboard() {
   /* Toutes les ventes de la période, quel que soit l'univers. */
   const ventes = useMemo(() => {
     const rows = soldItems(state.items, range).map((i) => {
-      const cost = i.cost ? (i.cost + (i.fees || 0)) * qtyOf(i) : 0;
+      const cost = i.cost ? costOf(i) : 0;
       const delai = i.buyDate && i.saleDate
         ? Math.max(0, Math.round((new Date(i.saleDate).getTime() - new Date(i.buyDate).getTime()) / 86400000))
         : null;
@@ -164,6 +166,8 @@ export default function Dashboard() {
       .filter((r) => r.value !== 0);
   }, [rows, chartView]);
 
+  const evolutionData = useMemo(() => monthlySeries(state.items, 6), [state.items]);
+
   const axisProps = { stroke: "var(--ink-3)", fontSize: 11, tickLine: false };
   const tooltipStyle = {
     background: "var(--surface-solid)",
@@ -180,6 +184,7 @@ export default function Dashboard() {
   return (
     <>
       <HeaderActions>
+        <span className="hint">Comparez vos univers, vos meilleures ventes et leur évolution</span>
         <RangePicker from={dateFrom} to={dateTo} onChange={setRange} />
       </HeaderActions>
 
@@ -390,7 +395,29 @@ export default function Dashboard() {
         }
       >
         <div className="card-b" style={{ height: 300 }}>
-          {chartData.length === 0 ? (
+          {chartView === "evolution" ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={evolutionData}>
+                <defs>
+                  <linearGradient id="caGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={PALETTE[0]} stopOpacity={0.35} />
+                    <stop offset="100%" stopColor={PALETTE[0]} stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="margeGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={PALETTE[1]} stopOpacity={0.35} />
+                    <stop offset="100%" stopColor={PALETTE[1]} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
+                <XAxis dataKey="label" {...axisProps} />
+                <YAxis {...axisProps} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => eur(v)} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Area type="monotone" dataKey="ca" name="CA" stroke={PALETTE[0]} fill="url(#caGrad)" strokeWidth={2} />
+                <Area type="monotone" dataKey="marge" name="Marge" stroke={PALETTE[1]} fill="url(#margeGrad)" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : chartData.length === 0 ? (
             <Empty glyph="📊" title="Aucune donnée">Rien à afficher sur cette période.</Empty>
           ) : chartView === "repartition" ? (
             <ResponsiveContainer width="100%" height="100%">

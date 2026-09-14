@@ -5,7 +5,7 @@ import type { AppState } from "../types";
 
 /** Bilan de rentabilité des ventes : d'où vient le chiffre d'affaires, marque par marque. */
 export default function RentabilitePanel({ state }: { state: AppState }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const soldItems = state.items.filter((i) => i.status === "vendu");
   const totalCa = soldItems.reduce((a, i) => a + i.price * qtyOf(i), 0);
   const totalMarge = soldItems.reduce((a, i) => a + marginOf(i), 0);

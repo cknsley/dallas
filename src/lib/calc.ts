@@ -1,11 +1,17 @@
-import type { AppState, Expense, Item, Period } from "../types";
+import type { AppState, Expense, Item, Period, Todo } from "../types";
 import { num } from "./format";
 
 /** Nombre d'exemplaires sur la ligne, au minimum un. */
 export const qtyOf = (i: Item): number => Math.max(1, num(i.quantity) || 1);
 
+/** Frais d'achat unitaires, séparés pour garder livraison et douane lisibles. */
+export const purchaseFeesUnitOf = (i: Item): number =>
+  num(i.fees) + num(i.purchaseShipping) + num(i.customsFees);
+
+export const purchaseFeesOf = (i: Item): number => purchaseFeesUnitOf(i) * qtyOf(i);
+
 /** Coût d'acquisition de la ligne : (prix payé + frais d'achat) × quantité. */
-export const costOf = (i: Item): number => (num(i.cost) + num(i.fees)) * qtyOf(i);
+export const costOf = (i: Item): number => (num(i.cost) + purchaseFeesUnitOf(i)) * qtyOf(i);
 
 /** Frais supportés lors de la vente : commission, emballage et port valent pour l'envoi entier. */
 export const saleCostsOf = (i: Item): number =>
@@ -130,6 +136,66 @@ export function filterItemsByDomain(items: Item[], domain: Domain): Item[] {
   if (domain === "fashion") return items.filter((i) => !isTcgItem(i) && !i.sector);
   // Univers personnalisé : uniquement les articles explicitement rattachés à cet id.
   return items.filter((i) => i.sector === domain);
+}
+
+const TCG_TERMS = [
+  "tcg", "carte", "booster", "display", "etb", "pokemon", "pokémon", "lorcana",
+  "yugioh", "yu-gi-oh", "magic", "one piece", "grading", "gradée", "gradee",
+  "psa", "bgs", "pca", "cgc", "blister", "coffret", "dracaufeu", "pikachu",
+  "charizard", "ev0", "eb0", "sv0", "swsh",
+];
+
+const FASHION_TERMS = [
+  "dunk", "jordan", "air max", "sneaker", "sneakers", "chaussure", "chaussures",
+  "basket", "baskets", "yeezy", "nike", "adidas", "stussy", "supreme", "corteiz",
+  "trapstar", "ralph lauren", "lacoste", "carhartt", "zara", "asics", "new balance",
+  "veste", "jean", "jeans", "pull", "sweat", "hoodie", "t-shirt", "tee-shirt", "tshirt",
+  "pantalon", "survêtement", "survetement", "jogging", "parka", "manteau", "blouson",
+  "polo", "chemise", "short", "jupe", "robe", "taille", "pointure", "vêtement", "vetement",
+];
+
+export function isTcgTodo(t: Todo, items: Item[] = []): boolean {
+  return todoDomain(t, items) === "tcg";
+}
+
+export function todoDomain(t: Todo, items: Item[] = []): string {
+  // 1. Si la tâche est liée à un article précis, hérite prioritairement du domaine de cet article
+  if (t.itemId && items.length > 0) {
+    const linked = items.find((i) => i.id === t.itemId);
+    if (linked) {
+      if (linked.sector) return linked.sector;
+      if (isTcgItem(linked)) return "tcg";
+      return "fashion";
+    }
+  }
+
+  const txt = `${t.text || ""} ${t.sourcingBrand || ""} ${t.sourcingSize || ""} ${t.sourcingLead || ""}`.toLowerCase();
+  const hasTcg = TCG_TERMS.some((term) => txt.includes(term));
+  const hasFashion = FASHION_TERMS.some((term) => txt.includes(term));
+
+  // 2. Détection par mots-clés sémantiques : un vêtement/sneaker n'est JAMAIS dans le TCG
+  if (hasFashion && !hasTcg) return "fashion";
+  if (hasTcg && !hasFashion) return "tcg";
+
+  // 3. Secteur ou tag explicite
+  if (t.sector && t.sector !== "all") {
+    if (t.sector === "tcg" && hasFashion) return "fashion";
+    return t.sector;
+  }
+  if (t.isTcg && !hasFashion) return "tcg";
+
+  // 4. Par défaut : fashion (univers textile / resell originel)
+  return "fashion";
+}
+
+export function filterTodosByDomain(todos: Todo[], domain: Domain, items: Item[] = []): Todo[] {
+  if (domain === "all") return todos;
+  return todos.filter((t) => todoDomain(t, items) === domain);
+}
+
+export function filterSourcingByDomain(todos: Todo[], domain: Domain, items: Item[] = []): Todo[] {
+  if (domain === "all") return todos;
+  return todos.filter((t) => todoDomain(t, items) === domain);
 }
 
 export function computeStats(state: AppState, r: Range, domain: Domain = "all"): Stats {

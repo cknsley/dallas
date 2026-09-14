@@ -19,7 +19,7 @@ import { Users, HelpCircle, FileText } from "lucide-react";
 const MODULES: { key: OptionalModule; label: string; hint: string; icon: any }[] = [
   { key: "clients", label: "Clients", hint: "Base acheteurs et historique des ventes", icon: Users },
   { key: "sav", label: "SAV & Litiges", hint: "Litiges, retours clients et remboursements fournisseurs", icon: HelpCircle },
-  { key: "facturation", label: "Facturation", hint: "Factures, reçus, TVA et impayés", icon: FileText },
+  { key: "facturation", label: "Preuves de Vente", hint: "Générez des preuves d'achat et de vente, sans valeur de facture", icon: FileText },
 ];
 
 export default function Reglages() {
@@ -78,6 +78,13 @@ export default function Reglages() {
               <strong>{legal.label}</strong>
               <span>{legal.hint}</span>
             </div>
+
+            <Field label="Mode de comptabilité">
+              <select value={s.accountingMode ?? "standard"} onChange={(e) => setSetting("accountingMode", e.target.value as "standard" | "fr")}>
+                <option value="standard">Standard (Actuel)</option>
+                <option value="fr">Comptabilité Française (À venir)</option>
+              </select>
+            </Field>
 
             <label className={`mode-switch${s.vatEnabled ? " on" : ""}`}>
               <input
@@ -193,8 +200,17 @@ export default function Reglages() {
             <Field label="Nom / raison sociale" span>
               <input type="text" value={s.business} placeholder="Votre nom commercial" onChange={(e) => setSetting("business", e.target.value)} />
             </Field>
-            <Field label="Adresse" span>
-              <textarea rows={2} value={s.address} onChange={(e) => setSetting("address", e.target.value)} />
+            <Field label="Rue / N° voie" span>
+              <input type="text" value={s.address} placeholder="12 rue de la Paix" onChange={(e) => setSetting("address", e.target.value)} />
+            </Field>
+            <Field label="Code postal">
+              <input type="text" value={s.zip || ""} placeholder="75002" onChange={(e) => setSetting("zip", e.target.value)} />
+            </Field>
+            <Field label="Ville">
+              <input type="text" value={s.city || ""} placeholder="Paris" onChange={(e) => setSetting("city", e.target.value)} />
+            </Field>
+            <Field label="Pays">
+              <input type="text" value={s.country || ""} placeholder="France" onChange={(e) => setSetting("country", e.target.value)} />
             </Field>
             <Field label="E-mail">
               <input type="email" value={s.email} onChange={(e) => setSetting("email", e.target.value)} />

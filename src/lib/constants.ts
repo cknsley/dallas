@@ -9,8 +9,8 @@ export const STATUS_LABEL: Record<ItemStatus, string> = {
 export const STATUS_ORDER: ItemStatus[] = ["arrivage", "stock", "vendu"];
 
 export const DELIVERY_LABEL: Record<Delivery, string> = {
-  non_payee: "Non payée",
-  commandee: "Commandée",
+  non_payee: "Réservée / commandée",
+  commandee: "Payée",
   livree: "Livrée",
 };
 

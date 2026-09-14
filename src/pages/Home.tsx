@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, ArrowUp, ArrowDown, Plus, X, DollarSign, TrendingUp, Wallet, Boxes } from "lucide-react";
-import { Modal } from "../components/ui";
+import { ArrowRight, ArrowUp, ArrowDown, Plus, X, Trash2, DollarSign, TrendingUp, Wallet, Boxes, Sparkles, CheckSquare } from "lucide-react";
+import { Confirm, Modal } from "../components/ui";
 import { useStore } from "../store/StoreContext";
-import { computeStats, periodRange, sectorMeta } from "../lib/calc";
+import { computeStats, filterSourcingByDomain, periodRange, sectorMeta, todoDomain } from "../lib/calc";
 import { eur, num } from "../lib/format";
 import { uid } from "../lib/id";
 import type { CustomSector } from "../types";
@@ -23,6 +23,7 @@ const EMOJI_CHOICES = ["📦", "👟", "👜", "💍", "🎮", "📱", "🧸", "
 export default function Home() {
   const { state, dispatch } = useStore();
   const [addOpen, setAddOpen] = useState(false);
+  const [deletingSector, setDeletingSector] = useState<CustomSector | null>(null);
   const [vaultOpen, setVaultOpen] = useState(false);
   const [draftVault, setDraftVault] = useState("");
 
@@ -43,10 +44,31 @@ export default function Home() {
     return m;
   }, [state, allTime, allSectorIds]);
 
+  // Tous les articles de sourcing actifs
+  const allSourcing = useMemo(
+    () => state.todos.filter((t) => t.isSourcing || t.col === "acheter"),
+    [state.todos],
+  );
+  const activeSourcing = useMemo(
+    () => allSourcing.filter((t) => !t.ordered && t.col !== "termine"),
+    [allSourcing],
+  );
+  const sourcingBySector = useMemo(() => {
+    const counts: Record<string, number> = {};
+    allSectorIds.forEach((id) => {
+      counts[id] = filterSourcingByDomain(activeSourcing, id).length;
+    });
+    return counts;
+  }, [allSectorIds, activeSourcing]);
+
 
   const addSector = (sector: CustomSector) => {
     dispatch({ type: "settings", patch: { customSectors: [...customSectors, sector] } });
     setAddOpen(false);
+  };
+
+  const removeSector = (id: string) => {
+    dispatch({ type: "settings", patch: { customSectors: customSectors.filter((s) => s.id !== id) } });
   };
 
   return (
@@ -90,6 +112,28 @@ export default function Home() {
               <span className="lbl">Stock</span>
               <b className="val">{eur(global.stockEstimate)} · {global.enStock + global.arrivage} art.</b>
             </div>
+
+            <Link
+              to="/todo"
+              className="home-kpi-pill compact clickable"
+              title="Ouvrir le Todo centralisé de tous les univers"
+              style={{ textDecoration: "none", color: "inherit" }}
+            >
+              <span className="ic-wrap"><CheckSquare size={16} /></span>
+              <span className="lbl">Todo Global</span>
+              <b className="val">{state.todos.filter(t => t.col !== 'termine' && !t.isSourcing && t.col !== 'acheter').length} à faire</b>
+            </Link>
+
+            <Link
+              to="/sourcing"
+              className="home-kpi-pill compact clickable"
+              title="Ouvrir le Sourcing centralisé de tous les univers"
+              style={{ textDecoration: "none", color: "inherit" }}
+            >
+              <span className="ic-wrap"><Sparkles size={16} /></span>
+              <span className="lbl">Sourcing</span>
+              <b className="val">{activeSourcing.length} à trouver</b>
+            </Link>
           </div>
         </div>
       </section>
@@ -139,8 +183,23 @@ export default function Home() {
           {allSectorIds.map((domain) => {
             const meta = sectorMeta(domain, customSectors);
             const s = statsById[domain];
+            const isCustom = customSectors.some((s) => s.id === domain);
             return (
               <Link key={domain} to={`/achats?secteur=${domain}`} className="home-sector">
+                {isCustom && (
+                  <button
+                    type="button"
+                    className="home-sector-del"
+                    title="Supprimer cet univers"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDeletingSector(customSectors.find((s) => s.id === domain) ?? null);
+                    }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
                 <span className="home-sector-ic">{meta.icon}</span>
                 <h2>Page {meta.label}</h2>
                 <p>{meta.subtitle}</p>
@@ -156,6 +215,10 @@ export default function Home() {
                   <div>
                     <dt>CA</dt>
                     <dd>{eur(s.ca)}</dd>
+                  </div>
+                  <div>
+                    <dt>Sourcing</dt>
+                    <dd>{sourcingBySector[domain] || 0}</dd>
                   </div>
                 </dl>
                 <span className="home-sector-go">
@@ -175,7 +238,136 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── SOURCING CENTRALISÉ — TOUS UNIVERS ── */}
+      <section className="home-section" style={{ marginTop: 24 }}>
+        <div className="home-section-title">
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", flexWrap: "wrap", gap: 10 }}>
+            <div>
+              <h2>🛒 Sourcing Centralisé</h2>
+              <span className="hint">Toutes vos opportunités et recherches d'achat réunies par univers (Vêtements, TCG...)</span>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <Link to="/sourcing" className="btn sm primary" style={{ textDecoration: "none" }}>
+                Ouvrir Sourcing ({activeSourcing.length}) <ArrowRight size={14} style={{ marginLeft: 4 }} />
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        <div className="card" style={{ padding: "18px 20px" }}>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
+            <div className="pill info" style={{ padding: "6px 12px", fontSize: 12 }}>
+              🔎 <b>{activeSourcing.filter((t) => !t.dueDate).length}</b> &nbsp; À rechercher
+            </div>
+            <div className="pill warn" style={{ padding: "6px 12px", fontSize: 12 }}>
+              💬 <b>{activeSourcing.filter((t) => !!t.dueDate).length}</b> &nbsp; En négociation
+            </div>
+            <div className="pill good" style={{ padding: "6px 12px", fontSize: 12 }}>
+              ✓ <b>{allSourcing.filter((t) => t.ordered || t.col === "termine").length}</b> &nbsp; Trouvés / Commandés
+            </div>
+          </div>
+
+          {activeSourcing.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "20px 0", color: "var(--ink-3)" }}>
+              <p style={{ margin: "0 0 12px 0", fontSize: 14 }}>Aucun produit en sourcing actif pour le moment.</p>
+              <Link to="/sourcing" className="btn sm primary">
+                🛒 + Ajouter un produit à sourcer
+              </Link>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+              {activeSourcing.slice(0, 4).map((t) => {
+                const sDom = todoDomain(t);
+                const sMeta = sectorMeta(sDom, customSectors);
+                const isNego = !!t.dueDate;
+                return (
+                  <div
+                    key={t.id}
+                    className="card"
+                    style={{
+                      padding: "14px 16px",
+                      background: "var(--surface-2)",
+                      border: "1px solid var(--line)",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      gap: 8,
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 6 }}>
+                        <span className="pill info" style={{ fontSize: 11, fontWeight: 600 }}>
+                          {sMeta.icon} {sMeta.label}
+                        </span>
+                        <span className={`pill ${isNego ? "warn" : "ghost"}`} style={{ fontSize: 10 }}>
+                          {isNego ? "💬 En négo" : "🔎 À chercher"}
+                        </span>
+                      </div>
+                      <b style={{ fontSize: 14, display: "block", color: "var(--ink)" }}>{t.text}</b>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4, fontSize: 11 }}>
+                        {t.sourcingBrand && <span className="pill ghost">{t.sourcingBrand}</span>}
+                        {t.sourcingPrice && t.sourcingPrice > 0 ? (
+                          <span className="pill good">Budget: {eur(t.sourcingPrice)}</span>
+                        ) : null}
+                        {t.supplierName && <span className="pill ghost">🏢 {t.supplierName}</span>}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+                      <Link to={`/sourcing?secteur=${sDom}`} className="btn sm ghost" style={{ fontSize: 11 }}>
+                        Voir dans {sMeta.label} →
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ── NÉGOCIER : ACHAT / VENTE ── */}
+      <section className="home-section" style={{ marginTop: 24 }}>
+        <div className="home-section-title">
+          <h2>🤝 Négocier</h2>
+          <span className="hint">Simulez un rachat ou une vente avant de vous engager</span>
+        </div>
+
+        <div className="home-sectors">
+          <Link to="/deal/achat" className="home-sector">
+            <span className="home-sector-ic">🎯</span>
+            <h2>Achat</h2>
+            <p>Simuler un rachat — article seul ou lot — avant de s'engager</p>
+            <span className="home-sector-go">
+              Ouvrir Achat <ArrowRight size={15} />
+            </span>
+          </Link>
+
+          <Link to="/deal/vente" className="home-sector">
+            <span className="home-sector-ic">🏷️</span>
+            <h2>Vente</h2>
+            <p>Simuler une vente ou une remise — lot ou article seul</p>
+            <span className="home-sector-go">
+              Ouvrir Vente <ArrowRight size={15} />
+            </span>
+          </Link>
+        </div>
+      </section>
+
       {addOpen && <AddSectorModal onClose={() => setAddOpen(false)} onCreate={addSector} />}
+
+      {deletingSector && (
+        <Confirm
+          title="Supprimer cet univers ?"
+          body={
+            <>
+              « {deletingSector.label} » disparaîtra de l'accueil. Les articles déjà rattachés restent en stock,
+              mais leur page dédiée n'existera plus.
+            </>
+          }
+          onConfirm={() => removeSector(deletingSector.id)}
+          onClose={() => setDeletingSector(null)}
+        />
+      )}
     </div>
   );
 }

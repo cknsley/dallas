@@ -2,13 +2,15 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Stock from "./pages/Stock";
-import TcgPage from "./pages/TcgPage";
 import CentraleAchat from "./pages/CentraleAchat";
+import Arrivage from "./pages/Arrivage";
 import Ventes from "./pages/Ventes";
+import VentesGlobales from "./pages/VentesGlobales";
 import Livraison from "./pages/Livraison";
 import Sav from "./pages/Sav";
 import Bilan from "./pages/Bilan";
-import Deal from "./pages/Deal";
+import Balance from "./pages/Balance";
+import { DealAchat, DealVente } from "./pages/Deal";
 import Clients from "./pages/Clients";
 import Fournisseurs from "./pages/Fournisseurs";
 import Charges from "./pages/Charges";
@@ -19,6 +21,7 @@ import Reglages from "./pages/Reglages";
 import SecteurHub from "./pages/SecteurHub";
 import Home from "./pages/Home";
 import Comptabilite from "./pages/Comptabilite";
+import Gradation from "./pages/Gradation";
 
 export default function App() {
   return (
@@ -28,19 +31,24 @@ export default function App() {
       <Route element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="dashboard" element={<Dashboard />} />
+        <Route path="ventes-globales" element={<VentesGlobales />} />
         <Route path="performance" element={<Navigate to="/dashboard" replace />} />
         <Route path="comptabilite" element={<Comptabilite />} />
         <Route path="stock" element={<Stock />} />
-        <Route path="tcg" element={<TcgPage />} />
+        {/* L'ancienne page TCG isolée : l'espace TCG vit désormais dans les pages secteur, comme Vêtements. */}
+        <Route path="tcg" element={<Navigate to="/stock?secteur=tcg" replace />} />
         <Route path="achats" element={<CentraleAchat />} />
-        <Route path="arrivage" element={<Navigate to="/achats" replace />} />
+        <Route path="arrivage" element={<Arrivage />} />
         <Route path="ventes" element={<Ventes />} />
         <Route path="livraison" element={<Livraison />} />
         <Route path="sav" element={<Sav />} />
         <Route path="retours" element={<Navigate to="/sav?tab=retours" replace />} />
         <Route path="colis" element={<Navigate to="/livraison" replace />} />
+        <Route path="balance" element={<Balance />} />
         <Route path="bilan" element={<Bilan />} />
-        <Route path="deal" element={<Deal />} />
+        <Route path="deal" element={<DealAchat />} />
+        <Route path="deal/achat" element={<DealAchat />} />
+        <Route path="deal/vente" element={<DealVente />} />
         <Route path="clients" element={<Clients />} />
         <Route path="fournisseurs" element={<Fournisseurs />} />
         <Route path="marge" element={<Navigate to="/bilan" replace />} />
@@ -49,6 +57,7 @@ export default function App() {
         <Route path="sourcing" element={<Sourcing />} />
         <Route path="facturation" element={<Facturation />} />
         <Route path="reglages" element={<Reglages />} />
+        <Route path="gradation" element={<Gradation />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

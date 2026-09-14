@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
-import { Confirm, Empty, Kpi, Segmented } from "../components/ui";
+import { Confirm, Empty, Segmented } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { caOfYear } from "../lib/calc";
-import { dfr, eur, eur2, pct } from "../lib/format";
-import { docKindLabel, isSociete, vatRegime } from "../lib/vat";
+import { dfr, eur2 } from "../lib/format";
+import { docKindLabel, vatRegime } from "../lib/vat";
 import { useQueryState } from "../lib/useQueryState";
 import { useSecteur } from "../lib/useSecteur";
 import { links } from "../lib/links";
@@ -54,10 +54,6 @@ export default function Facturation() {
   );
 
   const unpaid = scopedDocs.filter((d) => !d.paid);
-  const unpaidTotal = unpaid.reduce((a, d) => a + d.total, 0);
-  const vatCollected = scopedDocs
-    .filter((d) => d.date.slice(0, 4) === String(year))
-    .reduce((a, d) => a + d.vatAmount, 0);
 
   const visibleDocs = [...scopedDocs]
     .filter((d) => docFilter === "all" || (docFilter === "paid" ? d.paid : !d.paid))
@@ -70,38 +66,7 @@ export default function Facturation() {
         <button className="btn primary" onClick={() => setCreating([])}>+ Nouveau document</button>
       </HeaderActions>
 
-      <div className="kpi-grid">
-        <Kpi label={`CA ${year}`} value={eur(caYear)} meta={regime.label} to={links.ventes()} hint="Ventes" />
-        <Kpi
-          label={s.vatEnabled ? "Seuil de franchise" : "Facture pro"}
-          value={!s.vatEnabled ? "Désactivé" : isSociete(s.legalStatus) ? "—" : eur(regime.threshold)}
-          meta={
-            !s.vatEnabled
-              ? "Activez-la ci-dessous si vous facturez avec TVA"
-              : isSociete(s.legalStatus)
-              ? "Société assujettie dès le 1er euro"
-              : regime.threshold
-                ? `${pct((caYear / regime.threshold) * 100)} atteint`
-                : "Aucun seuil défini"
-          }
-          tone={regime.alert ? (regime.alert.level === "bad" ? "warn" : "warn") : "ok"}
-        />
-        <Kpi
-          label="TVA collectée"
-          value={eur(vatCollected)}
-          meta={regime.subject ? `Sur documents ${year}` : "Non assujetti"}
-          to={links.bilan()}
-          hint="Bilan"
-        />
-        <Kpi
-          label="Impayés"
-          value={eur(unpaidTotal)}
-          meta={`${unpaid.length} document${unpaid.length > 1 ? "s" : ""} en attente`}
-          tone={unpaid.length ? "warn" : "ok"}
-          to={unpaid.length ? links.facturation({ state: "unpaid" }) : undefined}
-          hint="Filtrer"
-        />
-      </div>
+
 
       {regime.alert && (
         <div className={`note ${regime.alert.level === "bad" ? "bad" : "warn"}`} style={{ marginBottom: 18 }}>

@@ -1,187 +1,55 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
-import { Kpi, Modal, Photo } from "../components/ui";
-import InlineField from "../components/InlineField";
+import { Kpi, RangePicker } from "../components/ui";
 import MenuButton from "../components/MenuButton";
 import { useStore } from "../store/StoreContext";
-import { costOf, qtyOf } from "../lib/calc";
+import { costOf, filterTodosByDomain, qtyOf } from "../lib/calc";
+import { useDateRange } from "../lib/useDateRange";
 import { useSecteur } from "../lib/useSecteur";
-import { dshort, eur, eur2, num, today } from "../lib/format";
+import { dshort, eur, num, today } from "../lib/format";
 import { links } from "../lib/links";
 import { uid } from "../lib/id";
 import { useToast } from "../components/Toast";
-import type { Item, ProductGender } from "../types";
-import TrackingLink from "../components/TrackingLink";
+import { DELIVERY_LABEL, SHIPPING_LABEL } from "../lib/constants";
+import { fieldLabels, sectorStamp } from "../lib/sectorFields";
+import type { Todo } from "../types";
+import type { Item } from "../types";
 import ItemModal from "../modals/ItemModal";
-import ScannerModal from "../components/ScannerModal";
 import ExpenseModal from "../modals/ExpenseModal";
-import SellModal from "../modals/SellModal";
 import OrderModal, { type OrderPresetLine } from "../modals/OrderModal";
 import ImportInvoiceModal from "../modals/ImportInvoiceModal";
 
-type Dispatch = ReturnType<typeof useStore>["dispatch"];
-
-/**
- * Réception d'une ligne d'arrivage. Un lot de N exemplaires éclate en N articles
- * individuels : chacun se vend, se photographie et se price séparément. Le tag du
- * lot garde le lien avec la commande d'origine.
- */
-function receivedUnits(item: Item): Item[] {
-  const qty = qtyOf(item);
-  const received = {
-    status: "stock" as const,
-    receiveDate: today(),
-    lotTag: item.lotTag || item.source || "",
-  };
-  if (qty <= 1) return [{ ...item, ...received }];
-  return Array.from({ length: qty }, (_, n) => ({
-    ...item,
-    ...received,
-    id: uid(),
-    quantity: 1,
-    createdAt: Date.now() + n,
-  }));
-}
-
-/** Seule implémentation de la réception : toute l'app passe par ici. Renvoie le nombre d'unités entrées. */
-function receiveInto(item: Item, dispatch: Dispatch): number {
-  const units = receivedUnits(item);
-  if (units.length > 1) dispatch({ type: "removeItem", id: item.id });
-  units.forEach((unit) => dispatch({ type: "upsertItem", item: unit }));
-  return units.length;
-}
-
-type ParcelDraft = {
-  id: string; name: string; brand: string; type: string; size: string; gender: ProductGender;
-  quantity: string; cost: string; fees: string; price: string; condition: string;
+/** Ordre d'avancement d'un envoi, du plus tôt au plus abouti — sert à trier la colonne Livraison. */
+const SHIP_RANK: Record<string, number> = {
+  a_emballer: 0, a_imprimer: 1, en_preparation: 2, a_deposer: 3, livree: 4, recu: 5,
 };
-
-function ReceiveParcelModal({ items, onClose }: { items: Item[]; onClose: () => void }) {
-  const { dispatch } = useStore();
-  const toast = useToast();
-  const navigate = useNavigate();
-  const [drafts, setDrafts] = useState<ParcelDraft[]>(() =>
-    items.map((i) => ({
-      id: i.id, name: i.name, brand: i.brand, type: i.type, size: i.size, gender: i.gender || "",
-      quantity: String(qtyOf(i)), cost: i.cost ? String(i.cost) : "", fees: i.fees ? String(i.fees) : "",
-      price: i.price ? String(i.price) : "", condition: i.condition || "Neuf avec étiquette",
-    })),
-  );
-
-  const patch = <K extends keyof ParcelDraft>(id: string, key: K, value: ParcelDraft[K]) =>
-    setDrafts((rows) => rows.map((r) => (r.id === id ? { ...r, [key]: value } : r)));
-
-  const saveAll = () => {
-    let total = 0;
-    for (const d of drafts) {
-      const original = items.find((i) => i.id === d.id);
-      if (!original) continue;
-      total += receiveInto(
-        {
-          ...original,
-          name: d.name.trim() || original.name,
-          brand: d.brand.trim(),
-          type: d.type.trim(),
-          size: d.size.trim(),
-          gender: d.gender,
-          quantity: Math.max(1, Math.round(num(d.quantity)) || 1),
-          cost: num(d.cost),
-          fees: num(d.fees),
-          price: num(d.price),
-          estimatedPrice: num(d.price) || original.estimatedPrice,
-          condition: d.condition.trim() || original.condition || "Neuf avec étiquette",
-        },
-        dispatch,
-      );
-    }
-    toast(`${total} article${total > 1 ? "s" : ""} réceptionné${total > 1 ? "s" : ""} en stock`, {
-      label: "Voir Stock",
-      onClick: () => navigate(links.stock({ status: "stock" })),
-    });
-    onClose();
-  };
-
-  return (
-    <Modal
-      title="Déballage du colis"
-      onClose={onClose}
-      wide
-      footer={
-        <>
-          <button className="btn" onClick={onClose}>Annuler</button>
-          <button className="btn primary" onClick={saveAll}>Réceptionner tout</button>
-        </>
-      }
-    >
-      <div className="hint" style={{ marginBottom: 12 }}>
-        Corrigez ce que le colis contient réellement, puis validez : une ligne de plusieurs
-        exemplaires entre en stock à l'unité.
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {drafts.map((d) => (
-          <div className="calc-line" key={d.id}>
-            <div className="calc-line-grid">
-              <label><span>Article</span><input value={d.name} onChange={(e) => patch(d.id, "name", e.target.value)} /></label>
-              <label><span>Marque</span><input value={d.brand} onChange={(e) => patch(d.id, "brand", e.target.value)} /></label>
-              <label><span>Type</span><input value={d.type} onChange={(e) => patch(d.id, "type", e.target.value)} /></label>
-              <label><span>Taille</span><input value={d.size} onChange={(e) => patch(d.id, "size", e.target.value)} /></label>
-              <label>
-                <span>Sexe</span>
-                <select value={d.gender} onChange={(e) => patch(d.id, "gender", e.target.value as ProductGender)}>
-                  <option value="">Non précisé</option>
-                  <option value="homme">Homme</option>
-                  <option value="femme">Femme</option>
-                  <option value="mixte">Mixte</option>
-                  <option value="enfant">Enfant</option>
-                </select>
-              </label>
-              <label><span>Quantité</span><input type="number" min="1" step="1" value={d.quantity} onChange={(e) => patch(d.id, "quantity", e.target.value)} /></label>
-              <label><span>Coût</span><input type="number" step="0.01" value={d.cost} onChange={(e) => patch(d.id, "cost", e.target.value)} /></label>
-              <label><span>Frais</span><input type="number" step="0.01" value={d.fees} onChange={(e) => patch(d.id, "fees", e.target.value)} /></label>
-              <label><span>Prix estimé</span><input type="number" step="0.01" value={d.price} onChange={(e) => patch(d.id, "price", e.target.value)} /></label>
-              <label>
-                <span>État</span>
-                <select value={d.condition} onChange={(e) => patch(d.id, "condition", e.target.value)}>
-                  <option value="Neuf avec étiquette">✨ Neuf avec étiquette</option>
-                  <option value="Neuf sans étiquette">🏷️ Neuf sans étiquette</option>
-                  <option value="Très bon état">⭐ Très bon état</option>
-                  <option value="Bon état">👍 Bon état</option>
-                  <option value="Satisfaisant">👌 Satisfaisant</option>
-                </select>
-              </label>
-            </div>
-          </div>
-        ))}
-      </div>
-    </Modal>
-  );
-}
 
 type Tab = "colis" | "express";
 
 /**
- * Centrale d'achat : tout ce qui entre — commandes, réception, demandes produit,
- * et l'import de facture pour créer une commande sans tout ressaisir.
+ * Centrale d'achat : le cockpit du jour. Actions rapides pour faire entrer du stock,
+ * et un aperçu "cette semaine" (Todo, Ventes, Livraison) pour ne rien laisser filer.
+ * La réception des colis vit désormais sur la page Arrivage.
  */
 export default function CentraleAchat() {
-  const { state, dispatch } = useStore();
+  const { state, dispatch, resolveAutoTodo } = useStore();
   const toast = useToast();
   const navigate = useNavigate();
   const secteur = useSecteur();
+  const isTcg = secteur.domain === "tcg";
+  const labels = fieldLabels(secteur.domain);
+  const { from: dateFrom, to: dateTo, setRange } = useDateRange("centrale");
   const [tab, setTab] = useState<Tab>("colis");
   const [editingItem, setEditingItem] = useState<Item | null>(null);
-  const [receivingParcel, setReceivingParcel] = useState<Item[] | null>(null);
-  const [showScanner, setShowScanner] = useState(false);
   const [importingInvoice, setImportingInvoice] = useState(false);
   const [creatingOrder, setCreatingOrder] = useState<{ mode: "lot" | "supplier"; defaultSource?: string; initialLines?: OrderPresetLine[] } | null>(null);
   const [addingExpense, setAddingExpense] = useState(false);
   const [newItem, setNewItem] = useState(false);
-  const [selling, setSelling] = useState<Item | null>(null);
 
   const [expressBrand, setExpressBrand] = useState("");
   const [expressName, setExpressName] = useState("");
-  const [expressType, setExpressType] = useState("Sneakers");
+  const [expressType, setExpressType] = useState(isTcg ? "" : "Sneakers");
   const [expressSize, setExpressSize] = useState("");
   const [expressQty, setExpressQty] = useState(1);
   const [expressCost, setExpressCost] = useState("");
@@ -191,76 +59,50 @@ export default function CentraleAchat() {
 
   const now = today();
 
-  const incomingItems = useMemo(
-    () => secteur.items.filter((i) => i.status === "arrivage"),
+  const stockItems = useMemo(() => secteur.items.filter((i) => i.status === "stock"), [secteur.items]);
+  const stockValue = useMemo(() => stockItems.reduce((a, i) => a + costOf(i), 0), [stockItems]);
+
+  /** Todo actifs, triés par échéance la plus proche (sans date en dernier). */
+  const activeTodos = useMemo(
+    () => filterTodosByDomain(
+      state.todos.filter((t: Todo) => t.col !== "termine"),
+      secteur.domain,
+      state.items
+    ).sort((a: Todo, b: Todo) => (a.dueDate || "9999").localeCompare(b.dueDate || "9999")),
+    [state.todos, secteur.domain, state.items],
+  );
+
+  /** Ventes qui attendent un règlement ou une expédition. */
+  const ventesATraiter = useMemo(
+    () => secteur.items.filter((i) => i.status === "vendu" && i.delivery !== "livree").sort((a, b) => (b.saleDate || "").localeCompare(a.saleDate || "")),
     [secteur.items],
   );
 
-  /** Un colis = une commande. Les lignes isolées forment leur propre colis. */
-  const parcels = useMemo(() => {
-    const map = new Map<string, {
-      orderId: string; items: Item[]; supplier: string; tracking: string; carrier: string;
-      expectedDate: string; buyDate: string; purchasePaid: boolean; qty: number; total: number;
-    }>();
-    incomingItems.forEach((item) => {
-      const key = item.orderId || `solo-${item.id}`;
-      if (!map.has(key)) {
-        const sup = state.suppliers.find((s) => s.id === item.source || s.name === item.source);
-        map.set(key, {
-          orderId: key, items: [], supplier: sup?.name || item.source || "Fournisseur direct",
-          tracking: item.tracking, carrier: item.carrier, expectedDate: item.expectedDate,
-          buyDate: item.buyDate, purchasePaid: true, qty: 0, total: 0,
-        });
-      }
-      const parcel = map.get(key)!;
-      parcel.items.push(item);
-      parcel.qty += qtyOf(item);
-      parcel.total += costOf(item);
-      if (!item.purchasePaid) parcel.purchasePaid = false;
-      if (item.expectedDate && (!parcel.expectedDate || item.expectedDate < parcel.expectedDate)) {
-        parcel.expectedDate = item.expectedDate;
-      }
-      if (!parcel.tracking && item.tracking) parcel.tracking = item.tracking;
-      if (!parcel.carrier && item.carrier) parcel.carrier = item.carrier;
-    });
-    return [...map.values()].sort((a, b) => (a.expectedDate || "9999").localeCompare(b.expectedDate || "9999"));
-  }, [incomingItems, state.suppliers]);
+  /** Colis vendus pas encore reçus par l'acheteur. */
+  const enLivraison = useMemo(
+    () => secteur.items.filter((i) => i.status === "vendu" && i.shipping !== "recu").sort((a, b) => (SHIP_RANK[a.shipping] ?? 9) - (SHIP_RANK[b.shipping] ?? 9)),
+    [secteur.items],
+  );
 
-  const totalValue = useMemo(() => incomingItems.reduce((a, i) => a + costOf(i), 0), [incomingItems]);
-  const lateParcels = parcels.filter((p) => p.expectedDate && p.expectedDate < now);
-
-  const patchParcel = (items: Item[], patch: Partial<Item>) =>
-    items.forEach((i) => dispatch({ type: "patchItem", id: i.id, patch }));
-
-  const receive = (item: Item) => {
-    const units = receiveInto(item, dispatch);
-    toast(
-      units > 1 ? `${units} exemplaires de « ${item.name || "Sans nom"} » entrés à l'unité` : `« ${item.name || "Sans nom"} » est en stock`,
-      { label: "Voir le stock", onClick: () => navigate(links.stock({ status: "stock" })) },
-    );
-  };
-
-  const openLitige = (item: Item) => {
-    dispatch({
-      type: "patchItem", id: item.id,
-      patch: {
-        litigeState: "en_cours",
-        litigeCategory: item.litigeCategory || "Arrivage",
-        notes: [item.notes, "Litige signalé à l'arrivage"].filter(Boolean).join("\n"),
-      },
-    });
-    toast("Litige ouvert sur cette ligne", { label: "Voir SAV", onClick: () => navigate(links.sav()) });
+  const completeTodo = (t: (typeof state.todos)[number]) => {
+    if (t.auto) {
+      const message = resolveAutoTodo(t);
+      if (message) toast(message);
+      return;
+    }
+    dispatch({ type: "patchTodo", id: t.id, patch: { col: "termine" } });
+    toast("Tâche marquée comme faite");
   };
 
   const handleExpressSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!expressBrand.trim() && !expressName.trim()) {
-      toast("Veuillez saisir au moins la marque ou le nom de l'article");
+      toast(`Veuillez saisir au moins la ${labels.brand.toLowerCase()} ou le nom de l'article`);
       return;
     }
     const newI: Item = {
       id: uid(), name: expressName.trim() || "Sans nom", brand: expressBrand.trim(),
-      type: expressType.trim() || "Sneakers", size: expressSize.trim(),
+      type: isTcg ? "Carte TCG" : expressType.trim() || "Sneakers", size: expressSize.trim(),
       source: expressSource.trim() || "Sortie de colis Express", quantity: Math.max(1, expressQty),
       cost: num(expressCost), fees: num(expressFees), price: 0, platform: "", buyer: "", buyerUrl: "",
       saleFees: 0, shippingCost: 0, shippingPaid: 0, status: "stock", buyDate: today(), receiveDate: today(),
@@ -268,6 +110,7 @@ export default function CentraleAchat() {
       tracking: "", expectedDate: "", shipDate: "", shipping: "en_preparation", orderId: "", purchasePaid: true,
       lotTag: expressLotTag.trim() || `LOT-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}`,
       autoReceive: false,
+      ...sectorStamp(secteur.domain, { brand: expressBrand.trim(), size: expressSize.trim(), set: expressType.trim() }),
     };
     dispatch({ type: "upsertItem", item: newI });
     toast(`« ${newI.brand} ${newI.name} » ajouté au stock`, {
@@ -297,12 +140,21 @@ export default function CentraleAchat() {
             else setCreatingOrder({ mode: v as "lot" | "supplier" });
           }}
         />
+        <RangePicker from={dateFrom} to={dateTo} onChange={setRange} />
       </HeaderActions>
 
       <div className="kpi-grid" style={{ marginBottom: 18 }}>
-        <Kpi label="Colis attendus" value={String(parcels.length)} meta={`${incomingItems.reduce((a, i) => a + qtyOf(i), 0)} article(s) en chemin`} tone="info" />
-        <Kpi label="Capital en transit" value={eur(totalValue)} meta="Engagé, pas encore en stock" tone="warn" to={links.bilan()} hint="Bilan" />
-        <Kpi label="En retard" value={String(lateParcels.length)} meta={lateParcels.length ? "Arrivée prévue dépassée" : "Aucun retard"} tone={lateParcels.length ? "warn" : "ok"} />
+        <Kpi
+          label="Tâches actives"
+          value={String(activeTodos.length)}
+          meta={activeTodos.length ? "À traiter dans le Todo" : "Rien en attente"}
+          tone={activeTodos.length ? "info" : "ok"}
+          to={links.todo({ secteur: secteur.domain !== "all" ? secteur.domain : undefined })}
+          hint="Voir"
+        />
+        <Kpi label="Ventes à traiter" value={String(ventesATraiter.length)} meta={ventesATraiter.length ? "Règlement ou envoi en attente" : "Tout est réglé"} tone={ventesATraiter.length ? "warn" : "ok"} to={links.ventes()} hint="Voir" />
+        <Kpi label="Colis en livraison" value={String(enLivraison.length)} meta={enLivraison.length ? "Pas encore reçus par l'acheteur" : "Aucune livraison en cours"} tone={enLivraison.length ? "info" : "ok"} to={links.livraison()} hint="Voir" />
+        <Kpi label="Stock actuel" value={eur(stockValue)} meta={`${stockItems.reduce((a, i) => a + qtyOf(i), 0)} article(s) disponibles`} tone="ok" to={links.stock({ status: "stock" })} hint="Voir" />
       </div>
 
       {tab === "colis" && (
@@ -332,13 +184,13 @@ export default function CentraleAchat() {
                   <span className="desc">Rattachée à un fournisseur suivi</span>
                 </button>
 
-                <button type="button" className="action-grid-card glass-highlight" onClick={() => setImportingInvoice(true)}>
+                <button type="button" className="action-grid-card" onClick={() => setImportingInvoice(true)}>
                   <span className="icon">📄</span>
                   <span className="title">Importer une facture</span>
                   <span className="desc">Extrayez automatiquement les pièces d'un PDF</span>
                 </button>
 
-                <button type="button" className="action-grid-card" onClick={() => navigate(links.sourcing())}>
+                <button type="button" className="action-grid-card" onClick={() => navigate(links.sourcing({ secteur: secteur.domain !== "all" ? secteur.domain : undefined }))}>
                   <span className="icon">🛒</span>
                   <span className="title">Sourcer un produit</span>
                   <span className="desc">Ajouter à la recherche et négociation sourcing</span>
@@ -353,91 +205,89 @@ export default function CentraleAchat() {
             </div>
           </div>
 
-          {/* ── SECTION RÉCEPTION & DÉBALLAGE ── */}
-          <div className="card">
-            <div className="card-h">
-              <h3>📦 Réception &amp; déballage ({parcels.length})</h3>
-              <div className="spacer" />
-              <Link to={links.stock({ status: "stock" })} className="hint-link">Voir le stock →</Link>
+          {/* ── CETTE SEMAINE : TODO / VENTES / LIVRAISON ── */}
+          <div className="home-section" style={{ marginTop: 0 }}>
+            <div className="home-section-title">
+              <h2>🗓️ Cette semaine</h2>
+              <span className="hint">Ce qui demande une action côté tâches, ventes et livraisons (J-7)</span>
             </div>
 
-            {parcels.length === 0 ? (
-              <div className="card-b" style={{ padding: 24, textAlign: "center" }}>
-                <h4 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 4px", color: "var(--ink)" }}>📥 Aucun colis en attente</h4>
-                <p className="hint" style={{ margin: 0 }}>Tous vos colis ont été déballés et réceptionnés en stock.</p>
-              </div>
-            ) : (
-              <div className="parcel-grid" style={{ padding: 16 }}>
-                {parcels.map((p) => {
-                  const isLate = !!p.expectedDate && p.expectedDate < now;
-                  return (
-                    <article className={`parcel-card${isLate ? " late" : ""}`} key={p.orderId}>
-                      <header className="parcel-head">
-                        <div className="parcel-id">
-                          <b>📦 {p.supplier}</b>
-                          <span className="pill info">{p.qty} article{p.qty > 1 ? "s" : ""}</span>
-                          <span className={`pill ${p.purchasePaid ? "good" : "bad"}`}>{p.purchasePaid ? "Réglé" : "À régler"}</span>
-                          {isLate && <span className="pill bad">Retard</span>}
+            <div className="kanban">
+              <div className="kcol">
+                <div className="kcol-h"><span className="t">📋 Todo</span><span className="c">{activeTodos.length}</span></div>
+                <div className="kcol-b">
+                  {activeTodos.length === 0 ? (
+                    <div className="hint" style={{ padding: 8 }}>Rien à faire 🎉</div>
+                  ) : (
+                    activeTodos.slice(0, 6).map((t: Todo) => (
+                      <div className="kcard" key={t.id}>
+                        <div className="kcard-inner">
+                          <div className="kcard-row"><span className="tx">{t.text}</span></div>
+                          <div className="kcard-meta">
+                            {t.dueDate && <span className={`pill ${t.dueDate < now ? "bad" : "neutral"}`}>{dshort(t.dueDate)}</span>}
+                            <button className="btn sm ok" onClick={() => completeTodo(t)}>✓ Fait</button>
+                          </div>
                         </div>
-                        <button className="btn ok" onClick={() => setReceivingParcel(p.items)}>✓ Déballer tout ({eur2(p.total)})</button>
-                      </header>
-
-                      <div className="parcel-meta">
-                        <InlineField value={p.carrier} placeholder="Transporteur" onCommit={(v) => patchParcel(p.items, { carrier: v })} width={130} />
-                        {p.tracking ? (
-                          <TrackingLink carrier={p.carrier} code={p.tracking} />
-                        ) : (
-                          <InlineField value={p.tracking} placeholder="Code de suivi" onCommit={(v) => patchParcel(p.items, { tracking: v })} width={140} />
-                        )}
-                        <InlineField value={p.expectedDate} type="date" placeholder="" onCommit={(v) => patchParcel(p.items, { expectedDate: v })} width={132} />
-                        <span className="hint">
-                          {p.expectedDate ? `Arrivée ${dshort(p.expectedDate)}` : "Date inconnue"}
-                          {p.buyDate ? ` · commandé le ${dshort(p.buyDate)}` : ""}
-                        </span>
                       </div>
-
-                      <div className="twrap">
-                        <table className="table-compact">
-                          <thead>
-                            <tr><th>Article</th><th>Marque</th><th>Taille</th><th className="r">Qté</th><th className="r">Coût</th><th className="r">Action</th></tr>
-                          </thead>
-                          <tbody>
-                            {p.items.map((i) => (
-                              <tr key={i.id}>
-                                <td>
-                                  <div className="cell-item">
-                                    <Photo id={i.photoId} />
-                                    <div className="cell-item-text">
-                                      <button className="linkish ellipsis" onClick={() => setEditingItem(i)}>{i.name || "Sans nom"}</button>
-                                      {(i.sku || i.condition) && (
-                                        <div className="cell-item-tags">
-                                          {i.sku && <span className="pill ghost">{i.sku}</span>}
-                                          {i.condition && <span className="accent">{i.condition}</span>}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </td>
-                                <td>{i.brand || "—"}</td>
-                                <td>{i.size || "—"}</td>
-                                <td className="r num">{qtyOf(i)}</td>
-                                <td className="r num">{eur2(costOf(i))}</td>
-                                <td className="r">
-                                  <div className="rowact always">
-                                    <button className="btn sm ok" onClick={() => receive(i)}>⇩ Stock</button>
-                                    <button className="btn sm ghost" onClick={() => openLitige(i)}>Litige</button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </article>
-                  );
-                })}
+                    ))
+                  )}
+                  <Link to={links.todo({ secteur: secteur.domain !== "all" ? secteur.domain : undefined })} className="hint-link">Voir tout le Todo →</Link>
+                </div>
               </div>
-            )}
+
+              <div className="kcol">
+                <div className="kcol-h"><span className="t">🛒 Ventes</span><span className="c">{ventesATraiter.length}</span></div>
+                <div className="kcol-b">
+                  {ventesATraiter.length === 0 ? (
+                    <div className="hint" style={{ padding: 8 }}>Aucune vente en attente</div>
+                  ) : (
+                    ventesATraiter.slice(0, 6).map((i) => (
+                      <div className="kcard" key={i.id}>
+                        <div className="kcard-inner">
+                          <div className="kcard-row">
+                            <button className="tx linkish" onClick={() => setEditingItem(i)}>{i.brand} {i.name || "Sans nom"}</button>
+                          </div>
+                          <div className="kcard-meta">
+                            <span className="pill ghost">{i.platform || "Direct"}</span>
+                            <span className={`pill ${i.delivery === "non_payee" ? "bad" : "warn"}`}>{DELIVERY_LABEL[i.delivery]}</span>
+                            {i.delivery === "non_payee" ? (
+                              <button className="btn sm ok" onClick={() => dispatch({ type: "patchItem", id: i.id, patch: { delivery: "commandee" } })}>💶 Marquer réglée</button>
+                            ) : (
+                              <button className="btn sm" onClick={() => navigate(links.livraison({ tab: "a_partir" }))}>🚚 Expédier</button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  <Link to={links.ventes()} className="hint-link">Voir toutes les ventes →</Link>
+                </div>
+              </div>
+
+              <div className="kcol">
+                <div className="kcol-h"><span className="t">🚚 Livraison</span><span className="c">{enLivraison.length}</span></div>
+                <div className="kcol-b">
+                  {enLivraison.length === 0 ? (
+                    <div className="hint" style={{ padding: 8 }}>Aucune livraison en cours</div>
+                  ) : (
+                    enLivraison.slice(0, 6).map((i) => (
+                      <div className="kcard" key={i.id}>
+                        <div className="kcard-inner">
+                          <div className="kcard-row">
+                            <button className="tx linkish" onClick={() => setEditingItem(i)}>{i.brand} {i.name || "Sans nom"}</button>
+                          </div>
+                          <div className="kcard-meta">
+                            <span className="pill info">{SHIPPING_LABEL[i.shipping]}</span>
+                            <button className="btn sm" onClick={() => navigate(links.livraison())}>→ Livraison</button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  <Link to={links.livraison()} className="hint-link">Voir toutes les livraisons →</Link>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -447,14 +297,14 @@ export default function CentraleAchat() {
           <div className="card-h" style={{ flexWrap: "wrap", gap: 8 }}>
             <h3>🤝 Achat in hand</h3>
             <div className="spacer" />
-            <button className="btn ghost" onClick={() => setTab("colis")}>← Retour aux colis</button>
+            <button className="btn ghost" onClick={() => setTab("colis")}>← Retour</button>
           </div>
           <form onSubmit={handleExpressSubmit} className="card-b express-form">
             <div className="fgrid">
-              <label className="field"><span>Marque *</span><input type="text" placeholder="ex. Nike, Adidas, Jordan…" value={expressBrand} onChange={(e) => setExpressBrand(e.target.value)} autoFocus /></label>
-              <label className="field"><span>Modèle / nom produit</span><input type="text" placeholder="ex. Dunk Low Panda" value={expressName} onChange={(e) => setExpressName(e.target.value)} /></label>
-              <label className="field"><span>Taille / pointure</span><input type="text" placeholder="ex. 42 / M / US 8.5" value={expressSize} onChange={(e) => setExpressSize(e.target.value)} /></label>
-              <label className="field"><span>Catégorie</span><input type="text" placeholder="Sneakers, Vêtements…" value={expressType} onChange={(e) => setExpressType(e.target.value)} /></label>
+              <label className="field"><span>{labels.brand} *</span><input type="text" placeholder={isTcg ? labels.brandPlaceholder : "ex. Nike, Adidas, Jordan…"} value={expressBrand} onChange={(e) => setExpressBrand(e.target.value)} autoFocus /></label>
+              <label className="field"><span>{labels.name}</span><input type="text" placeholder={labels.namePlaceholder} value={expressName} onChange={(e) => setExpressName(e.target.value)} /></label>
+              <label className="field"><span>{isTcg ? labels.size : "Taille / pointure"}</span><input type="text" placeholder={isTcg ? labels.sizePlaceholder : "ex. 42 / M / US 8.5"} value={expressSize} onChange={(e) => setExpressSize(e.target.value)} /></label>
+              <label className="field"><span>{isTcg ? labels.type : "Catégorie"}</span><input type="text" placeholder={labels.typePlaceholder} value={expressType} onChange={(e) => setExpressType(e.target.value)} /></label>
               <label className="field"><span>Coût d'achat unitaire (€)</span><input type="number" step="0.01" placeholder="0.00" value={expressCost} onChange={(e) => setExpressCost(e.target.value)} /></label>
               <label className="field"><span>Frais d'approche / port (€)</span><input type="number" step="0.01" placeholder="0.00" value={expressFees} onChange={(e) => setExpressFees(e.target.value)} /></label>
               <label className="field"><span>Quantité</span><input type="number" min="1" value={expressQty} onChange={(e) => setExpressQty(parseInt(e.target.value) || 1)} /></label>
@@ -482,8 +332,6 @@ export default function CentraleAchat() {
           onSell={() => { setEditingItem(null); navigate(links.stock()); }}
         />
       )}
-      {receivingParcel && <ReceiveParcelModal items={receivingParcel} onClose={() => setReceivingParcel(null)} />}
-      {showScanner && <ScannerModal onClose={() => setShowScanner(false)} />}
       {creatingOrder && (
         <OrderModal
           mode={creatingOrder.mode}
@@ -494,17 +342,6 @@ export default function CentraleAchat() {
       )}
       {addingExpense && <ExpenseModal expense={null} onClose={() => setAddingExpense(false)} />}
       {newItem && <ItemModal item={null} onClose={() => setNewItem(false)} />}
-      {selling && (
-        <SellModal
-          item={selling}
-          onClose={() => setSelling(null)}
-          onSold={(i) => {
-            toast(`« ${i.name} » est passée en Ventes`);
-            navigate(links.ventes({ platform: i.platform || undefined }));
-          }}
-          onInvoice={(i) => navigate(links.newDoc(i.id))}
-        />
-      )}
       {importingInvoice && (
         <ImportInvoiceModal
           onClose={() => setImportingInvoice(false)}

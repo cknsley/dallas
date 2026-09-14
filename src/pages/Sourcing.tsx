@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
 import { Empty, Kpi, Modal, Segmented } from "../components/ui";
 import { useStore } from "../store/StoreContext";
@@ -8,21 +8,42 @@ import { uid } from "../lib/id";
 import { links } from "../lib/links";
 import { eur2, num } from "../lib/format";
 import { useToast } from "../components/Toast";
-import type { Todo as TodoItem } from "../types";
+import { useSecteur } from "../lib/useSecteur";
+import { filterSourcingByDomain, isTcgTodo, sectorMeta, todoDomain } from "../lib/calc";
+import { fieldLabels } from "../lib/sectorFields";
+import type { CustomSector, Todo as TodoItem } from "../types";
 import OrderModal, { type OrderPresetLine } from "../modals/OrderModal";
 
 function AddSourcingModal({
   onClose,
   onAdd,
+  currentDomain,
+  customSectors,
 }: {
   onClose: () => void;
-  onAdd: (sourcing: { name: string; brand: string; size: string; price: number; supplierName: string }) => void;
+  onAdd: (sourcing: {
+    name: string;
+    brand: string;
+    size: string;
+    price: number;
+    supplierName: string;
+    lead: string;
+    sector: string;
+    isTcg: boolean;
+  }) => void;
+  currentDomain: string;
+  customSectors: CustomSector[];
 }) {
+  const [targetDomain, setTargetDomain] = useState(() => (currentDomain === "all" ? "fashion" : currentDomain));
   const [name, setName] = useState("");
   const [brand, setBrand] = useState("");
   const [size, setSize] = useState("");
   const [price, setPrice] = useState("");
   const [supplierName, setSupplierName] = useState("");
+  const [lead, setLead] = useState("");
+
+  const isTcg = targetDomain === "tcg";
+  const labels = fieldLabels(isTcg ? "tcg" : "fashion");
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +54,9 @@ function AddSourcingModal({
       size: size.trim(),
       price: num(price),
       supplierName: supplierName.trim(),
+      lead: lead.trim(),
+      sector: targetDomain,
+      isTcg,
     });
     onClose();
   };
@@ -49,23 +73,39 @@ function AddSourcingModal({
       }
     >
       <form onSubmit={submit} className="fgrid">
+        {currentDomain === "all" && (
+          <label className="field" style={{ gridColumn: "span 2" }}>
+            <span>Univers / Secteur de destination *</span>
+            <select
+              value={targetDomain}
+              onChange={(e) => setTargetDomain(e.target.value)}
+              style={{ width: "100%" }}
+            >
+              <option value="fashion">👕 Vêtements &amp; Fashion</option>
+              <option value="tcg">🃏 TCG &amp; Cartes</option>
+              {customSectors.map((cs) => (
+                <option key={cs.id} value={cs.id}>{cs.icon} {cs.label}</option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="field" style={{ gridColumn: "span 2" }}>
           <span>Nom du produit / Modèle recherché *</span>
           <input
             type="text"
-            placeholder="ex. Dunk Low Panda, Jordan 4 Military Black…"
+            placeholder={isTcg ? labels.namePlaceholder : "ex. Dunk Low Panda, Jordan 4 Military Black…"}
             value={name}
             onChange={(e) => setName(e.target.value)}
             autoFocus
           />
         </label>
         <label className="field">
-          <span>Marque</span>
-          <input type="text" placeholder="ex. Nike, Adidas, Supreme…" value={brand} onChange={(e) => setBrand(e.target.value)} />
+          <span>{labels.brand}</span>
+          <input type="text" placeholder={labels.brandPlaceholder} value={brand} onChange={(e) => setBrand(e.target.value)} />
         </label>
         <label className="field">
-          <span>Taille / Pointure</span>
-          <input type="text" placeholder="ex. 42, M, US 9…" value={size} onChange={(e) => setSize(e.target.value)} />
+          <span>{isTcg ? labels.size : "Taille / Pointure"}</span>
+          <input type="text" placeholder={labels.sizePlaceholder} value={size} onChange={(e) => setSize(e.target.value)} />
         </label>
         <label className="field">
           <span>Budget max d'achat (€)</span>
@@ -75,33 +115,57 @@ function AddSourcingModal({
           <span>Fournisseur / Plateforme visée</span>
           <input type="text" placeholder="ex. StockX, Vinted, Grossiste…" value={supplierName} onChange={(e) => setSupplierName(e.target.value)} />
         </label>
+        <label className="field" style={{ gridColumn: "span 2" }}>
+          <span>Lead</span>
+          <input type="text" placeholder="ex. @vendeur, contact boutique, piste à relancer…" value={lead} onChange={(e) => setLead(e.target.value)} />
+        </label>
       </form>
     </Modal>
   );
 }
 
-type SourcingCol = "recherche" | "negociation" | "commande" | "trouve";
+type SourcingCol = "recherche" | "negociation" | "trouve";
 
 const COL_LABEL: Record<SourcingCol, string> = {
   recherche: "🔎 À rechercher",
   negociation: "💬 En négociation",
-  commande: "📦 Passé en commande",
-  trouve: "✓ Trouvé / Stock",
+  trouve: "✓ Trouvé",
 };
 
-const COLS: SourcingCol[] = ["recherche", "negociation", "commande", "trouve"];
+const COLS: SourcingCol[] = ["recherche", "negociation", "trouve"];
 
 export default function Sourcing() {
   const { state, dispatch } = useStore();
   const toast = useToast();
   const navigate = useNavigate();
+  const secteur = useSecteur();
+  const currentDomain = secteur.domain;
+  const customSectors = state.settings.customSectors ?? [];
+  const currentMeta = sectorMeta(currentDomain, customSectors);
+  const labels = fieldLabels(currentDomain);
 
   const [view, setView] = usePref<"kanban" | "list">("sourcingView", "kanban");
   const [showAddModal, setShowAddModal] = useState(false);
   const [orderingTodo, setOrderingTodo] = useState<TodoItem | null>(null);
+  const [selectedFilterSector, setSelectedFilterSector] = useState<string>("all");
 
-  // Articles en sourcing = tous les todos marqués isSourcing ou col === "acheter"
-  const sourcingItems = state.todos.filter((t) => t.isSourcing || t.col === "acheter");
+  // Tous les articles en sourcing = tous les todos marqués isSourcing ou col === "acheter"
+  const allSourcingItems = useMemo(
+    () => state.todos.filter((t) => t.isSourcing || t.col === "acheter"),
+    [state.todos],
+  );
+
+  // Articles en sourcing selon le contexte (dans un univers vs accueil centralisé)
+  const sourcingItems = useMemo(() => {
+    if (currentDomain !== "all") {
+      return filterSourcingByDomain(allSourcingItems, currentDomain, state.items);
+    }
+    // Dans l'accueil centralisé : filtre interne optionnel
+    if (selectedFilterSector !== "all") {
+      return filterSourcingByDomain(allSourcingItems, selectedFilterSector, state.items);
+    }
+    return allSourcingItems;
+  }, [allSourcingItems, currentDomain, selectedFilterSector, state.items]);
 
   const getCol = (t: TodoItem): SourcingCol => {
     if (t.ordered || t.col === "termine") return "trouve";
@@ -111,7 +175,25 @@ export default function Sourcing() {
 
   const byCol = (col: SourcingCol) => sourcingItems.filter((t) => getCol(t) === col);
 
-  const addSourcing = ({ name, brand, size, price, supplierName }: { name: string; brand: string; size: string; price: number; supplierName: string }) => {
+  const addSourcing = ({
+    name,
+    brand,
+    size,
+    price,
+    supplierName,
+    lead,
+    sector,
+    isTcg,
+  }: {
+    name: string;
+    brand: string;
+    size: string;
+    price: number;
+    supplierName: string;
+    lead: string;
+    sector: string;
+    isTcg: boolean;
+  }) => {
     dispatch({
       type: "addTodo",
       todo: {
@@ -124,7 +206,10 @@ export default function Sourcing() {
         sourcingBrand: brand,
         sourcingSize: size,
         sourcingPrice: price,
+        sourcingLead: lead,
         supplierName,
+        sector,
+        isTcg,
       },
     });
     toast(`Article « ${name} » ajouté au Sourcing`);
@@ -132,6 +217,16 @@ export default function Sourcing() {
 
   const openOrder = (t: TodoItem) => {
     setOrderingTodo(t);
+  };
+
+  const markTracked = (t: TodoItem) => {
+    if (getCol(t) === "negociation") return;
+    dispatch({
+      type: "patchTodo",
+      id: t.id,
+      patch: { col: "acheter", ordered: false, dueDate: new Date().toISOString().slice(0, 10) },
+    });
+    toast(`« ${t.text} » passe en négociation`);
   };
 
   const orderLines = (t: TodoItem): OrderPresetLine[] => [
@@ -147,7 +242,7 @@ export default function Sourcing() {
   ];
 
   const pendingCount = sourcingItems.filter((t) => !t.ordered && t.col !== "termine").length;
-  const totalBudget = sourcingItems.filter((t) => !t.ordered && t.col !== "termine").reduce((a, t) => a + (t.sourcingPrice || 0), 0);
+  const negoCount = sourcingItems.filter((t) => getCol(t) === "negociation").length;
   const orderedCount = sourcingItems.filter((t) => t.ordered || t.col === "termine").length;
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -183,6 +278,9 @@ export default function Sourcing() {
   };
 
   const card = (t: TodoItem) => {
+    const itemDomain = todoDomain(t);
+    const itemMeta = sectorMeta(itemDomain, customSectors);
+
     return (
       <div
         key={t.id}
@@ -233,13 +331,17 @@ export default function Sourcing() {
           </div>
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6, fontSize: 12 }}>
+            <span className="pill info" style={{ fontSize: 11, fontWeight: 600 }}>
+              {itemMeta.icon} {itemMeta.label}
+            </span>
             {t.sourcingBrand && <span className="pill ghost">🏷 {t.sourcingBrand}</span>}
-            {t.sourcingSize && <span className="pill ghost">📏 T. {t.sourcingSize}</span>}
+            {t.sourcingSize && <span className="pill ghost">📏 {labels.sizePrefix}{t.sourcingSize}</span>}
             {t.sourcingPrice && t.sourcingPrice > 0 ? (
               <span className="pill good">💰 Budget: {eur2(t.sourcingPrice)}</span>
             ) : null}
             {t.supplierName && <span className="pill info">🏢 {t.supplierName}</span>}
           </div>
+          {t.sourcingLead && <div className="sourcing-lead">Lead : {t.sourcingLead}</div>}
 
           {/* Action Toolbar à la fin de la carte : Commander un article, Modifier, Abandonner */}
           <div className="kcard-actions">
@@ -247,18 +349,21 @@ export default function Sourcing() {
               <span
                 className="pill good"
                 style={{ cursor: "pointer", fontSize: 11, textAlign: "center", justifyContent: "center", width: "100%", padding: "6px 8px" }}
-                onClick={() => navigate(links.achats())}
+                onClick={() => navigate(links.achats({ secteur: itemDomain }))}
               >
                 ✓ Commandé (Centrale) →
               </span>
             ) : (
-              <button
-                className="btn sm ok"
-                style={{ width: "100%", justifyContent: "center" }}
-                onClick={() => openOrder(t)}
-              >
-                🛒 Commander un article
-              </button>
+              <div className="kcard-actions-row">
+                {getCol(t) === "recherche" && (
+                  <button className="btn sm" style={{ flex: 1, justifyContent: "center" }} onClick={() => markTracked(t)}>
+                    → Pisté
+                  </button>
+                )}
+                <button className="btn sm ok" style={{ flex: 1, justifyContent: "center" }} onClick={() => openOrder(t)}>
+                  ✓ Trouvé
+                </button>
+              </div>
             )}
             <div className="kcard-actions-row">
               <button
@@ -286,6 +391,11 @@ export default function Sourcing() {
   return (
     <>
       <HeaderActions>
+        {currentDomain !== "all" && (
+          <Link to="/sourcing" className="btn sm ghost" title="Voir tout le Sourcing centralisé de l'accueil">
+            🌐 Tout centralisé
+          </Link>
+        )}
         <button className="btn primary" onClick={() => setShowAddModal(true)}>
           🛒 + Produit à sourcer
         </button>
@@ -300,10 +410,110 @@ export default function Sourcing() {
         <span className="hint">{pendingCount} article{pendingCount > 1 ? "s" : ""} à rechercher</span>
       </HeaderActions>
 
+      {/* ── BANNIÈRE CONTEXTE : ACCUEIL CENTRALISÉ OU SECTEUR DÉDIÉ ── */}
+      {currentDomain === "all" ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: 16,
+            padding: "14px 18px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 12,
+            background: "linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(6, 182, 212, 0.05) 100%)",
+            border: "1px solid rgba(139, 92, 246, 0.2)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 24 }}>🌐</span>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <b style={{ fontSize: 14 }}>Sourcing Centralisé — Tous univers</b>
+                <span className="pill info" style={{ fontSize: 11, padding: "2px 8px" }}>Centralisé Accueil</span>
+              </div>
+              <div className="hint" style={{ fontSize: 12, marginTop: 2 }}>
+                Toutes vos opportunités et recherches d'achat réunies · Filtrage instantané par univers
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <button
+              type="button"
+              className={`btn sm ${selectedFilterSector === "all" ? "primary" : "ghost"}`}
+              onClick={() => setSelectedFilterSector("all")}
+            >
+              Tous ({allSourcingItems.length})
+            </button>
+            <button
+              type="button"
+              className={`btn sm ${selectedFilterSector === "fashion" ? "primary" : "ghost"}`}
+              onClick={() => setSelectedFilterSector("fashion")}
+            >
+              👕 Vêtements ({filterSourcingByDomain(allSourcingItems, "fashion", state.items).length})
+            </button>
+            <button
+              type="button"
+              className={`btn sm ${selectedFilterSector === "tcg" ? "primary" : "ghost"}`}
+              onClick={() => setSelectedFilterSector("tcg")}
+            >
+              🃏 TCG ({filterSourcingByDomain(allSourcingItems, "tcg", state.items).length})
+            </button>
+            {customSectors.map((cs) => (
+              <button
+                key={cs.id}
+                type="button"
+                className={`btn sm ${selectedFilterSector === cs.id ? "primary" : "ghost"}`}
+                onClick={() => setSelectedFilterSector(cs.id)}
+              >
+                {cs.icon} {cs.label} ({filterSourcingByDomain(allSourcingItems, cs.id, state.items).length})
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 16,
+            flexWrap: "wrap",
+            gap: 12,
+            padding: "10px 14px",
+            background: "var(--surface-2)",
+            borderRadius: "var(--radius-md)",
+            border: "1px solid var(--line)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 20 }}>{currentMeta.icon}</span>
+            <div>
+              <b style={{ fontSize: 14 }}>Sourcing · {currentMeta.label}</b>
+              <div className="hint" style={{ fontSize: 12 }}>
+                Recherches et opportunités isolées dans cet univers
+              </div>
+            </div>
+          </div>
+          <Link to="/sourcing" className="btn sm ghost" style={{ textDecoration: "none" }}>
+            🌐 Voir tout le Sourcing centralisé (tous univers) →
+          </Link>
+        </div>
+      )}
+
       <div className="kpi-grid">
         <Kpi label="Articles à sourcer" value={String(pendingCount)} meta="Recherches actives" tone={pendingCount ? "warn" : "ok"} />
-        <Kpi label="Budget engagé visé" value={eur2(totalBudget)} meta="Capital requis pour le sourcing" tone="info" />
-        <Kpi label="Commandés / Trouvés" value={String(orderedCount)} meta="Passés en Centrale d'achat" tone="ok" to={links.achats()} hint="Centrale" />
+        <Kpi label="En négociation" value={String(negoCount)} meta="Discussions en cours avec un vendeur" tone={negoCount ? "info" : "ok"} />
+        <Kpi
+          label="Commandés / Trouvés"
+          value={String(orderedCount)}
+          meta="Passés en Centrale d'achat"
+          tone="ok"
+          to={links.achats({ secteur: currentDomain !== "all" ? currentDomain : undefined })}
+          hint="Centrale"
+        />
       </div>
 
       {view === "kanban" ? (
@@ -363,47 +573,68 @@ export default function Sourcing() {
                 <thead>
                   <tr>
                     <th>Article</th>
-                    <th>Marque</th>
-                    <th>Taille</th>
+                    <th>Univers</th>
+                    <th>{labels.brand}</th>
+                    <th>{labels.size}</th>
                     <th>Budget Max</th>
                     <th>Source / Fournisseur</th>
+                    <th>Lead</th>
                     <th className="r">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sourcingItems.map((t) => (
-                    <tr key={t.id}>
-                      <td><b>{t.text}</b></td>
-                      <td>{t.sourcingBrand || "—"}</td>
-                      <td>{t.sourcingSize || "—"}</td>
-                      <td className="num">{t.sourcingPrice ? eur2(t.sourcingPrice) : "—"}</td>
-                      <td>{t.supplierName || "—"}</td>
-                      <td className="r">
-                        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center" }}>
-                          {t.ordered ? (
-                            <span className="pill good" style={{ cursor: "pointer" }} onClick={() => navigate(links.achats())}>
-                              ✓ Commandé →
-                            </span>
-                          ) : (
-                            <button className="btn sm ok" onClick={() => openOrder(t)}>
-                              🛒 Commander un article
+                  {sourcingItems.map((t) => {
+                    const itemDomain = todoDomain(t);
+                    const itemMeta = sectorMeta(itemDomain, customSectors);
+                    return (
+                      <tr key={t.id}>
+                        <td><b>{t.text}</b></td>
+                        <td>
+                          <span className="pill info" style={{ fontSize: 11, fontWeight: 600 }}>
+                            {itemMeta.icon} {itemMeta.label}
+                          </span>
+                        </td>
+                        <td>{t.sourcingBrand || "—"}</td>
+                        <td>{t.sourcingSize || "—"}</td>
+                        <td className="num">{t.sourcingPrice ? eur2(t.sourcingPrice) : "—"}</td>
+                        <td>{t.supplierName || "—"}</td>
+                        <td>{t.sourcingLead || "—"}</td>
+                        <td className="r">
+                          <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center" }}>
+                            {t.ordered ? (
+                              <span
+                                className="pill good"
+                                style={{ cursor: "pointer" }}
+                                onClick={() => navigate(links.achats({ secteur: itemDomain }))}
+                              >
+                                ✓ Commandé →
+                              </span>
+                            ) : (
+                              <>
+                                {getCol(t) === "recherche" && (
+                                  <button className="btn sm" onClick={() => markTracked(t)}>→ Pisté</button>
+                                )}
+                                <button className="btn sm ok" onClick={() => openOrder(t)}>
+                                  ✓ Trouvé
+                                </button>
+                              </>
+                            )}
+                            <button className="btn sm ghost" onClick={() => setEditingId(t.id)}>
+                              ✎ Modifier
                             </button>
-                          )}
-                          <button className="btn sm ghost" onClick={() => setEditingId(t.id)}>
-                            ✎ Modifier
-                          </button>
-                          <button
-                            className="btn sm ghost"
-                            style={{ color: "var(--bad)" }}
-                            title="Abandonner"
-                            onClick={() => dispatch({ type: "removeTodo", id: t.id })}
-                          >
-                            ✕ Abandonner
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                            <button
+                              className="btn sm ghost"
+                              style={{ color: "var(--bad)" }}
+                              title="Abandonner"
+                              onClick={() => dispatch({ type: "removeTodo", id: t.id })}
+                            >
+                              ✕ Abandonner
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -413,6 +644,8 @@ export default function Sourcing() {
 
       {showAddModal && (
         <AddSourcingModal
+          currentDomain={currentDomain}
+          customSectors={customSectors}
           onClose={() => setShowAddModal(false)}
           onAdd={addSourcing}
         />
@@ -430,9 +663,10 @@ export default function Sourcing() {
               id: orderingTodo.id,
               patch: { ordered: true, col: "termine" },
             });
+            const targetSector = orderingTodo.sector || (isTcgTodo(orderingTodo) ? "tcg" : undefined);
             toast(`Commande créée pour « ${orderingTodo.text} » dans la Centrale d'achat !`, {
               label: "Voir Centrale",
-              onClick: () => navigate(links.achats()),
+              onClick: () => navigate(links.achats({ secteur: targetSector })),
             });
             setOrderingTodo(null);
           }}

@@ -30,7 +30,9 @@ export interface Item {
   /** Nombre d'exemplaires identiques sur cette ligne. */
   quantity: number;
   cost: number;          // coût d'entrée, par exemplaire
-  fees: number;          // frais d'achat (port entrant, nettoyage, retouche…)
+  fees: number;          // autres frais d'achat (nettoyage, retouche…)
+  purchaseShipping?: number; // livraison entrante, par exemplaire
+  customsFees?: number;  // douane, par exemplaire
   price: number;         // prix de vente (0 tant que non fixé)
   /* côté vente */
   platform: string;      // plateforme ou canal de vente
@@ -110,8 +112,11 @@ export interface Todo {
   sourcingBrand?: string; // Marque de l'article à sourcer
   sourcingSize?: string;  // Taille de l'article à sourcer
   sourcingPrice?: number; // Budget / Prix cible d'achat
+  sourcingLead?: string;  // Contact ou piste commerciale, texte libre
   ordered?: boolean;      // Passé en commande dans la centrale d'achat
   orderId?: string;       // ID de la commande rattachée dans la centrale d'achat
+  sector?: string;        // "fashion" | "tcg" | id d'univers personnalisé
+  isTcg?: boolean;        // flag pour TCG
 }
 
 export interface DocLine {
@@ -130,6 +135,9 @@ export interface SalesDoc {
   clientName: string;
   clientId?: string;
   clientAddress: string;
+  clientZip: string;
+  clientCity: string;
+  clientCountry: string;
   clientVat: string;
   lines: DocLine[];
   itemIds: string[];
@@ -232,6 +240,9 @@ export interface SupplierRecord {
   phone: string;
   url: string;
   address: string;
+  zip: string;
+  city: string;
+  country: string;
   /** Délai de paiement accordé, en jours. */
   terms: number;
   /** Appréciation de 1 à 5, 0 si non notée — se met à jour à chaque interaction. */
@@ -250,6 +261,9 @@ export interface ClientRecord {
   email: string;
   phone: string;
   address: string;
+  zip: string;
+  city: string;
+  country: string;
   vatNumber?: string;
   platform?: string;     // Canal habituel (Vinted, Vestiaire, Instagram...)
   profileUrl?: string;   // Lien vers son profil
@@ -259,15 +273,18 @@ export interface ClientRecord {
 
 export interface Settings {
   business: string;
+  accountingMode: "standard" | "fr";
   /** Mode TVA : tant qu'il est éteint, aucune TVA n'est calculée nulle part. */
   vatEnabled: boolean;
   legalStatus: LegalStatus;
-  country: string;
   vatNumber: string;
   vatRate: number;
   marginScheme: boolean;   // régime de la marge (biens d'occasion)
   threshold: number;       // seuil de franchise en base
   address: string;
+  zip: string;
+  city: string;
+  country: string;
   email: string;
   phone: string;
   iban: string;

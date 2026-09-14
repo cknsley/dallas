@@ -13,6 +13,9 @@ export const blankClientRecord = (name = ""): ClientRecord => ({
   email: "",
   phone: "",
   address: "",
+  zip: "",
+  city: "",
+  country: "",
   vatNumber: "",
   platform: "Vinted",
   profileUrl: "",
@@ -145,12 +148,39 @@ export default function ClientModal({
           />
         </Field>
 
-        <Field label="Adresse de livraison & facturation" span>
-          <textarea
-            rows={2}
+        <Field label="Rue / N° voie" span>
+          <input
+            type="text"
             value={d.address}
-            placeholder="12 Rue de la Paix, 75002 Paris..."
+            placeholder="12 rue de la Paix"
             onChange={(e) => set("address", e.target.value)}
+          />
+        </Field>
+
+        <Field label="Code postal">
+          <input
+            type="text"
+            value={d.zip || ""}
+            placeholder="75002"
+            onChange={(e) => set("zip", e.target.value)}
+          />
+        </Field>
+
+        <Field label="Ville">
+          <input
+            type="text"
+            value={d.city || ""}
+            placeholder="Paris"
+            onChange={(e) => set("city", e.target.value)}
+          />
+        </Field>
+
+        <Field label="Pays">
+          <input
+            type="text"
+            value={d.country || ""}
+            placeholder="France"
+            onChange={(e) => set("country", e.target.value)}
           />
         </Field>
       </div>

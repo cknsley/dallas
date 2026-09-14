@@ -8,7 +8,7 @@ import {
 import { HeaderActions } from "../components/Layout";
 import { Empty, Kpi, Modal, Photo, Segmented } from "../components/ui";
 import { useStore } from "../store/StoreContext";
-import { costOf, marginOf, qtyOf, revenueOf } from "../lib/calc";
+import { costOf, marginOf, purchaseFeesUnitOf, qtyOf, revenueOf } from "../lib/calc";
 import { dshort, eur, eur2, num, today } from "../lib/format";
 import { links } from "../lib/links";
 import { uid } from "../lib/id";
@@ -125,7 +125,7 @@ export default function TcgPage() {
   const totalStockRealValue = useMemo(() => {
     return stockItems.reduce((a, i) => {
       const q = qtyOf(i);
-      const estUnit = num(i.price) || num(i.estimatedPrice) || (num(i.cost) + num(i.fees));
+      const estUnit = num(i.price) || num(i.estimatedPrice) || (num(i.cost) + purchaseFeesUnitOf(i));
       return a + estUnit * q;
     }, 0);
   }, [stockItems]);
@@ -207,7 +207,7 @@ export default function TcgPage() {
 
   const renderPriceInfo = (item: Item) => {
     const qty = qtyOf(item);
-    const unitCost = num(item.cost) + num(item.fees);
+    const unitCost = num(item.cost) + purchaseFeesUnitOf(item);
     const totalCost = costOf(item);
     const unitEst = num(item.price) || num(item.estimatedPrice) || unitCost;
     const totalEst = unitEst * qty;
@@ -973,4 +973,3 @@ export default function TcgPage() {
     </>
   );
 }
-

@@ -28,6 +28,9 @@ export default function DocModal({
   const [date, setDate] = useState(today());
   const [clientName, setClientName] = useState("");
   const [clientAddress, setClientAddress] = useState("");
+  const [clientZip, setClientZip] = useState("");
+  const [clientCity, setClientCity] = useState("");
+  const [clientCountry, setClientCountry] = useState("France");
   const [clientVat, setClientVat] = useState("");
   const [notes, setNotes] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set(preselect));
@@ -81,6 +84,9 @@ export default function DocModal({
       dueDate: addDays(date, state.settings.paymentTerms || 0),
       clientName: clientName.trim(),
       clientAddress: clientAddress.trim(),
+      clientZip: clientZip.trim(),
+      clientCity: clientCity.trim(),
+      clientCountry: clientCountry.trim(),
       clientVat: clientVat.trim(),
       lines,
       itemIds: picked.map((i) => i.id),
@@ -142,8 +148,17 @@ export default function DocModal({
         <Field label="Client">
           <input type="text" value={clientName} placeholder="Nom ou raison sociale" onChange={(e) => setClientName(e.target.value)} />
         </Field>
-        <Field label="Adresse du client" span>
-          <textarea rows={2} value={clientAddress} placeholder="Adresse de facturation" onChange={(e) => setClientAddress(e.target.value)} />
+        <Field label="Rue / Adresse" span>
+          <input type="text" value={clientAddress} placeholder="12 rue de la Paix" onChange={(e) => setClientAddress(e.target.value)} />
+        </Field>
+        <Field label="Code postal">
+          <input type="text" value={clientZip} placeholder="75002" onChange={(e) => setClientZip(e.target.value)} />
+        </Field>
+        <Field label="Ville">
+          <input type="text" value={clientCity} placeholder="Paris" onChange={(e) => setClientCity(e.target.value)} />
+        </Field>
+        <Field label="Pays">
+          <input type="text" value={clientCountry} placeholder="France" onChange={(e) => setClientCountry(e.target.value)} />
         </Field>
         {regime.subject && (
           <Field label="N° TVA du client (optionnel)">

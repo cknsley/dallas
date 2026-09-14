@@ -7,6 +7,7 @@ import { eur2, num, today } from "../lib/format";
 import { uid } from "../lib/id";
 import { compressImage, savePhoto } from "../store/photos";
 import { HINT, LABEL, eurLabel } from "../lib/lexicon";
+import { useSecteur } from "../lib/useSecteur";
 import type { Item } from "../types";
 
 interface Line {
@@ -87,7 +88,9 @@ export default function OrderModal({
   const [autoReceive, setAutoReceive] = useState(false);
 
   /* Support TCG & Cartes */
-  const [isTcgOrder, setIsTcgOrder] = useState(false);
+  // Depuis l'espace TCG, une commande est une commande TCG : sinon elle quitterait la page.
+  const secteur = useSecteur();
+  const [isTcgOrder, setIsTcgOrder] = useState(secteur.domain === "tcg");
   const [tcgGameOrder, setTcgGameOrder] = useState("Pokémon");
   const [tcgCategoryOrder, setTcgCategoryOrder] = useState<"raw" | "graded" | "sealed" | "grading" | "blister" | "case">("raw");
   const [tcgSetOrder, setTcgSetOrder] = useState("");
@@ -233,11 +236,11 @@ export default function OrderModal({
         lotTag: tag,
         autoReceive: isProMode ? autoReceive : false,
         isTcg: isTcgOrder,
-        tcgGame: isTcgOrder ? tcgGameOrder : undefined,
+        tcgGame: isTcgOrder ? (l.brand.trim() || tcgGameOrder) : undefined,
         tcgSet: isTcgOrder ? tcgSetOrder : undefined,
         tcgCategory: isTcgOrder ? tcgCategoryOrder : undefined,
         tcgGrade: isTcgOrder
-          ? (tcgCategoryOrder === "grading"
+          ? l.size.trim() || (tcgCategoryOrder === "grading"
             ? "En gradation (Note à découvrir ✨)"
             : tcgCategoryOrder === "raw"
             ? "Raw (Near Mint)"
@@ -643,9 +646,9 @@ export default function OrderModal({
             </div>
             <div className="calc-line-grid">
               <label><span>Quantité</span><input type="number" step="1" min="1" value={l.quantity} onChange={(e) => patch(l.key, { quantity: e.target.value })} /></label>
-              <label><span>Marque</span><input type="text" list="dl-order-brand" value={l.brand} onChange={(e) => patch(l.key, { brand: e.target.value })} /></label>
+              <label><span>{isTcgOrder ? "Licence" : "Marque"}</span><input type="text" list="dl-order-brand" value={l.brand} onChange={(e) => patch(l.key, { brand: e.target.value })} /></label>
               <label><span>Type</span><input type="text" list="dl-order-type" value={l.type} onChange={(e) => patch(l.key, { type: e.target.value })} /></label>
-              <label><span>Taille</span><input type="text" list="dl-order-size" value={l.size} onChange={(e) => patch(l.key, { size: e.target.value })} /></label>
+              <label><span>{isTcgOrder ? "Grade" : "Taille"}</span><input type="text" list="dl-order-size" value={l.size} onChange={(e) => patch(l.key, { size: e.target.value })} /></label>
               <label><span>{LABEL.cost}</span><input type="number" step="0.01" value={l.cost} placeholder="0,00" onChange={(e) => patch(l.key, { cost: e.target.value })} /></label>
               <label><span>{destination === "direct" ? "Prix de vente (€)" : LABEL.estimate}</span><input type="number" step="0.01" value={l.estimate} placeholder={HINT.estimate} onChange={(e) => patch(l.key, { estimate: e.target.value })} /></label>
             </div>

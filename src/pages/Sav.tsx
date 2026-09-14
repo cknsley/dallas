@@ -1,22 +1,19 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
-import { Empty, Field, Kpi, Modal, Photo, Segmented } from "../components/ui";
+import { Empty, Field, Kpi, Modal, Photo } from "../components/ui";
 import TrackingLink from "../components/TrackingLink";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
-import { useQueryState } from "../lib/useQueryState";
 import { useSecteur } from "../lib/useSecteur";
+import { itemAttr } from "../lib/sectorFields";
 import { links } from "../lib/links";
 import { revenueOf } from "../lib/calc";
 import { dfr, eur, eur2, today } from "../lib/format";
 import ItemModal from "../modals/ItemModal";
 import SellModal from "../modals/SellModal";
 import ReturnModal, { emptyReturn } from "../modals/ReturnModal";
-import RetoursTab from "./sav/RetoursTab";
 import type { Item, LitigeStatus, PersonalLitige } from "../types";
-
-type SavTab = "litiges" | "retours";
 
 const blankPersonalLitige = (): PersonalLitige => ({
   id: `pl-${Date.now()}`,
@@ -33,8 +30,6 @@ export default function Sav() {
   const { state, dispatch } = useStore();
   const toast = useToast();
   const navigate = useNavigate();
-  const [tabParam, setTab] = useQueryState("tab", "litiges");
-  const tab = tabParam as SavTab;
   const secteur = useSecteur();
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<Item | null>(null);
@@ -181,31 +176,25 @@ export default function Sav() {
   return (
     <>
       <HeaderActions>
-        <Segmented<SavTab>
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: "litiges", label: `Litiges (${litiges.length})` },
-            { value: "retours", label: `Retours & refunds (${openReturns})` },
-          ]}
-        />
-        {tab === "litiges" && (
-          <button className="btn primary" onClick={() => setEditingPersonal(blankPersonalLitige())}>+ Litige perso</button>
-        )}
+        <span className="hint">{litiges.length} litige{litiges.length > 1 ? "s" : ""} suivi{litiges.length > 1 ? "s" : ""}</span>
+        <button className="btn" onClick={() => navigate(links.retours())}>↩️ Retours &amp; refunds ({openReturns})</button>
+        <button className="btn primary" onClick={() => setEditingPersonal(blankPersonalLitige())}>+ Litige perso</button>
       </HeaderActions>
 
-      {tab === "retours" && <RetoursTab />}
-
-      {tab === "litiges" && (
       <>
       <div className="card" style={{ marginBottom: 18 }}>
-        <div className="card-h">
+        <div
+          className="card-h"
+          style={{ cursor: "pointer", userSelect: "none" }}
+          onClick={() => setPersonalOpen((v) => !v)}
+        >
           <h3>Mes litiges ouverts ({openPersonalLitiges.length})</h3>
           <div className="spacer" />
-          <button className="btn sm ghost" onClick={() => setPersonalOpen((v) => !v)}>
-            {personalOpen ? "Masquer" : "Afficher"}
-          </button>
-          <button className="btn sm primary" onClick={() => setEditingPersonal(blankPersonalLitige())}>
+          <button className="btn sm ghost">{personalOpen ? "▲ Masquer" : "▼ Afficher"}</button>
+          <button
+            className="btn sm primary"
+            onClick={(e) => { e.stopPropagation(); setEditingPersonal(blankPersonalLitige()); }}
+          >
             + Litige perso
           </button>
         </div>
@@ -369,7 +358,7 @@ export default function Sav() {
                               {i.name || "Sans nom"}
                             </button>
                             <div className="hint" style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", fontSize: 11 }}>
-                              <span>{i.brand || "—"}{i.size ? ` · ${i.size}` : ""}</span>
+                              <span>{itemAttr(i, "brand") || "—"}{itemAttr(i, "size") ? ` · ${itemAttr(i, "size")}` : ""}</span>
                               {i.sku && <span className="pill ghost" style={{ fontSize: 9.5, padding: "0 5px" }}>{i.sku}</span>}
                             </div>
                           </div>
@@ -744,7 +733,6 @@ export default function Sav() {
         )}
       </div>
       </>
-      )}
 
       {editing && <ItemModal item={editing} onClose={() => setEditing(null)} onSell={(i) => setSelling(i)} />}
       {convertingReturn && (

@@ -85,6 +85,7 @@ export default function DeliveryDetailModal({
         shipDeadline,
         shipping,
         delivery: isNowRecu ? "livree" : item.delivery,
+        validationDate: isNowRecu ? (item.validationDate || today()) : item.validationDate,
         notes: notes.trim(),
         shippingVideo,
         shippingVideoName,

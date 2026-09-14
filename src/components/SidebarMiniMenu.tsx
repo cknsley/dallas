@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Settings, Sun, Moon } from "lucide-react";
+import { Settings, Sun, Moon, User } from "lucide-react";
 import { useTheme } from "./Theme";
 import type { AppState } from "../types";
 
@@ -42,6 +42,11 @@ export function SidebarMiniMenu() {
           <span>{theme.mode === "dark" ? "Clair" : "Sombre"}</span>
         </button>
       </div>
+
+      <button type="button" className="mini-menu-btn mini-menu-btn-wide" title="Mon compte">
+        <User size={15} />
+        <span>Mon compte</span>
+      </button>
     </div>
   );
 }

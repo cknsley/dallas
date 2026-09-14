@@ -1,16 +1,32 @@
 import type { AppState, Todo } from "../types";
 import { today } from "../lib/format";
+import { isTcgItem } from "../lib/calc";
 
 /**
- * Tâches déduites de l'état de l'app : un colis vendu pas encore expédié,
- * un arrivage en retard, une facture échue. Elles n'ont pas à être saisies —
+ * Tâches déduites de l'état de l'app : une vente pas encore expédiée ou une
+ * facture échue. Elles n'ont pas à être saisies —
  * elles apparaissent, et les cocher exécute l'action réelle sur l'objet lié.
  */
 export function deriveAutoTodos(state: AppState): Todo[] {
   const now = today();
   const out: Todo[] = [];
 
-  // Les livraisons sont désormais directement gérées avec leur vue Kanban priorisée dans l'onglet Livraison.
+  state.items.forEach((i, ix) => {
+    if (i.status === "vendu" && i.delivery !== "livree" && i.shipping !== "livree" && i.shipping !== "recu") {
+      out.push({
+        id: `auto:ship:${i.id}`,
+        text: `Faire l'envoi de ${i.name || "article sans nom"}`,
+        col: "faire",
+        order: 3000 + ix,
+        createdAt: i.createdAt,
+        auto: "ship",
+        itemId: i.id,
+        dueDate: i.shipDeadline || undefined,
+        sector: i.sector,
+        isTcg: isTcgItem(i),
+      });
+    }
+  });
 
   state.docs.forEach((d, ix) => {
     if (!d.paid && d.dueDate && d.dueDate < now) {

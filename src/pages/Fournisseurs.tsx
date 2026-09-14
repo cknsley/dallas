@@ -8,7 +8,7 @@ import { usePref } from "../lib/usePref";
 import { useQueryState } from "../lib/useQueryState";
 import { useSecteur } from "../lib/useSecteur";
 import { buildSuppliers, blankSupplierRecord, looksLikeRetail, type Supplier } from "../lib/suppliers";
-import { costOf, revenueOf } from "../lib/calc";
+import { costOf } from "../lib/calc";
 import { dshort, eur, eur2 } from "../lib/format";
 import { links } from "../lib/links";
 import { uid } from "../lib/id";
@@ -107,21 +107,25 @@ export default function Fournisseurs() {
 
   const debt = suppliers.reduce((a, s) => a + s.debt, 0);
   const debtors = suppliers.filter((s) => s.debt > 0);
-  const clientDebt = secteur.items
-    .filter((i) => i.status === "vendu" && i.delivery === "non_payee")
-    .reduce((a, i) => a + revenueOf(i), 0);
   const unpaidDocs = state.docs.filter((d) => !d.paid && secteur.matchesLinked(d.itemIds));
-  const unpaidTotal = unpaidDocs.reduce((a, d) => a + d.total, 0);
-  const receivables = clientDebt + unpaidTotal;
+
+  const nextWeek = new Date();
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  const nextWeekStr = nextWeek.toISOString().slice(0, 10);
+  const allArriving = useMemo(() => 
+    secteur.items.filter((i) => i.status === "arrivage" && i.expectedDate && i.expectedDate <= nextWeekStr),
+    [secteur.items, nextWeekStr]
+  );
+  const arrivingItems = useMemo(() => 
+    [...allArriving].sort((a, b) => a.expectedDate.localeCompare(b.expectedDate)).slice(0, 5),
+    [allArriving]
+  );
 
   const settle = (s: Supplier) => {
     const due = s.items.filter((i) => !i.purchasePaid);
     due.forEach((i) => dispatch({ type: "patchItem", id: i.id, patch: { purchasePaid: true } }));
     toast(`${due.length} achat${due.length > 1 ? "s" : ""} réglé${due.length > 1 ? "s" : ""} chez ${s.name}`);
   };
-
-  const markPaid = (docId: string) =>
-    dispatch({ type: "patchDoc", id: docId, patch: { paid: true, paidDate: new Date().toISOString().slice(0, 10) } });
 
   return (
     <>
@@ -140,12 +144,10 @@ export default function Fournisseurs() {
           tone={debt > 0 ? "warn" : "ok"}
         />
         <Kpi
-          label="Créances clients"
-          value={eur(receivables)}
-          meta={receivables > 0 ? `${eur(clientDebt)} de ventes · ${eur(unpaidTotal)} de factures` : "Rien à encaisser"}
-          tone={receivables > 0 ? "warn" : "ok"}
-          to={links.facturation({ state: "unpaid" })}
-          hint="Factures"
+          label="Arrivages en cours"
+          value={allArriving.length.toString()}
+          meta={allArriving.length > 0 ? "Articles attendus sous 7 jours" : "Aucun arrivage prévu"}
+          tone={allArriving.length > 0 ? "info" : "ok"}
         />
         <Kpi
           label={`Achats — ${range.label}`}
@@ -155,34 +157,63 @@ export default function Fournisseurs() {
         />
       </div>
 
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-h">
-          <h3>Factures clients impayées</h3>
-          <div className="spacer" />
-          <a className="btn sm ghost" href={`#${links.facturation()}`}>Toutes les factures →</a>
-        </div>
-        {unpaidDocs.length === 0 ? (
-          <Empty glyph="§" title="Rien à encaisser">Toutes les factures émises sont réglées.</Empty>
-        ) : (
-          <div className="twrap">
-            <table className="table-compact">
-              <thead>
-                <tr><th>Client</th><th>N°</th><th>Échéance</th><th className="r">Montant</th><th className="r" /></tr>
-              </thead>
-              <tbody>
-                {unpaidDocs.map((d) => (
-                  <tr key={d.id}>
-                    <td>{d.clientName || "Client non renseigné"}</td>
-                    <td className="num">{d.number}</td>
-                    <td className={d.dueDate && d.dueDate < new Date().toISOString().slice(0, 10) ? "bad" : ""}>{dshort(d.dueDate)}</td>
-                    <td className="r num">{eur2(d.total)}</td>
-                    <td className="r"><button className="btn sm" onClick={() => markPaid(d.id)}>Marquer payée</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <div className="cols two" style={{ marginBottom: 16 }}>
+        <div className="card">
+          <div className="card-h">
+            <h3>Factures à régler</h3>
+            <div className="spacer" />
+            <a className="btn sm ghost" href={`#${links.facturation()}`}>Toutes →</a>
           </div>
-        )}
+          {unpaidDocs.length === 0 ? (
+            <Empty glyph="§" title="Rien à encaisser">Toutes les factures émises sont réglées.</Empty>
+          ) : (
+            <div className="twrap">
+              <table className="table-compact">
+                <thead>
+                  <tr><th>Client</th><th>N°</th><th>Échéance</th><th className="r">Montant</th></tr>
+                </thead>
+                <tbody>
+                  {unpaidDocs.slice(0, 5).map((d) => (
+                    <tr key={d.id}>
+                      <td><div className="ellipsis">{d.clientName || "Client non renseigné"}</div></td>
+                      <td className="num">{d.number}</td>
+                      <td className={d.dueDate && d.dueDate < new Date().toISOString().slice(0, 10) ? "bad" : ""}>{dshort(d.dueDate)}</td>
+                      <td className="r num">{eur2(d.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div className="card">
+          <div className="card-h">
+            <h3>Arrivages en cours (J-7)</h3>
+            <div className="spacer" />
+            <a className="btn sm ghost" href={`#${links.arrivage()}`}>Tous →</a>
+          </div>
+          {arrivingItems.length === 0 ? (
+            <Empty glyph="📦" title="Aucun arrivage">Aucun colis prévu dans les 7 jours.</Empty>
+          ) : (
+            <div className="twrap">
+              <table className="table-compact">
+                <thead>
+                  <tr><th>Article</th><th>Source</th><th>Date prévue</th></tr>
+                </thead>
+                <tbody>
+                  {arrivingItems.map((i) => (
+                    <tr key={i.id}>
+                      <td><div className="ellipsis">{i.name || "Sans nom"}</div></td>
+                      <td><div className="ellipsis">{i.source}</div></td>
+                      <td className={i.expectedDate && i.expectedDate < new Date().toISOString().slice(0, 10) ? "bad" : ""}>{dshort(i.expectedDate)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
       {allTags.length > 0 && (

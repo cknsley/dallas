@@ -110,6 +110,7 @@ export default function SellModal({
       shippingCost,
       extraFees,
       status: "vendu" as const,
+      delivery: item.status === "vendu" ? item.delivery : "non_payee" as const,
     };
     dispatch({ type: "patchItem", id: item.id, patch });
     const sold = { ...item, ...patch };

@@ -55,3 +55,12 @@ export const dshort = (d: string | undefined | null): string =>
         year: "numeric",
       })
     : "—";
+
+/** Date très compacte sans année : 09/12 */
+export const dshortNoYear = (d: string | undefined | null): string =>
+  d
+    ? new Date(d + "T12:00:00").toLocaleDateString("fr-FR", {
+        day: "2-digit",
+        month: "2-digit",
+      })
+    : "—";

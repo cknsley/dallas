@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Field, Modal, Segmented } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
-import { costOf, revenueOf } from "../lib/calc";
+import { costOf, purchaseFeesUnitOf, revenueOf } from "../lib/calc";
 import { addDays, num, today } from "../lib/format";
 import { uid } from "../lib/id";
 import type { Item, ReturnCase, ReturnKind, ReturnResolution, ReturnStatus } from "../types";
@@ -58,7 +58,7 @@ export const emptyReturn = (kind: ReturnKind, item?: Item): ReturnCase => ({
   counterparty: kind === "client" ? item?.buyer ?? "" : item?.source ?? "",
   platform: kind === "client" ? item?.platform ?? "" : item?.source ?? "",
   amount: kind === "client" && item ? revenueOf(item) : item ? costOf(item) : 0,
-  feesLost: kind === "client" && item ? num(item.saleFees) + num(item.shippingCost) : num(item?.fees),
+  feesLost: kind === "client" && item ? num(item.saleFees) + num(item.shippingCost) : item ? purchaseFeesUnitOf(item) : 0,
   openedDate: today(),
   dueDate: addDays(today(), 14),
   closedDate: "",
@@ -101,7 +101,7 @@ export default function ReturnModal({
       counterparty: r.kind === "client" ? item.buyer : item.source,
       platform: r.kind === "client" ? item.platform : item.source,
       amount: r.kind === "client" ? revenueOf(item) : costOf(item),
-      feesLost: r.kind === "client" ? num(item.saleFees) + num(item.shippingCost) : num(item.fees),
+      feesLost: r.kind === "client" ? num(item.saleFees) + num(item.shippingCost) : purchaseFeesUnitOf(item),
       carrier: item.carrier,
       tracking: item.tracking,
     }));

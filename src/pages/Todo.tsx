@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
-import { Empty, Modal, Segmented } from "../components/ui";
+import { Modal } from "../components/ui";
 import { useStore } from "../store/StoreContext";
-import { usePref } from "../lib/usePref";
 import { useSecteur } from "../lib/useSecteur";
+import { filterTodosByDomain, sectorMeta } from "../lib/calc";
+import { fieldLabels } from "../lib/sectorFields";
 import { TODO_LABEL, TODO_ORDER } from "../lib/constants";
 import { uid } from "../lib/id";
 import { links } from "../lib/links";
@@ -20,6 +21,8 @@ function AddSourcingModal({ onClose, onAdd }: { onClose: () => void; onAdd: (sou
   const [size, setSize] = useState("");
   const [price, setPrice] = useState("");
   const [supplierName, setSupplierName] = useState("");
+  const isTcg = useSecteur().domain === "tcg";
+  const labels = fieldLabels(isTcg ? "tcg" : "fashion");
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,19 +53,19 @@ function AddSourcingModal({ onClose, onAdd }: { onClose: () => void; onAdd: (sou
           <span>Nom du produit / Modèle *</span>
           <input
             type="text"
-            placeholder="ex. Dunk Low Panda, Jordan 4 Military Black…"
+            placeholder={isTcg ? labels.namePlaceholder : "ex. Dunk Low Panda, Jordan 4 Military Black…"}
             value={name}
             onChange={(e) => setName(e.target.value)}
             autoFocus
           />
         </label>
         <label className="field">
-          <span>Marque</span>
-          <input type="text" placeholder="ex. Nike, Adidas, Supreme…" value={brand} onChange={(e) => setBrand(e.target.value)} />
+          <span>{labels.brand}</span>
+          <input type="text" placeholder={labels.brandPlaceholder} value={brand} onChange={(e) => setBrand(e.target.value)} />
         </label>
         <label className="field">
-          <span>Taille / Pointure</span>
-          <input type="text" placeholder="ex. 42, M, US 9…" value={size} onChange={(e) => setSize(e.target.value)} />
+          <span>{isTcg ? labels.size : "Taille / Pointure"}</span>
+          <input type="text" placeholder={labels.sizePlaceholder} value={size} onChange={(e) => setSize(e.target.value)} />
         </label>
         <label className="field">
           <span>Budget d'achat (€)</span>
@@ -140,9 +143,9 @@ function AddTodoModal({
 export default function Todo() {
   const { state, dispatch, resolveAutoTodo } = useStore();
   const secteur = useSecteur();
+  const labels = fieldLabels(secteur.domain);
   const toast = useToast();
   const navigate = useNavigate();
-  const [view, setView] = usePref<"kanban" | "list">("todoView", "kanban");
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<TodoCol | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -153,15 +156,29 @@ export default function Todo() {
   const [showAddTodoModal, setShowAddTodoModal] = useState(false);
   const [defaultAddCol, setDefaultAddCol] = useState<TodoCol>("envoyer");
 
-  // L'affichage est filtré par secteur, jamais les écritures : réordonner une colonne
-  // renvoie la liste complète des tâches, y compris celles de l'autre secteur.
-  const visibleTodos = state.todos.filter((t) => secteur.matchesLinked([t.itemId, ...(t.itemIds ?? [])]));
-  const byCol = (c: TodoCol) => visibleTodos.filter((t) => t.col === c).sort((a, b) => a.order - b.order);
+  // L'affichage est strictement cloisonné par univers (sauf sur Todo centralisé de l'accueil)
+  const visibleTodos = useMemo(
+    () => filterTodosByDomain(state.todos, secteur.domain, state.items),
+    [state.todos, secteur.domain, state.items],
+  );
+  const byCol = (c: TodoCol) => visibleTodos.filter((t: TodoItem) => t.col === c).sort((a: TodoItem, b: TodoItem) => {
+    if (secteur.domain === "all") {
+      const sA = a.sector || (a.isTcg ? "tcg" : "fashion");
+      const sB = b.sector || (b.isTcg ? "tcg" : "fashion");
+      if (sA !== sB) return sA.localeCompare(sB);
+      if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+      if (a.dueDate) return -1;
+      if (b.dueDate) return 1;
+    }
+    return a.order - b.order;
+  });
 
   const add = (col: TodoCol, text: string, dueDate?: string) => {
     const clean = text.trim();
     if (!clean) return;
     const order = Math.max(0, ...state.todos.filter((t) => t.col === col).map((t) => t.order)) + 1;
+    const isTcgSector = secteur.domain === "tcg";
+    const currentSector = secteur.domain !== "all" ? secteur.domain : undefined;
     dispatch({
       type: "addTodo",
       todo: {
@@ -171,6 +188,8 @@ export default function Todo() {
         order,
         createdAt: Date.now(),
         dueDate,
+        sector: currentSector,
+        isTcg: isTcgSector,
       },
     });
     toast(`Tâche « ${clean} » ajoutée dans ${TODO_LABEL[col]}`);
@@ -192,6 +211,8 @@ export default function Todo() {
         sourcingSize: size,
         sourcingPrice: price,
         supplierName,
+        sector: secteur.domain !== "all" ? secteur.domain : undefined,
+        isTcg: secteur.domain === "tcg",
       },
     });
     toast(`Article « ${name} » ajouté aux produits à acheter`);
@@ -212,14 +233,11 @@ export default function Todo() {
     dispatch({ type: "reorderTodos", todos: [...others, ...renumbered] });
   };
 
-  const remaining = visibleTodos.filter((t) => t.col !== "termine").length;
-  const autoCount = visibleTodos.filter((t) => t.auto).length;
-  const sourcingCount = visibleTodos.filter((t) => t.isSourcing || t.col === "acheter").length;
+  const remaining = visibleTodos.filter((t: TodoItem) => t.col !== "termine").length;
 
   /** Où se règle réellement la tâche. */
   const autoTarget = (t: TodoItem) =>
     t.auto === "ship" ? links.livraison({ tab: "a_partir" })
-    : t.auto === "receive" ? links.livraison({ tab: "a_venir" })
     : links.facturation({ state: "unpaid" });
 
   const completeAuto = (t: TodoItem) => {
@@ -326,6 +344,11 @@ export default function Todo() {
             ) : (
               <div className="tx" onDoubleClick={() => setEditingId(t.id)}>{t.text}</div>
             )}
+            {secteur.domain === "all" && (
+              <span className="pill ghost" style={{ fontSize: 10, padding: "2px 6px", marginRight: 4 }}>
+                {sectorMeta(t.sector || (t.isTcg ? "tcg" : "fashion"), state.settings.customSectors ?? []).icon}
+              </span>
+            )}
             {isAuto ? (
               <span className="auto-tag" title="Tâche automatique générée par l'application">⚡ AUTO</span>
             ) : isSourcing ? (
@@ -333,11 +356,11 @@ export default function Todo() {
             ) : null}
           </div>
 
-          {/* Métadonnées Sourcing : Marque, Taille, Budget */}
+          {/* Métadonnées Sourcing : Marque/Licence, Taille/Grade, Budget */}
           {isSourcing && (t.sourcingBrand || t.sourcingSize || (t.sourcingPrice && t.sourcingPrice > 0)) && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4, fontSize: 12, opacity: 0.9 }}>
               {t.sourcingBrand && <span className="pill ghost">🏷 {t.sourcingBrand}</span>}
-              {t.sourcingSize && <span className="pill ghost">📏 T. {t.sourcingSize}</span>}
+              {t.sourcingSize && <span className="pill ghost">📏 {labels.sizePrefix}{t.sourcingSize}</span>}
               {t.sourcingPrice && t.sourcingPrice > 0 ? (
                 <span className="pill good">💰 Budget : {eur2(t.sourcingPrice)}</span>
               ) : null}
@@ -465,7 +488,7 @@ export default function Todo() {
                 style={{ width: "100%", justifyContent: "center", fontSize: 11 }}
                 onClick={() => completeAuto(t)}
               >
-                {t.auto === "ship" ? "📦 Expédier & Valider →" : t.auto === "receive" ? "⇩ Réceptionner →" : "💳 Voir le règlement →"}
+                {t.auto === "ship" ? "📦 Expédier & Valider →" : "💳 Voir le règlement →"}
               </button>
             ) : (
               <>
@@ -525,26 +548,52 @@ export default function Todo() {
         >
           + Nouvelle tâche
         </button>
-        <button className="btn" onClick={() => navigate(links.sourcing())}>
+        <button
+          className="btn"
+          onClick={() => navigate(links.sourcing({ secteur: secteur.domain !== "all" ? secteur.domain : undefined }))}
+        >
           🛒 Espace Sourcing →
         </button>
-        <Segmented<"kanban" | "list">
-          value={view}
-          onChange={setView}
-          options={[
-            { value: "kanban", label: "Kanban" },
-            { value: "list", label: "Liste" },
-          ]}
-        />
         <span className="hint">
-          {remaining} tâche{remaining > 1 ? "s" : ""} en cours
-          {sourcingCount > 0 && ` · ${sourcingCount} sourcing`}
-          {autoCount > 0 && ` · ${autoCount} auto`}
+          {remaining} action{remaining > 1 ? "s" : ""} à suivre
         </span>
       </HeaderActions>
 
-      {view === "kanban" ? (
-        <div className="kanban">
+      {secteur.domain !== "all" && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 16,
+            flexWrap: "wrap",
+            gap: 12,
+            padding: "10px 14px",
+            background: "var(--surface-2)",
+            borderRadius: "var(--radius-md)",
+            border: "1px solid var(--line)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 20 }}>{sectorMeta(secteur.domain, state.settings.customSectors ?? []).icon}</span>
+            <div>
+              <b style={{ fontSize: 14 }}>Todo · {sectorMeta(secteur.domain, state.settings.customSectors ?? []).label}</b>
+              <div className="hint" style={{ fontSize: 12 }}>
+                Tâches et actions isolées dans cet univers
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn sm ghost"
+            onClick={() => navigate("/todo")}
+          >
+            🌐 Voir tout le Todo centralisé (tous univers) →
+          </button>
+        </div>
+      )}
+
+      <div className="kanban">
           {TODO_ORDER.map((col) => (
             <section
               key={col}
@@ -604,137 +653,7 @@ export default function Todo() {
               </div>
             </section>
           ))}
-        </div>
-      ) : (
-        <div className="card">
-          <div className="card-h">
-            <h3>Toutes les tâches &amp; Sourcing</h3>
-            <div className="spacer" />
-            <button className="btn sm primary" onClick={() => setShowAddSourcingModal(true)}>
-              🛒 + Article à sourcer
-            </button>
-          </div>
-          {state.todos.length === 0 ? (
-            <Empty glyph="☑" title="Rien à faire pour l'instant">
-              Ajoutez une tâche ou un produit à sourcer pour démarrer.
-            </Empty>
-          ) : (
-            <div className="tlist">
-              {[...state.todos]
-                .sort((a, b) => TODO_ORDER.indexOf(a.col) - TODO_ORDER.indexOf(b.col) || a.order - b.order)
-                .map((t) => {
-                  const linkedIds = t.itemIds?.length ? t.itemIds : (t.itemId ? [t.itemId] : []);
-                  const linkedItems = state.items.filter((i) => linkedIds.includes(i.id));
-                  const isSourcing = t.isSourcing || t.col === "acheter";
-                  return (
-                    <div className="row" key={t.id} style={{ flexWrap: "wrap", gap: 8, padding: "8px 0" }}>
-                      <input
-                        type="checkbox"
-                        checked={t.col === "termine"}
-                        style={{ accentColor: "var(--accent)" }}
-                        onChange={(e) => {
-                          if (t.auto) {
-                            if (e.target.checked) completeAuto(t);
-                            return;
-                          }
-                          dispatch({ type: "patchTodo", id: t.id, patch: { col: e.target.checked ? "termine" : "faire" } });
-                        }}
-                      />
-                      {t.auto ? (
-                        <button className="linkish" style={{ flex: 1 }} onClick={() => navigate(autoTarget(t))}>
-                          {t.text}
-                        </button>
-                      ) : (
-                        <div style={{ flex: 1, minWidth: 200, textDecoration: t.col === "termine" ? "line-through" : "none", color: t.col === "termine" ? "var(--ink-3)" : undefined }}>
-                          <b>{t.text}</b>
-                          {(t.sourcingBrand || t.sourcingSize || t.sourcingPrice) ? (
-                            <div className="hint" style={{ fontSize: 11, marginTop: 2 }}>
-                              {[t.sourcingBrand && `Marque: ${t.sourcingBrand}`, t.sourcingSize && `Taille: ${t.sourcingSize}`, t.sourcingPrice ? `Budget: ${eur2(t.sourcingPrice)}` : null].filter(Boolean).join(" · ")}
-                            </div>
-                          ) : null}
-                        </div>
-                      )}
-
-                      {/* Action commander sur la ligne */}
-                      {isSourcing && !t.auto && (
-                        <div>
-                          {t.ordered ? (
-                            <span className="pill good" style={{ cursor: "pointer" }} onClick={() => navigate(links.achats())}>
-                              ✓ Commandé →
-                            </span>
-                          ) : (
-                            <button className="btn sm ok" onClick={() => openOrderForTodo(t)}>
-                              🛒 Commander
-                            </button>
-                          )}
-                        </div>
-                      )}
-
-                      {!t.auto && (
-                        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                          <input
-                            type="date"
-                            value={t.dueDate || ""}
-                            onChange={(e) => dispatch({ type: "patchTodo", id: t.id, patch: { dueDate: e.target.value } })}
-                            style={{ fontSize: 11, padding: "2px 4px", height: 24 }}
-                          />
-
-                          {t.supplierName && (
-                            <span className="kcard-item-chip" style={{ background: "rgba(59, 130, 246, 0.1)" }}>
-                              🏢 {t.supplierName}
-                            </span>
-                          )}
-
-                          {t.clientName && (
-                            <span className="kcard-item-chip" style={{ background: "rgba(16, 185, 129, 0.1)" }}>
-                              👤 {t.clientName}
-                            </span>
-                          )}
-
-                          {linkedItems.map((item) => (
-                            <span key={item.id} className="kcard-item-chip">
-                              📦 {item.name}
-                            </span>
-                          ))}
-                          <button className="btn sm ghost" onClick={() => setLinkingTodo(t)}>
-                            + Lien
-                          </button>
-                        </div>
-                      )}
-
-                      {t.auto ? (
-                        <span className="auto-tag">auto</span>
-                      ) : (
-                        <>
-                          <select
-                            value={t.col}
-                            style={{ width: "auto", padding: "3px 6px", fontSize: 12 }}
-                            onChange={(e) => dispatch({ type: "patchTodo", id: t.id, patch: { col: e.target.value as TodoCol } })}
-                          >
-                            {TODO_ORDER.map((c) => (
-                              <option key={c} value={c}>{TODO_LABEL[c]}</option>
-                            ))}
-                          </select>
-                          <button className="btn sm ghost" onClick={() => setEditingId(t.id)}>
-                            ✎ Modifier
-                          </button>
-                          <button
-                            className="btn sm ghost"
-                            style={{ color: "var(--bad)" }}
-                            title="Abandonner"
-                            onClick={() => dispatch({ type: "removeTodo", id: t.id })}
-                          >
-                            ✕ Abandonner
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
-            </div>
-          )}
-        </div>
-      )}
+      </div>
 
       {/* Modal d'ajout de tâche Todo */}
       {showAddTodoModal && (

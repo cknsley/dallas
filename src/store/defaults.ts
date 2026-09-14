@@ -3,6 +3,7 @@ import { DEFAULT_TRACKING_URLS } from "../lib/carriers";
 
 export const DEFAULT_SETTINGS: Settings = {
   business: "",
+  accountingMode: "standard",
   vatEnabled: false,
   legalStatus: "rien",
   country: "FR",
@@ -11,6 +12,8 @@ export const DEFAULT_SETTINGS: Settings = {
   marginScheme: true,
   threshold: 85000,
   address: "",
+  zip: "",
+  city: "",
   email: "",
   phone: "",
   iban: "",

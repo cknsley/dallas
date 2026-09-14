@@ -6,7 +6,10 @@ import { compressImage, deletePhoto, savePhoto } from "../store/photos";
 import { ARTICLE_TYPES, PLATFORMS } from "../lib/constants";
 import { eur2, num, pct, today } from "../lib/format";
 import { uid } from "../lib/id";
-import { HINT, LABEL, eurLabel } from "../lib/lexicon";
+import { LABEL, eurLabel } from "../lib/lexicon";
+import { isTcgItem, qtyOf } from "../lib/calc";
+import { useSecteur } from "../lib/useSecteur";
+import { TCG_CATEGORIES, TCG_GAMES, TCG_GRADES, fieldLabels, sectorStamp } from "../lib/sectorFields";
 import type { Item, PackagingKind } from "../types";
 
 export const blankItem = (): Item => ({
@@ -14,7 +17,7 @@ export const blankItem = (): Item => ({
   sku: "",
   condition: "Neuf avec étiquette",
   name: "", brand: "", type: "", size: "", gender: "", packaging: "boite", source: "",
-  quantity: 1, cost: 0, fees: 0, price: 0, estimatedPrice: 0,
+  quantity: 1, cost: 0, fees: 0, purchaseShipping: 0, customsFees: 0, price: 0, estimatedPrice: 0,
   platform: "", buyer: "", buyerUrl: "", saleFees: 0, packagingCost: 0, shippingCost: 0, shippingPaid: 0,
   status: "arrivage",
   buyDate: today(), receiveDate: "", saleDate: "",
@@ -25,8 +28,26 @@ export const blankItem = (): Item => ({
 });
 
 /** Les montants restent des chaînes le temps de la saisie. */
-type MoneyKey = "cost" | "fees" | "price" | "estimatedPrice" | "saleFees" | "packagingCost" | "shippingPaid" | "shippingCost";
+type MoneyKey = "cost" | "fees" | "purchaseShipping" | "customsFees" | "price" | "estimatedPrice" | "saleFees" | "packagingCost" | "shippingPaid" | "shippingCost";
 type Draft = Omit<Item, MoneyKey | "quantity"> & Record<MoneyKey, string> & { quantity: string };
+type ItemStep = "base" | "details" | "prix" | "notes";
+
+const ITEM_STEPS: { key: ItemStep; label: string }[] = [
+  { key: "base", label: "Article" },
+  { key: "details", label: "Détails" },
+  { key: "prix", label: "Prix" },
+  { key: "notes", label: "Notes" },
+];
+
+const VINTED_CONDITIONS = [
+  "Neuf avec étiquette",
+  "Neuf sans étiquette",
+  "Très bon état",
+  "Bon état",
+  "Satisfaisant",
+];
+
+const CONDITION_GRADES = ["Grade A", "Grade B", "Grade C", "Grade D", "Grade E", "Grade F"];
 
 const toDraft = (i: Item): Draft => ({
   ...i,
@@ -37,6 +58,8 @@ const toDraft = (i: Item): Draft => ({
   quantity: String(Math.max(1, i.quantity || 1)),
   cost: i.cost ? String(i.cost) : "",
   fees: i.fees ? String(i.fees) : "",
+  purchaseShipping: i.purchaseShipping ? String(i.purchaseShipping) : "",
+  customsFees: i.customsFees ? String(i.customsFees) : "",
   price: i.price ? String(i.price) : "",
   estimatedPrice: i.estimatedPrice ? String(i.estimatedPrice) : (i.price ? String(i.price) : ""),
   saleFees: i.saleFees ? String(i.saleFees) : "",
@@ -56,13 +79,24 @@ export default function ItemModal({
   const { state, dispatch } = useStore();
   const toast = useToast();
   const isNew = item === null;
-  const [draft, setDraft] = useState<Draft>(() => toDraft(item ?? blankItem()));
+  const secteur = useSecteur();
+  // Un article créé depuis un univers y reste : TCG marqué comme tel, univers perso rattaché.
+  const [draft, setDraft] = useState<Draft>(() =>
+    toDraft(item ?? { ...blankItem(), ...sectorStamp(secteur.domain), ...(secteur.domain === "tcg" ? { tcgCategory: "raw" as const } : {}) }),
+  );
   const [pending, setPending] = useState<Blob | null>(null);
   const [pendingURL, setPendingURL] = useState<string | null>(null);
   const [cleared, setCleared] = useState(false);
+  const [step, setStep] = useState<ItemStep>("base");
+  const [syncLotCosts, setSyncLotCosts] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const conditionOptions = [...VINTED_CONDITIONS, ...CONDITION_GRADES];
+
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
+
+  const tcg = !!draft.isTcg || (!!item && isTcgItem(item));
+  const labels = fieldLabels(tcg ? "tcg" : "fashion");
 
   const autoGenerateSku = () => {
     const prefix = (draft.brand || "RS").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
@@ -77,22 +111,26 @@ export default function ItemModal({
     const uniq = (k: "brand" | "type" | "size" | "source" | "platform") =>
       [...new Set(state.items.map((i) => i[k]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
     return {
-      brand: uniq("brand"),
+      brand: tcg ? [...new Set([...TCG_GAMES, ...uniq("brand")])] : uniq("brand"),
       type: [...new Set([...ARTICLE_TYPES, ...uniq("type")])],
-      size: uniq("size"),
+      size: tcg ? [...new Set([...TCG_GRADES, ...uniq("size")])] : uniq("size"),
       source: uniq("source"),
       platform: [...new Set([...PLATFORMS, ...uniq("platform")])],
     };
-  }, [state.items]);
+  }, [state.items, tcg]);
 
   const existingLots = useMemo(() => {
     return [...new Set(state.items.map((i) => i.lotTag).filter(Boolean))].sort();
   }, [state.items]);
 
   const isSold = draft.status === "vendu";
+  const stepIndex = ITEM_STEPS.findIndex((s) => s.key === step);
+  const isFirstStep = stepIndex === 0;
+  const isLastStep = stepIndex === ITEM_STEPS.length - 1;
 
   const qty = Math.max(1, Math.round(num(draft.quantity)) || 1);
-  const totalCost = (num(draft.cost) + num(draft.fees)) * qty;
+  const purchaseFees = num(draft.purchaseShipping) + num(draft.customsFees) + num(draft.fees);
+  const totalCost = (num(draft.cost) + purchaseFees) * qty;
   const price = num(draft.price) || num(draft.estimatedPrice);
   const saleCosts = isSold ? num(draft.saleFees) + num(draft.packagingCost) + num(draft.shippingCost) : 0;
   const cashIn = (isSold ? price + num(draft.shippingPaid) / qty : price) * qty;
@@ -100,9 +138,53 @@ export default function ItemModal({
   const marge = cashIn - outflow;
 
   const parseSizes = (raw: string): string[] => {
-    if (!raw.trim()) return [""];
+    // Un grade TCG ne se décline pas en plusieurs fiches comme une liste de tailles.
+    if (tcg || !raw.trim()) return [raw.trim()];
     const items = raw.split(/[,/]+/).map((s) => s.trim()).filter(Boolean);
     return items.length > 0 ? items : [raw.trim()];
+  };
+
+  const selectLot = (lotTag: string) => {
+    if (!lotTag) {
+      set("lotTag", "");
+      setSyncLotCosts(false);
+      return;
+    }
+
+    const linkedItems = state.items.filter((candidate) => candidate.lotTag === lotTag && candidate.id !== draft.id);
+    const currentAlreadyInLot = item?.lotTag === lotTag;
+    const addedUnits = qty * (isNew ? parseSizes(draft.size).length : 1);
+    const totalUnits = linkedItems.reduce((sum, candidate) => sum + qtyOf(candidate), 0) + addedUnits;
+    const shippingTotal = linkedItems.reduce(
+      (sum, candidate) => sum + num(candidate.purchaseShipping) * qtyOf(candidate),
+      currentAlreadyInLot ? num(draft.purchaseShipping) * qty : 0,
+    );
+    const customsTotal = linkedItems.reduce(
+      (sum, candidate) => sum + num(candidate.customsFees) * qtyOf(candidate),
+      currentAlreadyInLot ? num(draft.customsFees) * qty : 0,
+    );
+
+    setDraft((current) => ({
+      ...current,
+      lotTag,
+      purchaseShipping: shippingTotal > 0 ? (shippingTotal / totalUnits).toFixed(2) : "",
+      customsFees: customsTotal > 0 ? (customsTotal / totalUnits).toFixed(2) : "",
+    }));
+    setSyncLotCosts(true);
+  };
+
+  const syncLinkedLotCosts = (savedIds: string[], saved: Item) => {
+    if (!syncLotCosts || !saved.lotTag) return;
+    state.items
+      .filter((candidate) => candidate.lotTag === saved.lotTag && !savedIds.includes(candidate.id))
+      .forEach((candidate) => dispatch({
+        type: "patchItem",
+        id: candidate.id,
+        patch: {
+          purchaseShipping: saved.purchaseShipping || 0,
+          customsFees: saved.customsFees || 0,
+        },
+      }));
   };
 
   const generateVintedDescription = (): string => {
@@ -112,9 +194,10 @@ export default function ItemModal({
 
     const details: string[] = [];
     if (draft.sku) details.push(`• Réf / SKU : ${draft.sku}`);
-    if (draft.brand) details.push(`• Marque : ${draft.brand}`);
-    if (draft.type) details.push(`• Modèle / Type : ${draft.type}`);
-    if (draft.size) details.push(`• Taille : ${draft.size}`);
+    if (draft.brand) details.push(`• ${labels.brand} : ${draft.brand}`);
+    if (tcg && draft.tcgSet) details.push(`• ${labels.type} : ${draft.tcgSet}`);
+    if (!tcg && draft.type) details.push(`• Modèle / Type : ${draft.type}`);
+    if (draft.size) details.push(`• ${labels.size} : ${draft.size}`);
     if (draft.condition) details.push(`• État : ${draft.condition}`);
 
     const pkgMap: Record<string, string> = {
@@ -206,6 +289,8 @@ export default function ItemModal({
           quantity: qty,
           cost: num(draft.cost),
           fees: num(draft.fees),
+          purchaseShipping: num(draft.purchaseShipping),
+          customsFees: num(draft.customsFees),
           price: num(draft.price),
           estimatedPrice: num(draft.estimatedPrice) || num(draft.price),
           saleFees: num(draft.saleFees),
@@ -219,6 +304,7 @@ export default function ItemModal({
         dispatch({ type: "upsertItem", item: next });
         createdItems.push(next);
       }
+      syncLinkedLotCosts(createdItems.map((created) => created.id), createdItems[0]);
       toast(`${createdItems.length} fiches créées (Tailles : ${sizes.join(", ")})`);
       return createdItems[0];
     }
@@ -238,6 +324,8 @@ export default function ItemModal({
       quantity: qty,
       cost: num(draft.cost),
       fees: num(draft.fees),
+      purchaseShipping: num(draft.purchaseShipping),
+      customsFees: num(draft.customsFees),
       price: num(draft.price),
       estimatedPrice: num(draft.estimatedPrice) || num(draft.price),
       saleFees: num(draft.saleFees),
@@ -247,8 +335,18 @@ export default function ItemModal({
       photoId,
       saleDate: draft.status === "vendu" && !draft.saleDate ? today() : draft.saleDate,
       receiveDate: draft.status !== "arrivage" && !draft.receiveDate ? today() : draft.receiveDate,
+      ...(tcg
+        ? {
+          isTcg: true,
+          tcgGame: draft.brand.trim() || undefined,
+          tcgGrade: draft.size.trim() || undefined,
+          tcgSet: draft.tcgSet?.trim() || undefined,
+          type: draft.type.trim() || "Carte TCG",
+        }
+        : {}),
     };
     dispatch({ type: "upsertItem", item: next });
+    syncLinkedLotCosts([next.id], next);
     return next;
   };
 
@@ -278,13 +376,35 @@ export default function ItemModal({
             </>
           )}
           <button className="btn" onClick={onClose}>Annuler</button>
-          <button className="btn primary" onClick={() => void submit()}>
-            {isNew ? "Ajouter l’article" : "Enregistrer"}
-          </button>
+          {!isFirstStep && (
+            <button className="btn" onClick={() => setStep(ITEM_STEPS[stepIndex - 1].key)}>Précédent</button>
+          )}
+          {isLastStep ? (
+            <button className="btn primary" onClick={() => void submit()}>
+              {isNew ? "Ajouter l’article" : "Enregistrer"}
+            </button>
+          ) : (
+            <button className="btn primary" onClick={() => setStep(ITEM_STEPS[stepIndex + 1].key)}>Suivant</button>
+          )}
         </>
       }
     >
-      {/* Top Header: Photo en haut à gauche + Informations principales */}
+      <div className="modal-steps">
+        {ITEM_STEPS.map((s, idx) => (
+          <button
+            key={s.key}
+            type="button"
+            className={`modal-step${s.key === step ? " active" : ""}${idx < stepIndex ? " done" : ""}`}
+            onClick={() => setStep(s.key)}
+          >
+            <span>{idx + 1}</span>
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {step === "base" && (
+        <>
       <div style={{ display: "flex", gap: 16, alignItems: "flex-start", marginBottom: 16 }}>
         {/* Photo dropzone à gauche */}
         <div style={{ flexShrink: 0, width: 120 }}>
@@ -366,19 +486,29 @@ export default function ItemModal({
             <input
               type="text"
               value={draft.name}
-              placeholder="Ex. Dunk Low UNC, AJ1 Low Travis Scott..."
+              placeholder={tcg ? "Ex. Dracaufeu ex 199/165, Display 151..." : "Ex. Dunk Low UNC, AJ1 Low Travis Scott..."}
               onChange={(e) => set("name", e.target.value)}
               autoFocus
             />
           </Field>
 
           <div className="fgrid" style={{ gridTemplateColumns: "1fr 1fr" }}>
-            <Field label="Marque">
-              <input type="text" list="dl-brand" value={draft.brand} placeholder="Ex. Nike, Jordan, Carhartt" onChange={(e) => set("brand", e.target.value)} />
+            <Field label={labels.brand}>
+              <input type="text" list="dl-brand" value={draft.brand} placeholder={tcg ? "Ex. Pokémon, One Piece" : "Ex. Nike, Jordan, Carhartt"} onChange={(e) => set("brand", e.target.value)} />
             </Field>
-            <Field label="Type / Modèle">
-              <input type="text" list="dl-type" value={draft.type} placeholder="Ex. Sneakers, Veste, Sweat" onChange={(e) => set("type", e.target.value)} />
-            </Field>
+            {tcg ? (
+              <Field label="Format">
+                <select value={draft.tcgCategory || "raw"} onChange={(e) => set("tcgCategory", e.target.value as Item["tcgCategory"])}>
+                  {TCG_CATEGORIES.map((c) => (
+                    <option key={c.key} value={c.key}>{c.icon} {c.label}</option>
+                  ))}
+                </select>
+              </Field>
+            ) : (
+              <Field label="Type / Modèle">
+                <input type="text" list="dl-type" value={draft.type} placeholder="Ex. Sneakers, Veste, Sweat" onChange={(e) => set("type", e.target.value)} />
+              </Field>
+            )}
           </div>
         </div>
       </div>
@@ -403,42 +533,53 @@ export default function ItemModal({
           />
         </Field>
 
-        <Field label="Taille(s)">
+        <Field label={tcg ? labels.size : "Taille(s)"}>
           <input
             type="text"
             list="dl-size"
             value={draft.size}
-            placeholder="Ex. 42 (ou '38, 39, 40')"
+            placeholder={tcg ? "Ex. PSA 10 Gem Mint" : "Ex. 42 (ou '38, 39, 40')"}
             onChange={(e) => set("size", e.target.value)}
           />
-          {isNew && draft.size.includes(",") && (
+          {isNew && !tcg && draft.size.includes(",") && (
             <span className="hint pos" style={{ fontSize: 11, marginTop: 2, display: "block" }}>
               ✨ {parseSizes(draft.size).length} fiches distinctes seront créées automatiquement !
             </span>
           )}
         </Field>
 
-        <Field label="Sexe">
-          <select value={draft.gender || ""} onChange={(e) => set("gender", e.target.value as Item["gender"])}>
-            <option value="">Non précisé</option>
-            <option value="homme">Homme</option>
-            <option value="femme">Femme</option>
-            <option value="mixte">Mixte</option>
-            <option value="enfant">Enfant</option>
-          </select>
-        </Field>
+        {tcg ? (
+          <Field label={labels.type}>
+            <input type="text" value={draft.tcgSet || ""} placeholder="Ex. 151, Évolution Céleste, OP-05" onChange={(e) => set("tcgSet", e.target.value)} />
+          </Field>
+        ) : (
+          <Field label="Sexe">
+            <select value={draft.gender || ""} onChange={(e) => set("gender", e.target.value as Item["gender"])}>
+              <option value="">Non précisé</option>
+              <option value="homme">Homme</option>
+              <option value="femme">Femme</option>
+              <option value="mixte">Mixte</option>
+              <option value="enfant">Enfant</option>
+            </select>
+          </Field>
+        )}
 
         <Field label="Source">
           <input type="text" list="dl-source" value={draft.source} placeholder="Ex. Vinted, friperie, grossiste" onChange={(e) => set("source", e.target.value)} />
         </Field>
 
         <Field label="Fait partie d'un lot ?">
-          <select value={draft.lotTag || ""} onChange={(e) => set("lotTag", e.target.value)}>
+          <select value={draft.lotTag || ""} onChange={(e) => selectLot(e.target.value)}>
             <option value="">Non (Article solo)</option>
             {existingLots.map((lot) => (
               <option key={lot} value={lot}>{lot}</option>
             ))}
           </select>
+          {draft.lotTag && (
+            <span className="hint" style={{ display: "block", marginTop: 4, fontSize: 10 }}>
+              {state.items.filter((candidate) => candidate.lotTag === draft.lotTag && candidate.id !== draft.id).reduce((sum, candidate) => sum + qtyOf(candidate), 0) + qty} unités · frais répartis automatiquement
+            </span>
+          )}
         </Field>
       </div>
 
@@ -453,131 +594,15 @@ export default function ItemModal({
           </select>
         </Field>
       )}
+        </>
+      )}
 
-      {/* Section TCG / Cartes à collectionner */}
-      <div
-        style={{
-          marginTop: 14,
-          padding: 14,
-          borderRadius: 12,
-          background: draft.isTcg ? "rgba(234, 179, 8, 0.06)" : "var(--surface-sub)",
-          border: draft.isTcg ? "1px solid rgba(234, 179, 8, 0.3)" : "1px solid var(--line-2)",
-          transition: "all 0.2s ease",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
-            <input
-              type="checkbox"
-              checked={Boolean(draft.isTcg)}
-              onChange={(e) => {
-                const checked = e.target.checked;
-                setDraft((d) => ({
-                  ...d,
-                  isTcg: checked,
-                  tcgGame: checked ? d.tcgGame || "Pokémon" : d.tcgGame,
-                  tcgCategory: checked ? d.tcgCategory || "raw" : d.tcgCategory,
-                }));
-              }}
-            />
-            <span>🃏 Article / Carte TCG (Trading Card Game)</span>
-          </label>
-          {draft.isTcg && (
-            <span className="pill" style={{ background: "#eab308", color: "#000", fontWeight: 800, fontSize: 10 }}>
-              MODE TCG ACTIF
-            </span>
-          )}
-        </div>
-
-        {draft.isTcg && (
-          <div className="fgrid" style={{ marginTop: 12, gridTemplateColumns: "1fr 1fr 1fr" }}>
-            <Field label="Licence / Jeu TCG">
-              <select value={draft.tcgGame || "Pokémon"} onChange={(e) => set("tcgGame", e.target.value)}>
-                <option value="Pokémon">⚡ Pokémon</option>
-                <option value="One Piece">🏴‍☠️ One Piece</option>
-                <option value="Yu-Gi-Oh!">👁️ Yu-Gi-Oh!</option>
-                <option value="Magic">🔮 Magic: The Gathering</option>
-                <option value="Lorcana">✨ Lorcana</option>
-                <option value="Dragon Ball">🐉 Dragon Ball</option>
-                <option value="Autre">🃏 Autre TCG</option>
-              </select>
-            </Field>
-
-            <Field label="Extension / Set">
-              <input
-                type="text"
-                value={draft.tcgSet || ""}
-                placeholder="Ex. 151, EV05, OP-05..."
-                onChange={(e) => set("tcgSet", e.target.value)}
-              />
-            </Field>
-
-            <Field label="Format & Statut">
-              <select
-                value={draft.tcgCategory || "raw"}
-                onChange={(e) => {
-                  const cat = e.target.value as any;
-                  setDraft((d) => ({
-                    ...d,
-                    tcgCategory: cat,
-                    tcgGrade:
-                      cat === "grading"
-                        ? "En gradation (Note à découvrir ✨)"
-                        : cat === "raw"
-                        ? "Raw (Near Mint)"
-                        : d.tcgGrade || "PSA 10 Gem Mint",
-                  }));
-                }}
-              >
-                <option value="raw">🃏 Carte Raw / Brut</option>
-                <option value="grading">⏳ En gradation chez PSA/BGS (Note à découvrir ✨)</option>
-                <option value="graded">🏆 Carte Gradée (Note connue)</option>
-                <option value="blister">🟡 Blister / Artset (Booster protégé)</option>
-                <option value="sealed">📦 Coffret / Booster Box / ETB scellé</option>
-                <option value="case">🧱 Case / Carton Scellé (Case Displays/Blisters)</option>
-              </select>
-            </Field>
-
-            {(draft.tcgCategory === "graded" || draft.tcgCategory === "grading") && (
-              <Field label={draft.tcgCategory === "grading" ? "Société de gradation" : "Note / Grade"}>
-                {draft.tcgCategory === "grading" ? (
-                  <select value={draft.gradingCompany || "PSA"} onChange={(e) => set("gradingCompany", e.target.value)}>
-                    <option value="PSA">PSA (Professional Sports Authenticator)</option>
-                    <option value="BGS">BGS (Beckett Grading Services)</option>
-                    <option value="PCA">PCA (PCA France)</option>
-                    <option value="CGC">CGC Cards</option>
-                    <option value="SGS">SGS / SGC</option>
-                  </select>
-                ) : (
-                  <select value={draft.tcgGrade || "PSA 10 Gem Mint"} onChange={(e) => set("tcgGrade", e.target.value)}>
-                    <option value="PSA 10 Gem Mint">PSA 10 Gem Mint</option>
-                    <option value="PSA 9 Mint">PSA 9 Mint</option>
-                    <option value="PSA 8 Near Mint">PSA 8 Near Mint</option>
-                    <option value="BGS 10 Pristine">BGS 10 Pristine</option>
-                    <option value="BGS 9.5 Gem Mint">BGS 9.5 Gem Mint</option>
-                    <option value="PCA 10 Gem Mint">PCA 10 Gem Mint</option>
-                    <option value="PCA 9.5">PCA 9.5</option>
-                    <option value="CGC 10 Pristine">CGC 10 Pristine</option>
-                    <option value="Autre">Autre grade</option>
-                  </select>
-                )}
-              </Field>
-            )}
-          </div>
-        )}
-      </div>
-
+      {step === "details" && (
+        <>
       <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 14 }}>
-        {/* État / Condition de l'article - Boutons carrés interactifs SANS champ texte qui répète */}
         <Field label="État / Condition de l'article">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 8, marginTop: 4 }}>
-            {[
-              "✨ Neuf avec étiquette",
-              "🏷️ Neuf sans étiquette",
-              "⭐ Très bon état",
-              "👍 Bon état",
-              "👌 Satisfaisant",
-            ].map((cond) => {
+            {conditionOptions.map((cond) => {
               const active = draft.condition === cond;
               return (
                 <button
@@ -646,13 +671,16 @@ export default function ItemModal({
           </div>
         </Field>
       </div>
+        </>
+      )}
 
       <datalist id="dl-brand">{suggestions.brand.map((v) => <option key={v} value={v} />)}</datalist>
       <datalist id="dl-type">{suggestions.type.map((v) => <option key={v} value={v} />)}</datalist>
       <datalist id="dl-size">{suggestions.size.map((v) => <option key={v} value={v} />)}</datalist>
       <datalist id="dl-source">{suggestions.source.map((v) => <option key={v} value={v} />)}</datalist>
 
-      <hr className="sep" />
+      {step === "prix" && (
+        <>
       <div className="fgrid">
         <Field label={eurLabel(LABEL.cost)}>
           <input type="number" step="0.01" value={draft.cost} placeholder="0,00" onChange={(e) => set("cost", e.target.value)} />
@@ -662,26 +690,14 @@ export default function ItemModal({
             </span>
           )}
         </Field>
-        <Field label={eurLabel(LABEL.fees)}>
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <input type="number" step="0.01" value={draft.fees} placeholder={HINT.fees} onChange={(e) => set("fees", e.target.value)} />
-            {num(draft.fees) > 0 && (
-              <button
-                type="button"
-                className="btn sm ghost"
-                title="Intégrer les frais au coût d'achat"
-                onClick={() => {
-                  const newCost = (num(draft.cost) + num(draft.fees)).toFixed(2);
-                  set("cost", newCost);
-                  set("fees", "");
-                  toast(`Frais intégrés au coût d'achat (${newCost} €)`);
-                }}
-                style={{ fontSize: 10, whiteSpace: "nowrap" }}
-              >
-                + Coût
-              </button>
-            )}
-          </div>
+        <Field label={eurLabel(draft.lotTag ? "Part livraison du lot" : "Livraison")}>
+          <input type="number" min="0" step="0.01" value={draft.purchaseShipping} placeholder="0,00" onChange={(e) => { set("purchaseShipping", e.target.value); setSyncLotCosts(!!draft.lotTag); }} />
+        </Field>
+        <Field label={eurLabel(draft.lotTag ? "Part douane du lot" : "Douane")}>
+          <input type="number" min="0" step="0.01" value={draft.customsFees} placeholder="0,00" onChange={(e) => { set("customsFees", e.target.value); setSyncLotCosts(!!draft.lotTag); }} />
+        </Field>
+        <Field label={eurLabel("Autres frais")}>
+          <input type="number" min="0" step="0.01" value={draft.fees} placeholder="Nettoyage, retouche…" onChange={(e) => set("fees", e.target.value)} />
         </Field>
         <Field label={eurLabel(isSold ? LABEL.price : "Prix estimé")}>
           <input
@@ -726,7 +742,6 @@ export default function ItemModal({
 
       <hr className="sep" />
 
-      {/* Dates d'achat et de réception */}
       <div className="fgrid">
         <Field label="Date d'achat">
           <input type="date" value={draft.buyDate} onChange={(e) => set("buyDate", e.target.value)} />
@@ -735,8 +750,10 @@ export default function ItemModal({
           <input type="date" value={draft.receiveDate} onChange={(e) => set("receiveDate", e.target.value)} />
         </Field>
       </div>
+        </>
+      )}
 
-      {/* Notes & Description de l'annonce */}
+      {step === "notes" && (
       <Field label="Notes & Description de l'annonce">
         <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
           <button type="button" className="btn sm primary" onClick={copyDescription}>
@@ -748,6 +765,7 @@ export default function ItemModal({
         </div>
         <textarea rows={4} value={draft.notes} placeholder="État, défauts, mesures, détails de l'annonce…" onChange={(e) => set("notes", e.target.value)} />
       </Field>
+      )}
     </Modal>
   );
 }

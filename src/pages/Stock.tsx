@@ -1,16 +1,16 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
-import { Confirm, Empty, PhotoCover, Photo, Segmented, StatusPill } from "../components/ui";
+import { Confirm, Empty, PhotoCover, Photo, Segmented } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
 import { useClearQuery, useQueryState } from "../lib/useQueryState";
 import { links } from "../lib/links";
-import { costOf, qtyOf } from "../lib/calc";
+import { costOf, purchaseFeesOf, qtyOf } from "../lib/calc";
 import { useSecteur } from "../lib/useSecteur";
-import { dshort, eur, eur2 } from "../lib/format";
-import { STATUS_LABEL } from "../lib/constants";
+import { dshortNoYear, eur, eur2 } from "../lib/format";
+import { TCG_CATEGORIES, fieldLabels, getTcgCategory, itemAttr, type AttrKey, type TcgCategory } from "../lib/sectorFields";
 import { downloadText, itemsToCSV, stockFilename } from "../lib/csv";
 import { Download, Plus, Pencil, Trash2 } from "lucide-react";
 import ItemModal from "../modals/ItemModal";
@@ -83,38 +83,57 @@ export function getStockCategory(i: Item): "vetements" | "chaussures" | "sacs" |
 }
 
 const STOCK_TABS: { key: StockCategoryTab; label: string; icon: string }[] = [
+  { key: "total", label: "Total", icon: "📊" },
   { key: "vetements", label: "Vêtements", icon: "👕" },
   { key: "chaussures", label: "Chaussures", icon: "👟" },
   { key: "sacs", label: "Sacs", icon: "👜" },
   { key: "accessoires", label: "Accessoires", icon: "🧢" },
-  { key: "tcg", label: "TCG & Cartes", icon: "🃏" },
-  { key: "emballages", label: "Emballages", icon: "📦" },
-  { key: "total", label: "Total", icon: "📊" },
 ];
 
-type SortKey = "name" | "brand" | "type" | "size" | "source" | "status" | "cost" | "buyDate" | "quantity";
+/** Espace TCG : mêmes onglets, découpés par format de produit plutôt que par vêtement. */
+const TCG_STOCK_TABS: { key: TcgCategory | "total"; label: string; icon: string }[] = [
+  { key: "total", label: "Total", icon: "📊" },
+  ...TCG_CATEGORIES,
+];
+
+type SortKey = "name" | "brand" | "type" | "size" | "condition" | "supplierLot" | "source" | "cost" | "fees" | "price" | "estimate" | "buyDate" | "quantity";
 
 const COLUMNS: { key: SortKey | "photo" | "sell" | "actions"; label: string; sortable: boolean; right?: boolean }[] = [
   { key: "photo", label: "", sortable: false },
   { key: "name", label: "Article", sortable: true },
   { key: "quantity", label: "Qté", sortable: true, right: true },
   { key: "brand", label: "Marque", sortable: true },
-  { key: "type", label: "Type", sortable: true },
+  { key: "type", label: "Catégorie", sortable: true },
   { key: "size", label: "Taille", sortable: true },
-  { key: "source", label: "Source", sortable: true },
+  { key: "condition", label: "État", sortable: true },
+  { key: "supplierLot", label: "Fournisseur / lot", sortable: true },
   { key: "cost", label: "Coût", sortable: true, right: true },
+  { key: "fees", label: "Frais", sortable: true, right: true },
+  { key: "price", label: "Prix", sortable: true, right: true },
+  { key: "estimate", label: "Estim.", sortable: true, right: true },
   { key: "buyDate", label: "Achat", sortable: true },
-  { key: "status", label: "Statut", sortable: true, right: true },
   { key: "actions", label: "", sortable: false, right: true },
 ];
 
+const TCG_COLUMN_LABELS: Record<AttrKey, string> = {
+  brand: "Licence",
+  type: "Set",
+  size: "Grade",
+  condition: "Format",
+};
+
 const sortValue = (i: Item, k: SortKey): string | number => {
   switch (k) {
-    case "name": case "brand": case "type": case "size": case "source":
-      return i[k].toLowerCase();
-    case "status": return i.status;
+    case "name": case "source":
+      return (i[k] || "").toLowerCase();
+    case "brand": case "type": case "size": case "condition":
+      return itemAttr(i, k).toLowerCase();
+    case "supplierLot": return `${i.source || ""} ${i.lotTag || ""}`.toLowerCase();
     case "quantity": return qtyOf(i);
     case "cost": return costOf(i);
+    case "fees": return purchaseFeesOf(i);
+    case "price": return i.price || 0;
+    case "estimate": return i.estimatedPrice || 0;
     case "buyDate": return i.buyDate;
   }
 };
@@ -131,12 +150,19 @@ export default function Stock() {
   // secteur : les catégories vêtement n'ont plus lieu d'être. L'onglet TCG, lui, ne
   // sort que dans la vue générale et dans l'espace Vêtements.
   const isBuiltinFashionOrAll = secteur.domain === "all" || secteur.domain === "fashion";
-  const visibleTabs = isBuiltinFashionOrAll
+  const isTcg = secteur.domain === "tcg";
+  const labels = fieldLabels(secteur.domain);
+  const visibleTabs: { key: string; label: string; icon: string }[] = isTcg
+    ? TCG_STOCK_TABS
+    : isBuiltinFashionOrAll
     ? STOCK_TABS.filter((t) => secteur.domain === "all" || t.key !== "tcg")
     : [];
-  const categoryTab: StockCategoryTab =
-    isBuiltinFashionOrAll ? ((catRaw as StockCategoryTab) || "total") : "total";
-  const setCategoryTab = (val: StockCategoryTab) => setCatRaw(val);
+  const categoryTab: string =
+    visibleTabs.some((t) => t.key === catRaw) || (isBuiltinFashionOrAll && catRaw === "emballages") ? catRaw : "total";
+  const setCategoryTab = (val: string) => setCatRaw(val);
+  const columns = isTcg
+    ? COLUMNS.map((c) => (c.key in TCG_COLUMN_LABELS ? { ...c, label: TCG_COLUMN_LABELS[c.key as AttrKey] } : c))
+    : COLUMNS;
   const [q, setQ] = useQueryState("q");
   const [brand, setBrand] = useQueryState("brand");
   const [type, setType] = useQueryState("type");
@@ -155,44 +181,39 @@ export default function Stock() {
     [secteur.items],
   );
 
+  /** Onglet d'un article : son format en TCG, sa catégorie vêtement partout ailleurs. */
+  const tabOf = (i: Item): string => (isTcg ? getTcgCategory(i) : getStockCategory(i));
+
   const tabCounts = useMemo(() => {
-    const counts = {
-      vetements: 0,
-      chaussures: 0,
-      sacs: 0,
-      accessoires: 0,
-      tcg: 0,
-      emballages: 0,
-      total: 0,
-    };
+    const counts: Record<string, number> = { total: 0 };
     for (const i of held) {
-      const cat = getStockCategory(i);
+      const cat = tabOf(i);
       const qty = qtyOf(i);
-      counts[cat] += qty;
+      counts[cat] = (counts[cat] ?? 0) + qty;
       if (cat !== "emballages") {
         counts.total += qty;
       }
     }
     return counts;
-  }, [held]);
+  }, [held, isTcg]);
 
   const uniq = (k: "brand" | "type" | "size") =>
-    [...new Set(held.map((i) => i[k]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
+    [...new Set(held.map((i) => itemAttr(i, k)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
 
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const filtered = held.filter((i) => {
-      const cat = getStockCategory(i);
+      const cat = tabOf(i);
       if (categoryTab === "total") {
         if (cat === "emballages") return false; // Emballage exclu du Total
       } else {
         if (cat !== categoryTab) return false;
       }
-      if (brand && i.brand !== brand) return false;
-      if (type && i.type !== type) return false;
-      if (size && i.size !== size) return false;
+      if (brand && itemAttr(i, "brand") !== brand) return false;
+      if (type && itemAttr(i, "type") !== type) return false;
+      if (size && itemAttr(i, "size") !== size) return false;
       if (needle) {
-        const hay = [i.name, i.brand, i.type, i.size, i.source, i.notes, i.sku, i.condition].join(" ").toLowerCase();
+        const hay = [i.name, i.brand, i.type, i.size, i.source, i.notes, i.sku, i.condition, i.tcgGame, i.tcgSet, i.tcgGrade].join(" ").toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
@@ -204,18 +225,22 @@ export default function Stock() {
       if (x === y) return b.createdAt - a.createdAt;
       return (x > y ? 1 : -1) * dir;
     });
-  }, [held, categoryTab, brand, type, size, q, sortKey, sortDir]);
+  }, [held, categoryTab, brand, type, size, q, sortKey, sortDir, isTcg]);
 
   const toggleSort = (k: SortKey) => {
     if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else {
       setSortKey(k);
-      setSortDir(["name", "brand", "type", "size", "source", "status"].includes(k) ? "asc" : "desc");
+      setSortDir(["name", "brand", "type", "size", "condition", "supplierLot", "source"].includes(k) ? "asc" : "desc");
     }
   };
 
   const hasFilters = !!brand || !!type || !!size || !!q;
   const linkedDoc = (i: Item) => state.docs.find((d) => d.itemIds.includes(i.id));
+  const supplierNameOf = (i: Item) =>
+    state.suppliers.find((supplier) => supplier.id === i.supplierId || supplier.id === i.source || supplier.name === i.source)?.name
+    || i.source
+    || "—";
 
   // Le capital immobilisé ne compte que les pièces encore en stock pour l'onglet actif.
   const heldCost = list.reduce((a, i) => a + costOf(i), 0);
@@ -252,26 +277,6 @@ export default function Stock() {
     );
   };
 
-  /** Toggle de statut : « Vendu » ouvre la vente. */
-  const statusToggle = (i: Item) => (
-    <div className="status-toggle" role="group" aria-label="Statut de l’article">
-      {(["stock", "vendu"] as const).map((s) => (
-        <button
-          key={s}
-          type="button"
-          className={`st-${s}${i.status === s ? " on" : ""}`}
-          aria-pressed={i.status === s}
-          onClick={() => {
-            if (i.status === s) return;
-            if (s === "vendu") { setSelling(i); return; }
-          }}
-        >
-          {STATUS_LABEL[s]}
-        </button>
-      ))}
-    </div>
-  );
-
   return (
     <>
       <HeaderActions>
@@ -292,7 +297,15 @@ export default function Stock() {
       </HeaderActions>
 
       {/* Onglets de catégories du Stock */}
-      {visibleTabs.length > 0 && (
+      {categoryTab === "emballages" ? (
+        <div className="stock-packaging-heading">
+          <div>
+            <h2>Emballages</h2>
+            <span className="hint">Cartons, protections et fournitures d'envoi</span>
+          </div>
+          <button className="btn ghost sm" onClick={() => setCategoryTab("total")}>Retour au stock</button>
+        </div>
+      ) : visibleTabs.length > 0 && (
       <div className="stock-tabs-bar" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
         {visibleTabs.map((tab) => {
           const active = categoryTab === tab.key;
@@ -305,7 +318,7 @@ export default function Stock() {
               onClick={() => setCategoryTab(tab.key)}
             >
               <span>{tab.icon} {tab.label}</span>
-              <span className={`badge stock-tab-badge${active ? " active" : ""}`}>{count}</span>
+              <span className={`badge stock-tab-badge${active ? " active" : ""}`}>{count ?? 0}</span>
             </button>
           );
         })}
@@ -313,23 +326,26 @@ export default function Stock() {
       )}
 
       <div className="toolbar">
+        <button className="btn primary sm" onClick={() => setEditing({ item: null })}>
+          <Plus size={14} /> Nouveau
+        </button>
         <select value={brand} onChange={(e) => setBrand(e.target.value)} style={{ width: "auto", minWidth: 130 }}>
-          <option value="">Toutes marques</option>
+          <option value="">{labels.brandAll}</option>
           {uniq("brand").map((b) => <option key={b}>{b}</option>)}
         </select>
         <select value={type} onChange={(e) => setType(e.target.value)} style={{ width: "auto", minWidth: 130 }}>
-          <option value="">Tous types</option>
+          <option value="">{labels.typeAll}</option>
           {uniq("type").map((b) => <option key={b}>{b}</option>)}
         </select>
         <select value={size} onChange={(e) => setSize(e.target.value)} style={{ width: "auto", minWidth: 110 }}>
-          <option value="">Toutes tailles</option>
+          <option value="">{labels.sizeAll}</option>
           {uniq("size").map((b) => <option key={b}>{b}</option>)}
         </select>
         <div className="grow">
           <input
             type="search"
             value={q}
-            placeholder="Rechercher par nom, marque, SKU, état…"
+            placeholder={isTcg ? "Rechercher par carte, licence, set, grade, SKU…" : "Rechercher par nom, marque, SKU, état…"}
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
@@ -355,15 +371,15 @@ export default function Stock() {
       ) : view === "table" ? (
         <div className="card">
           <div className="twrap">
-            <table className="table-compact">
+            <table className="table-compact stock-table">
               <thead>
                 <tr>
-                  {COLUMNS.map((c) => {
+                  {columns.map((c) => {
                     const active = c.sortable && sortKey === c.key;
                     return (
                       <th
                         key={c.key}
-                        className={`${c.sortable ? "sortable" : ""}${c.right ? " r" : ""}${active ? " active" : ""}${c.key === "status" || c.key === "actions" || c.key === "photo" ? " shrink" : ""}`}
+                        className={`${c.sortable ? "sortable" : ""}${c.right ? " r" : ""}${active ? " active" : ""}${c.right || c.key === "photo" || c.key === "buyDate" || c.key === "condition" ? " shrink" : ""}`}
                         onClick={c.sortable ? () => toggleSort(c.key as SortKey) : undefined}
                       >
                         {c.label}
@@ -379,26 +395,32 @@ export default function Stock() {
                 {list.map((i) => (
                   <tr key={i.id}>
                     <td className="shrink"><Photo id={i.photoId} /></td>
-                    <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <td className="stock-name-cell">
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <button className="linkish ellipsis" title={i.name} onClick={() => setEditing({ item: i })}>
                           {i.name || "Sans nom"}
                         </button>
-                        {i.sku && <span className="pill ghost" style={{ fontSize: 10, padding: "1px 6px" }}>SKU: {i.sku}</span>}
                       </div>
-                      <div className="hint ellipsis" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 2 }}>
-                        {i.condition && <span style={{ color: "var(--accent)", fontWeight: 600 }}>{i.condition}</span>}
-                        {i.notes && <span>{i.notes}</span>}
+                      <div className="hint ellipsis stock-sku" title={i.sku || "SKU non renseigné"}>
+                        SKU · {i.sku || "—"}
                       </div>
                     </td>
                     <td className="r num shrink">{qtyOf(i)}</td>
-                    <td>{i.brand || "—"}</td>
-                    <td>{i.type || "—"}</td>
-                    <td>{i.size || "—"}</td>
-                    <td>{i.source || "—"}</td>
+                    <td>{itemAttr(i, "brand") || "—"}</td>
+                    <td>{itemAttr(i, "type") || "—"}</td>
+                    <td>{itemAttr(i, "size") || "—"}</td>
+                    <td className="shrink"><span className="stock-condition">{itemAttr(i, "condition") || "—"}</span></td>
+                    <td className="stock-supplier-cell">
+                      <div className="ellipsis" title={supplierNameOf(i)}>{supplierNameOf(i)}</div>
+                      {i.lotTag && <div className="hint ellipsis" title={i.lotTag}>Lot · {i.lotTag}</div>}
+                    </td>
                     <td className="r num">{eur2(costOf(i))}</td>
-                    <td className="num nowrap" style={{ fontSize: 12 }}>{dshort(i.buyDate)}</td>
-                    <td className="r shrink">{statusToggle(i)}</td>
+                    <td className="r num">{purchaseFeesOf(i) ? eur2(purchaseFeesOf(i)) : "—"}</td>
+                    <td className="r num">{i.price ? eur2(i.price) : "—"}</td>
+                    <td className={`r num shrink stock-estimate-cell${i.estimatedPrice ? "" : " empty"}`}>
+                      {i.estimatedPrice ? eur2(i.estimatedPrice) : "—"}
+                    </td>
+                    <td className="num nowrap" style={{ fontSize: 12 }}>{dshortNoYear(i.buyDate)}</td>
                     <td className="r shrink">{actions(i)}</td>
                   </tr>
                 ))}
@@ -412,12 +434,11 @@ export default function Stock() {
             <article className="gcard" key={i.id}>
               <div className="ph">
                 <PhotoCover id={i.photoId} />
-                <StatusPill status={i.status} />
               </div>
               <div className="gb">
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="brand-line">{i.brand || "—"}</div>
+                    <div className="brand-line">{itemAttr(i, "brand") || "—"}</div>
                     <button className="linkish" onClick={() => setEditing({ item: i })}>
                       {i.name || "Sans nom"}
                     </button>
@@ -425,14 +446,16 @@ export default function Stock() {
                   <div style={{ flexShrink: 0, marginTop: -2 }}>{actions(i)}</div>
                 </div>
                 <div className="meta" style={{ marginTop: 4 }}>
-                  {i.type || "—"}{i.size ? ` · ${i.size}` : ""}
-                  {i.condition ? ` · ${i.condition}` : ""}
+                  {itemAttr(i, "type") || "—"}{itemAttr(i, "size") ? ` · ${itemAttr(i, "size")}` : ""}
+                  {itemAttr(i, "condition") ? ` · ${itemAttr(i, "condition")}` : ""}
                   {qtyOf(i) > 1 && <span className="qty-badge">×{qtyOf(i)}</span>}
                 </div>
                 {i.sku && <div className="meta hint" style={{ fontSize: 11 }}>SKU: {i.sku}</div>}
+                <div className="meta hint">
+                  {supplierNameOf(i)}{i.lotTag ? ` · Lot ${i.lotTag}` : ""}
+                </div>
                 <div className="meta num">Coût {eur2(costOf(i))}</div>
               </div>
-              <div className="gf">{statusToggle(i)}</div>
             </article>
           ))}
         </div>

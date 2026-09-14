@@ -89,8 +89,17 @@ export default function SupplierModal({
             onChange={(e) => setTagsInput(e.target.value)}
           />
         </Field>
-        <Field label="Adresse" span>
-          <textarea rows={2} value={d.address} onChange={(e) => set("address", e.target.value)} />
+        <Field label="Rue / N° voie" span>
+          <input type="text" value={d.address} placeholder="12 rue du Commerce" onChange={(e) => set("address", e.target.value)} />
+        </Field>
+        <Field label="Code postal">
+          <input type="text" value={d.zip || ""} placeholder="75015" onChange={(e) => set("zip", e.target.value)} />
+        </Field>
+        <Field label="Ville">
+          <input type="text" value={d.city || ""} placeholder="Paris" onChange={(e) => set("city", e.target.value)} />
+        </Field>
+        <Field label="Pays">
+          <input type="text" value={d.country || ""} placeholder="France" onChange={(e) => set("country", e.target.value)} />
         </Field>
       </div>
 

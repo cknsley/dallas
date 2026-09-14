@@ -52,6 +52,8 @@ export default function DocPreview({ doc, onClose }: { doc: SalesDoc; onClose: (
             <b>Émetteur</b>
             {s.business || "Votre nom"}
             {s.address ? `\n${s.address}` : ""}
+            {(s.zip || s.city) ? `\n${[s.zip, s.city].filter(Boolean).join(" ")}` : ""}
+            {s.country ? `\n${s.country}` : ""}
             {s.email ? `\n${s.email}` : ""}
             {s.phone ? `\n${s.phone}` : ""}
             {s.vatNumber ? `\nTVA : ${s.vatNumber}` : ""}
@@ -60,6 +62,8 @@ export default function DocPreview({ doc, onClose }: { doc: SalesDoc; onClose: (
             <b>Client</b>
             {doc.clientName}
             {doc.clientAddress ? `\n${doc.clientAddress}` : ""}
+            {(doc.clientZip || doc.clientCity) ? `\n${[doc.clientZip, doc.clientCity].filter(Boolean).join(" ")}` : ""}
+            {doc.clientCountry ? `\n${doc.clientCountry}` : ""}
             {doc.clientVat ? `\nTVA : ${doc.clientVat}` : ""}
           </div>
         </div>
@@ -104,6 +108,15 @@ export default function DocPreview({ doc, onClose }: { doc: SalesDoc; onClose: (
           {doc.notes ? `\n${doc.notes}` : ""}
           {s.iban ? `\nRèglement par virement — IBAN : ${s.iban}` : ""}
           {s.footer ? `\n${s.footer}` : ""}
+        </div>
+        
+        <div className="signature-box" style={{ marginTop: 40, display: "flex", justifyContent: "space-between" }}>
+          <div style={{ borderTop: "1px solid var(--border)", paddingTop: 8, width: 200, textAlign: "center" }}>
+            Signature Émetteur
+          </div>
+          <div style={{ borderTop: "1px solid var(--border)", paddingTop: 8, width: 200, textAlign: "center" }}>
+            Signature Client
+          </div>
         </div>
       </div>
     </Modal>
