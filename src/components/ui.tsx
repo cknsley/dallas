@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { X, ArrowRight, ChevronDown, ImageOff, LucideIcon } from "lucide-react";
+import { X, ArrowRight, CalendarDays, ChevronDown, ImageOff, LucideIcon } from "lucide-react";
 import { photoURL, subscribePhotos } from "../store/photos";
 import type { ItemStatus } from "../types";
 import { STATUS_LABEL } from "../lib/constants";
@@ -294,6 +294,85 @@ export function Section({
         {open && right}
       </div>
       {open && children}
+    </div>
+  );
+}
+
+/** Sélecteur de période : un seul bouton, un panneau avec raccourcis et plage libre. */
+export function RangePicker({
+  from, to, onChange,
+}: { from: string; to: string; onChange: (r: { from: string; to: string }) => void }) {
+  const [open, setOpen] = useState(false);
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+
+  const presets = [
+    { label: "Ce mois-ci", make: () => {
+      const n = new Date();
+      return { from: iso(new Date(n.getFullYear(), n.getMonth(), 1)), to: iso(new Date(n.getFullYear(), n.getMonth() + 1, 0)) };
+    } },
+    { label: "Mois dernier", make: () => {
+      const n = new Date();
+      return { from: iso(new Date(n.getFullYear(), n.getMonth() - 1, 1)), to: iso(new Date(n.getFullYear(), n.getMonth(), 0)) };
+    } },
+    { label: "30 derniers jours", make: () => {
+      const n = new Date(); const f = new Date(); f.setDate(f.getDate() - 29);
+      return { from: iso(f), to: iso(n) };
+    } },
+    { label: "Ce trimestre", make: () => {
+      const n = new Date(); const q = Math.floor(n.getMonth() / 3) * 3;
+      return { from: iso(new Date(n.getFullYear(), q, 1)), to: iso(new Date(n.getFullYear(), q + 3, 0)) };
+    } },
+    { label: "Cette année", make: () => {
+      const n = new Date();
+      return { from: iso(new Date(n.getFullYear(), 0, 1)), to: iso(new Date(n.getFullYear(), 11, 31)) };
+    } },
+    { label: "Depuis le début", make: () => ({ from: "2000-01-01", to: iso(new Date()) }) },
+  ];
+
+  const fr = (d: string) => (d ? d.split("-").reverse().slice(0, 2).join("/") : "");
+  const active = presets.find((p) => { const r = p.make(); return r.from === from && r.to === to; });
+  const label = active ? active.label : `${fr(from)} → ${fr(to)}`;
+
+  return (
+    <div className="rp">
+      <button type="button" className="rp-trigger" onClick={() => setOpen((o) => !o)}>
+        <CalendarDays size={14} />
+        <span>{label}</span>
+        <ChevronDown size={13} />
+      </button>
+
+      {open && (
+        <>
+          <div className="rp-backdrop" onClick={() => setOpen(false)} />
+          <div className="rp-pop">
+            <div className="rp-presets">
+              {presets.map((p) => {
+                const isOn = active?.label === p.label;
+                return (
+                  <button
+                    key={p.label}
+                    type="button"
+                    className={isOn ? "on" : ""}
+                    onClick={() => { onChange(p.make()); setOpen(false); }}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="rp-custom">
+              <label>
+                <span>Du</span>
+                <input type="date" value={from} max={to} onChange={(e) => onChange({ from: e.target.value, to })} />
+              </label>
+              <label>
+                <span>Au</span>
+                <input type="date" value={to} min={from} onChange={(e) => onChange({ from, to: e.target.value })} />
+              </label>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

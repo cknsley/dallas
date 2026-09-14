@@ -338,50 +338,6 @@ export default function Livraison() {
         )}
       </HeaderActions>
 
-      {/* ── BARRE DE CONTRÔLE D'ONGLETS ET VUES DANS LA PAGE (AU-DESSUS DE LA ZONE DE CONTENU) ── */}
-      <div
-        className="card"
-        style={{
-          marginBottom: 18,
-          padding: "10px 16px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 12,
-        }}
-      >
-        <Segmented<DeliveryTab>
-          value={tab as DeliveryTab}
-          onChange={(v) => setTab(v)}
-          options={[
-            { value: "a_partir", label: `📤 À partir (${toShip.length})` },
-            { value: "a_venir", label: `📥 À venir (${incomingParcels.length})` },
-            { value: "retours", label: `↩️ Retours (${returnItems.length})` },
-          ]}
-        />
-
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {(tab === "a_partir" || tab === "retours") && (
-            <Segmented<"kanban" | "table">
-              value={viewMode}
-              onChange={setViewMode}
-              options={[
-                { value: "kanban", label: "Kanban" },
-                { value: "table", label: "Tableau" },
-              ]}
-            />
-          )}
-          {tab === "a_partir" ? (
-            <button className="btn primary" onClick={() => setCreating(true)}>+ Nouvelle livraison</button>
-          ) : tab === "a_venir" ? (
-            <button className="btn primary" onClick={() => navigate(links.achats())}>🏬 Centrale d'achat</button>
-          ) : (
-            <button className="btn primary" onClick={() => navigate(links.sav())}>💬 Ouvrir le SAV</button>
-          )}
-        </div>
-      </div>
-
       {tab === "a_partir" && (
         /* ================= TAB 1: À PARTIR (VENTES À EXPÉDIER) ================= */
         <>

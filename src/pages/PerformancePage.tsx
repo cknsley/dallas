@@ -5,15 +5,15 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import { HeaderActions } from "../components/Layout";
-import { Empty, Section } from "../components/ui";
+import { Empty, RangePicker, Section } from "../components/ui";
 import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
 import {
   chargesByCategory, chargesInRange, costOf, filterItemsByDomain, marginOf,
-  monthlySeries, periodRange, qtyOf, revenueOf, saleCostsOf, sectorMeta, soldItems,
+  monthlySeries, qtyOf, revenueOf, saleCostsOf, sectorMeta, soldItems,
 } from "../lib/calc";
 import { dshort, eur, eur2, pct } from "../lib/format";
-import type { Item, Period } from "../types";
+import type { Item } from "../types";
 
 type ChartView = "evolution" | "univers" | "marques" | "canaux" | "charges";
 type SortKey =
@@ -51,7 +51,8 @@ const daysInStock = (i: Item): number | null => {
 export default function PerformancePage() {
   const { state } = useStore();
   const [searchParams] = useSearchParams();
-  const [period, setPeriod] = usePref<Period>("perf_period", "month");
+  const [dateFrom, setDateFrom] = usePref<string>("perfFrom", "");
+  const [dateTo, setDateTo] = usePref<string>("perfTo", "");
   const [domain, setDomain] = usePref<string>("perfDomain", "all");
   const [chartView, setChartView] = useState<ChartView>("univers");
   const [sortKey, setSortKey] = useState<SortKey>("recent");
@@ -69,7 +70,20 @@ export default function PerformancePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, sectorIds.join(",")]);
 
-  const range = useMemo(() => periodRange(period), [period]);
+  const monthDefaults = useMemo(() => {
+    const n = new Date();
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    return { from: iso(new Date(n.getFullYear(), n.getMonth(), 1)), to: iso(new Date(n.getFullYear(), n.getMonth() + 1, 0)) };
+  }, []);
+
+  const range = useMemo(
+    () => {
+      const from = dateFrom || monthDefaults.from;
+      const to = dateTo || monthDefaults.to;
+      return { from, to, label: `du ${dshort(from)} au ${dshort(to)}`, bounded: true };
+    },
+    [dateFrom, dateTo, monthDefaults],
+  );
   const domainItems = useMemo(() => filterItemsByDomain(state.items, domain), [state.items, domain]);
   const sold = useMemo(() => soldItems(domainItems, range), [domainItems, range]);
 
@@ -179,12 +193,7 @@ export default function PerformancePage() {
             return <option key={id} value={id}>{meta.icon} {meta.label}</option>;
           })}
         </select>
-        <select value={period} onChange={(e) => setPeriod(e.target.value as Period)} style={{ width: "auto" }}>
-          <option value="month">Mois en cours</option>
-          <option value="quarter">Ce trimestre</option>
-          <option value="year">Année en cours</option>
-          <option value="all">Depuis le début</option>
-        </select>
+        <RangePicker from={dateFrom || monthDefaults.from} to={dateTo || monthDefaults.to} onChange={(r) => { setDateFrom(r.from); setDateTo(r.to); }} />
       </HeaderActions>
 
       {/* ── INDICATEURS CLÉS ── */}

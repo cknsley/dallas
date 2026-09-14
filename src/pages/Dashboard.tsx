@@ -6,15 +6,14 @@ import {
   CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 import { HeaderActions } from "../components/Layout";
-import { Empty, Section } from "../components/ui";
+import { Empty, RangePicker, Section } from "../components/ui";
 import { useStore } from "../store/StoreContext";
 import { usePref } from "../lib/usePref";
 import {
-  computeStats, filterItemsByDomain, marginOf, periodRange,
+  computeStats, filterItemsByDomain, marginOf,
   qtyOf, revenueOf, sectorMeta, soldItems,
 } from "../lib/calc";
-import { eur, pct } from "../lib/format";
-import type { Period } from "../types";
+import { dshort, eur, pct } from "../lib/format";
 
 type SectorSort = "ca" | "marge" | "stock" | "articles" | "nom";
 type ChartView = "ca" | "marge" | "stock" | "repartition";
@@ -48,7 +47,8 @@ const CHART_LABELS: Record<ChartView, string> = {
 export default function Dashboard() {
   const { state } = useStore();
   const navigate = useNavigate();
-  const [period, setPeriod] = usePref<Period>("period", "month");
+  const [dateFrom, setDateFrom] = usePref<string>("dashFrom", "");
+  const [dateTo, setDateTo] = usePref<string>("dashTo", "");
   const [sectorSort, setSectorSort] = useState<SectorSort>("ca");
   const [chartView, setChartView] = useState<ChartView>("ca");
   const [topSort, setTopSort] = useState<TopSort>("marge");
@@ -59,7 +59,20 @@ export default function Dashboard() {
     [customSectors],
   );
 
-  const range = useMemo(() => periodRange(period), [period]);
+  const monthDefaults = useMemo(() => {
+    const n = new Date();
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    return { from: iso(new Date(n.getFullYear(), n.getMonth(), 1)), to: iso(new Date(n.getFullYear(), n.getMonth() + 1, 0)) };
+  }, []);
+
+  const range = useMemo(
+    () => {
+      const from = dateFrom || monthDefaults.from;
+      const to = dateTo || monthDefaults.to;
+      return { from, to, label: `du ${dshort(from)} au ${dshort(to)}`, bounded: true };
+    },
+    [dateFrom, dateTo, monthDefaults],
+  );
   const global = useMemo(() => computeStats(state, range), [state, range]);
 
   /* Une ligne par univers, existant ou créé plus tard : la liste suit les réglages. */
@@ -144,12 +157,7 @@ export default function Dashboard() {
   return (
     <>
       <HeaderActions>
-        <select value={period} onChange={(e) => setPeriod(e.target.value as Period)} style={{ width: "auto" }}>
-          <option value="month">Mois en cours</option>
-          <option value="quarter">Ce trimestre</option>
-          <option value="year">Année en cours</option>
-          <option value="all">Depuis le début</option>
-        </select>
+        <RangePicker from={dateFrom || monthDefaults.from} to={dateTo || monthDefaults.to} onChange={(r) => { setDateFrom(r.from); setDateTo(r.to); }} />
       </HeaderActions>
 
       {/* ── TOTAUX, TOUS UNIVERS CONFONDUS ── */}

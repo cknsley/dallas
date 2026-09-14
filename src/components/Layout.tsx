@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Link, NavLink, Outlet, useLocation, useSearchParams } from "react-router-dom";
+import { Link, NavLink, Outlet, useSearchParams } from "react-router-dom";
 import {
   LayoutDashboard,
   CheckSquare,
@@ -56,7 +56,16 @@ export const HOME_NAV_GROUPS: { label: string; routes: NavRoute[] }[] = [
       { path: "/dashboard", label: "Vue générale", icon: LayoutDashboard, subtitle: "Indicateurs et chiffres consolidés", end: true },
       { path: "/performance", label: "Performance générale", icon: BarChart3, subtitle: "Bilan global de rentabilité" },
       { path: "/livraison", label: "Livraison générale", icon: Truck, subtitle: "Suivi global des réceptions et expéditions" },
-      { path: "/comptabilite", label: "Comptabilité", icon: Scale, subtitle: "Bilan, charges, facturation, fournisseurs & clients" },
+      { path: "/charges", label: "Charges", icon: DollarSign, subtitle: "Matériel, emballages et abonnements" },
+    ],
+  },
+  {
+    label: "Comptabilité",
+    routes: [
+      { path: "/fournisseurs", label: "Fournisseurs", icon: Building2, subtitle: "Achats, dettes fournisseurs et créances clients" },
+      { path: "/bilan", label: "Bilan", icon: Scale, subtitle: "Ce que vous possédez et ce que l'activité dégage" },
+      { path: "/facturation", label: "Facturation", icon: FileText, subtitle: "Factures, reçus et régime de TVA" },
+      { path: "/clients", label: "Clients", icon: Users, subtitle: "Acheteurs et historique d'achat" },
     ],
   },
   {
@@ -121,14 +130,9 @@ export function HeaderActions({ children }: { children: ReactNode }) {
 
 export default function Layout() {
   const { state } = useStore();
-  const { pathname } = useLocation();
   const [searchParams] = useSearchParams();
   const [cmdOpen, setCmdOpen] = useState(false);
   const [mobOpen, setMobOpen] = useState(false);
-  // Sur l'accueil, le switcher fait double emploi avec la section "Accès aux Pages
-  // Univers" de la page elle-même : on le retire là, pas ailleurs.
-  const isHome = pathname === "/";
-
   const customSectorIds = (state.settings.customSectors ?? []).map((s) => s.id);
   const secteurParam = searchParams.get("secteur");
   const activeSecteur = isSectorDomain(secteurParam, customSectorIds) ? secteurParam : null;
@@ -228,43 +232,10 @@ export default function Layout() {
             <Menu size={20} />
           </button>
 
-          {/* Sur l'accueil : le nom de la boutique. Ailleurs : le switcher de secteur. */}
-          {isHome ? (
-            <div className="topbar-shop-name">{state.settings.business?.trim() || "Ma Boutique Resell"}</div>
-          ) : (
-            <div className="topbar-pages-switcher">
-              <Link
-                to="/"
-                className={`topbar-page-btn ${!activeSecteur ? "active" : ""}`}
-              >
-                <span>🏠 Accueil</span>
-              </Link>
-              <Link
-                to="/achats?secteur=fashion"
-                className={`topbar-page-btn ${activeSecteur === "fashion" ? "active" : ""}`}
-              >
-                <span>👕 Vêtements</span>
-              </Link>
-              <Link
-                to="/achats?secteur=tcg"
-                className={`topbar-page-btn ${activeSecteur === "tcg" ? "active" : ""}`}
-              >
-                <span>🏷️ Tag / Cartes</span>
-              </Link>
-            </div>
-          )}
+          {/* Le nom de la boutique, partout : les univers s'ouvrent depuis l'accueil. */}
+          <div className="topbar-shop-name">{state.settings.business?.trim() || "Ma Boutique Resell"}</div>
 
           <div className="spacer" />
-
-          {/* Bouton Central Deal */}
-          <Link
-            to={activeSecteur ? `/deal?secteur=${activeSecteur}` : "/deal"}
-            className="topbar-deal-btn"
-            title="Calculateur & Négociation Deal"
-          >
-            <Sparkles size={13} />
-            <span>Page Deal</span>
-          </Link>
 
           {/* Quick Cmd+K search trigger in topbar */}
           <button className="btn ghost sm topbar-cmd" onClick={() => setCmdOpen(true)}>
