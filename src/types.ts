@@ -39,6 +39,7 @@ export interface Item {
   buyerUrl: string;      // lien vers son profil sur la plateforme
   saleFees: number;      // commission de la plateforme
   packagingCost?: number; // emballage supporté à la vente
+  extraFees?: number;     // frais divers (studio photo, stockage, retouche vendeur…)
   shippingCost: number;  // port payé par le vendeur
   shippingPaid: number;  // port refacturé à l'acheteur
   status: ItemStatus;

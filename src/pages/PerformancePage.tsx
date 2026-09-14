@@ -33,7 +33,7 @@ import { dshort, eur, eur2, pct } from "../lib/format";
 import { links } from "../lib/links";
 import type { Item, Period } from "../types";
 
-type PerfTab = "sales_list" | "channels" | "categories" | "velocity" | "charges";
+type PerfTab = "sales_list" | "channels" | "categories" | "charges";
 type SalesSortKey = "saleDate" | "marge" | "price" | "cost" | "daysInStock";
 
 export default function PerformancePage() {
@@ -295,7 +295,7 @@ export default function PerformancePage() {
         <Kpi
           label="Délai Moyen d'Écoulement"
           value={averageDaysToSell !== null ? `${averageDaysToSell} jours` : "–"}
-          meta="Temps moyen en stock avant vente"
+          meta={`Taux d'écoulement : ${pct(sellThroughRate)}`}
           tone="ok"
         />
         <Kpi
@@ -350,7 +350,6 @@ export default function PerformancePage() {
           { id: "channels", label: "🛍️ Canaux & Plateformes", icon: ShoppingBag },
           { id: "categories", label: "🏷️ Marque & Catégorie", icon: Layers },
           { id: "charges", label: "💸 Charges & Frais", icon: DollarSign },
-          { id: "velocity", label: "⚡ Vitesse & Écoulement", icon: Zap },
         ].map((t) => {
           const Icon = t.icon;
           const active = activeTab === t.id;
@@ -753,18 +752,18 @@ export default function PerformancePage() {
               <span className="hint">{range.label}</span>
             </div>
             <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
-                <div style={{ padding: 14, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--line)" }}>
-                  <div style={{ fontSize: 11, color: "var(--ink-3)", textTransform: "uppercase" }}>Marge Brute (Ventes)</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, margin: "4px 0" }}>{eur(grossMarge)}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+                <div className="stat-box">
+                  <div className="stat-box-label">Marge Brute (Ventes)</div>
+                  <div className="stat-box-value">{eur(grossMarge)}</div>
                 </div>
-                <div style={{ padding: 14, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--line)" }}>
-                  <div style={{ fontSize: 11, color: "var(--ink-3)", textTransform: "uppercase" }}>Charges de la Période</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, margin: "4px 0", color: "var(--warn)" }}>−{eur(charges)}</div>
+                <div className="stat-box">
+                  <div className="stat-box-label">Charges de la Période</div>
+                  <div className="stat-box-value" style={{ color: "var(--warn)" }}>−{eur(charges)}</div>
                 </div>
-                <div style={{ padding: 14, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--line)" }}>
-                  <div style={{ fontSize: 11, color: "var(--ink-3)", textTransform: "uppercase" }}>Marge Nette Finale</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, margin: "4px 0", color: netMarge >= 0 ? "var(--ok)" : "var(--bad)" }}>{eur(netMarge)}</div>
+                <div className="stat-box">
+                  <div className="stat-box-label">Marge Nette Finale</div>
+                  <div className="stat-box-value" style={{ color: netMarge >= 0 ? "var(--ok)" : "var(--bad)" }}>{eur(netMarge)}</div>
                 </div>
               </div>
 
@@ -801,53 +800,6 @@ export default function PerformancePage() {
         </div>
       )}
 
-      {/* ── TAB 4 : VITESSE D'ÉCOULEMENT & VÉLOCITÉ DE STOCK ── */}
-      {activeTab === "velocity" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-          <div className="card">
-            <div className="card-h">
-              <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <Zap size={18} style={{ color: "var(--accent)" }} /> Vélocité de Vente & Écoulement du Stock
-              </h3>
-            </div>
-            <div className="card-b">
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 18 }}>
-                <div style={{ padding: 14, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--line)" }}>
-                  <div style={{ fontSize: 11, color: "var(--ink-3)", textTransform: "uppercase" }}>
-                    Délai Moyen d'Écoulement
-                  </div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: "var(--accent)", margin: "4px 0" }}>
-                    {averageDaysToSell !== null ? `${averageDaysToSell} jours` : "–"}
-                  </div>
-                  <div style={{ fontSize: 11, color: "var(--ink-3)" }}>Temps entre l'achat et la vente</div>
-                </div>
-
-                <div style={{ padding: 14, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--line)" }}>
-                  <div style={{ fontSize: 11, color: "var(--ink-3)", textTransform: "uppercase" }}>
-                    Taux d'Écoulement (Sell-Through)
-                  </div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: "var(--ok)", margin: "4px 0" }}>
-                    {pct(sellThroughRate)}
-                  </div>
-                  <div style={{ fontSize: 11, color: "var(--ink-3)" }}>
-                    {totalSoldAllTime} vendus / {totalStockCount + totalSoldAllTime} articles gérés
-                  </div>
-                </div>
-
-                <div style={{ padding: 14, borderRadius: 10, background: "var(--surface-2)", border: "1px solid var(--line)" }}>
-                  <div style={{ fontSize: 11, color: "var(--ink-3)", textTransform: "uppercase" }}>
-                    Pièces en Stock à Vendre
-                  </div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: "var(--ink)", margin: "4px 0" }}>
-                    {state.items.filter((i) => i.status === "stock").reduce((a, i) => a + qtyOf(i), 0)}
-                  </div>
-                  <div style={{ fontSize: 11, color: "var(--ink-3)" }}>Articles disponibles immédiatement</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

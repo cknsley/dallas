@@ -17,6 +17,7 @@ interface SaleDraft {
   saleFees: string;
   packagingCost: string;
   port: string;
+  extraFees: string;
 }
 
 export default function SellModal({
@@ -42,6 +43,7 @@ export default function SellModal({
     saleFees: item.saleFees ? String(item.saleFees) : "",
     packagingCost: item.packagingCost ? String(item.packagingCost) : "",
     port: item.shippingCost ? String(item.shippingCost) : "0",
+    extraFees: item.extraFees ? String(item.extraFees) : "",
   });
   const set = <K extends keyof SaleDraft>(k: K, v: SaleDraft[K]) => setD((x) => ({ ...x, [k]: v }));
 
@@ -79,8 +81,9 @@ export default function SellModal({
   const saleFees = num(d.saleFees);
   const packagingCost = num(d.packagingCost);
   const shippingCost = num(d.port);
+  const extraFees = num(d.extraFees);
   const cashIn = price;
-  const outflow = buyCost + saleFees + packagingCost + shippingCost;
+  const outflow = buyCost + saleFees + packagingCost + shippingCost + extraFees;
   const margin = cashIn - outflow;
 
   const submit = () => {
@@ -105,6 +108,7 @@ export default function SellModal({
       packagingCost,
       shippingPaid: 0,
       shippingCost,
+      extraFees,
       status: "vendu" as const,
     };
     dispatch({ type: "patchItem", id: item.id, patch });
@@ -172,6 +176,9 @@ export default function SellModal({
             <Field label={eurLabel("Emballage")}>
               <input type="number" min="0" step="0.01" value={d.packagingCost} placeholder="0,00" onChange={(e) => set("packagingCost", e.target.value)} />
             </Field>
+            <Field label={eurLabel("Frais divers")}>
+              <input type="number" min="0" step="0.01" value={d.extraFees} placeholder="0,00" onChange={(e) => set("extraFees", e.target.value)} />
+            </Field>
           </div>
           <datalist id="dl-buyer">
             {buyerSuggestions.map((v) => <option key={v} value={v} />)}
@@ -189,6 +196,7 @@ export default function SellModal({
           <Row label="Commission plateforme" value={saleFees ? `−${eur2(saleFees)}` : eur2(0)} />
           <Row label="Port" value={shippingCost ? `−${eur2(shippingCost)}` : eur2(0)} />
           <Row label="Emballage" value={packagingCost ? `−${eur2(packagingCost)}` : eur2(0)} />
+          <Row label="Frais divers" value={extraFees ? `−${eur2(extraFees)}` : eur2(0)} />
           <div className="totrow big">
             <span>Marge nette</span>
             <b className={`num ${margin >= 0 ? "pos" : "neg"}`}>{eur2(margin)}</b>

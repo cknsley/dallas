@@ -217,6 +217,7 @@ export default function Ventes() {
                     <th>Vendue</th>
                     <th className="r">Prix</th>
                     <th className="r">Port</th>
+                    <th className="r">Frais</th>
                     <th className="r">Marge</th>
                     <th className="r">Livraison</th>
                     <th>Doc</th>
@@ -262,6 +263,9 @@ export default function Ventes() {
                         </td>
                         <td className={`r num ${portNet > 0 ? "pos" : portNet < 0 ? "neg" : ""}`}>
                           {portNet === 0 ? "—" : `${portNet > 0 ? "+" : "−"}${eur2(Math.abs(portNet))}`}
+                        </td>
+                        <td className="r num">
+                          {i.extraFees ? `−${eur2(i.extraFees)}` : "—"}
                         </td>
                         <td className={`r num ${m >= 0 ? "pos" : "neg"}`}>{eur2(m)}</td>
                         <td className="r">

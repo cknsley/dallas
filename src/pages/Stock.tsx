@@ -301,31 +301,11 @@ export default function Stock() {
             <button
               key={tab.key}
               type="button"
-              className={`btn${active ? " primary" : " ghost"}`}
+              className={`btn stock-tab${active ? " primary" : " ghost"}`}
               onClick={() => setCategoryTab(tab.key)}
-              style={{
-                borderRadius: 20,
-                padding: "6px 14px",
-                fontSize: 13,
-                fontWeight: active ? 600 : 500,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
             >
               <span>{tab.icon} {tab.label}</span>
-              <span
-                className="badge"
-                style={{
-                  background: active ? "rgba(255, 255, 255, 0.25)" : "var(--surface-sub)",
-                  padding: "2px 8px",
-                  borderRadius: 10,
-                  fontSize: 11,
-                  fontWeight: 600,
-                }}
-              >
-                {count}
-              </span>
+              <span className={`badge stock-tab-badge${active ? " active" : ""}`}>{count}</span>
             </button>
           );
         })}

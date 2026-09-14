@@ -535,6 +535,20 @@ a.kpi:hover .go, button.kpi:hover .go { opacity: 1; transform: none; }
 .home-sector-add-lbl { font-weight: 600; font-size: 14px; }
 .home-sector-add-sub { font-size: 11.5px; }
 
+/* Bloc de stat compact, réutilisé partout où l'on affichait le même style inline
+ * (Performance, cockpits…) — un seul endroit à ajuster plutôt que N copies. */
+.stat-box {
+  padding: 12px 14px; border-radius: 10px;
+  background: var(--surface-2); border: 1px solid var(--line);
+}
+.stat-box-label { font-size: 10.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.04em; }
+.stat-box-value { font-size: 20px; font-weight: 800; margin: 3px 0; }
+.stat-box-sub { font-size: 11px; color: var(--ink-3); }
+
+.stock-tab { border-radius: 20px; padding: 6px 14px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.stock-tab-badge { background: var(--surface-sub); padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.stock-tab-badge.active { background: rgba(255, 255, 255, 0.25); }
+
 @media (max-width: 900px) {
   .home { grid-template-columns: 1fr; align-items: start; gap: 28px; padding: 36px 18px; }
 }

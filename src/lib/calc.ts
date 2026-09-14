@@ -8,7 +8,8 @@ export const qtyOf = (i: Item): number => Math.max(1, num(i.quantity) || 1);
 export const costOf = (i: Item): number => (num(i.cost) + num(i.fees)) * qtyOf(i);
 
 /** Frais supportés lors de la vente : commission, emballage et port valent pour l'envoi entier. */
-export const saleCostsOf = (i: Item): number => num(i.saleFees) + num(i.packagingCost) + num(i.shippingCost);
+export const saleCostsOf = (i: Item): number =>
+  num(i.saleFees) + num(i.packagingCost) + num(i.shippingCost) + num(i.extraFees);
 
 /** Encaissé pour la ligne : prix de vente × quantité, plus le port refacturé. */
 export const revenueOf = (i: Item): number => num(i.price) * qtyOf(i) + num(i.shippingPaid);
