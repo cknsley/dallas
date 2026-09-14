@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Plus, X, DollarSign, TrendingUp, Package, Wallet, Boxes } from "lucide-react";
+import { ArrowRight, ArrowUp, ArrowDown, Plus, X, DollarSign, TrendingUp, Wallet, Boxes } from "lucide-react";
 import { Modal } from "../components/ui";
 import { useStore } from "../store/StoreContext";
 import { computeStats, periodRange, sectorMeta } from "../lib/calc";
@@ -55,53 +55,40 @@ export default function Home() {
       <section className="home-hero-cockpit">
         <div className="home-hero-top">
           <div className="home-stats-bar">
-            <div className="home-kpi-pill">
+            <div className="home-kpi-pill index-card">
               <span className="ic-wrap"><TrendingUp size={16} /></span>
               <div>
                 <span className="lbl">Chiffre d'Affaires</span>
                 <b className="val">{eur(global.ca)}</b>
-                <div className="kpi-day-badges">
-                  <span className="kpi-day-badge d7">7j · {eur(last7.ca)}</span>
-                  <span className="kpi-day-badge d30">30j · {eur(last30.ca)}</span>
+                <div className="kpi-trend-lines">
+                  <TrendLine label="7j" value={last7.ca} />
+                  <TrendLine label="30j" value={last30.ca} />
                 </div>
               </div>
             </div>
 
-            <div className="home-kpi-pill good">
+            <div className="home-kpi-pill index-card good">
               <span className="ic-wrap"><DollarSign size={16} /></span>
               <div>
                 <span className="lbl">Marge Nette</span>
                 <b className="val">{eur(global.margeNette)}</b>
-                <div className="kpi-day-badges">
-                  <span className="kpi-day-badge d7">7j · {eur(last7.margeNette)}</span>
-                  <span className="kpi-day-badge d30">30j · {eur(last30.margeNette)}</span>
+                <div className="kpi-trend-lines">
+                  <TrendLine label="7j" value={last7.margeNette} />
+                  <TrendLine label="30j" value={last30.margeNette} />
                 </div>
               </div>
             </div>
 
-            <button type="button" className="home-kpi-pill info clickable" onClick={() => { setDraftVault(vaultAmount ? String(vaultAmount) : ""); setVaultOpen(true); }}>
+            <button type="button" className="home-kpi-pill compact info clickable" onClick={() => { setDraftVault(vaultAmount ? String(vaultAmount) : ""); setVaultOpen(true); }} title="Cliquer pour modifier">
               <span className="ic-wrap"><Wallet size={16} /></span>
-              <div>
-                <span className="lbl">Trésorerie</span>
-                <b className="val">{eur(vaultAmount)}</b>
-                <span className="sub">Cliquer pour modifier ✎</span>
-              </div>
+              <span className="lbl">Trésorerie</span>
+              <b className="val">{eur(vaultAmount)}</b>
             </button>
 
-            <div className="home-kpi-pill">
+            <div className="home-kpi-pill compact">
               <span className="ic-wrap"><Boxes size={16} /></span>
-              <div>
-                <span className="lbl">Stock</span>
-                <b className="val">{eur(global.stockEstimate)}</b>
-              </div>
-            </div>
-
-            <div className="home-kpi-pill">
-              <span className="ic-wrap"><Package size={16} /></span>
-              <div>
-                <span className="lbl">Articles</span>
-                <b className="val">{global.enStock + global.arrivage} en stock</b>
-              </div>
+              <span className="lbl">Stock</span>
+              <b className="val">{eur(global.stockEstimate)} · {global.enStock + global.arrivage} art.</b>
             </div>
           </div>
         </div>
@@ -284,5 +271,16 @@ function AddSectorModal({ onClose, onCreate }: { onClose: () => void; onCreate: 
         </div>
       </div>
     </div>
+  );
+}
+
+/** Ligne de tendance façon indice boursier : flèche + période + montant, colorée selon le signe. */
+function TrendLine({ label, value }: { label: string; value: number }) {
+  const positive = value >= 0;
+  return (
+    <span className={`kpi-trend-line ${positive ? "up" : "down"}`}>
+      {positive ? <ArrowUp size={11} /> : <ArrowDown size={11} />}
+      {label} · {eur(Math.abs(value))}
+    </span>
   );
 }
