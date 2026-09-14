@@ -2216,15 +2216,19 @@ button.totrow { width: 100%; background: none; border: 0; font: inherit; color: 
   justify-content: space-between;
   gap: 20px;
   flex-wrap: wrap;
-  padding-bottom: 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .home-stats-bar {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
   gap: 12px;
-  flex-wrap: wrap;
+  align-items: stretch;
+}
+@media (max-width: 900px) {
+  .home-stats-bar { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 480px) {
+  .home-stats-bar { grid-template-columns: 1fr; }
 }
 
 .home-kpi-pill {
@@ -2236,6 +2240,15 @@ button.totrow { width: 100%; background: none; border: 0; font: inherit; color: 
   background: var(--surface-1);
   border: 1px solid var(--line);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+.home-kpi-pill .lbl,
+.home-kpi-pill .val {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .home-kpi-pill .ic-wrap {
@@ -2273,6 +2286,51 @@ button.totrow { width: 100%; background: none; border: 0; font: inherit; color: 
   font-size: 15px;
   font-weight: 800;
   color: var(--ink);
+}
+
+.home-kpi-pill .sub {
+  display: block;
+  font-size: 10px;
+  color: var(--ink-3);
+  margin-top: 1px;
+}
+
+.kpi-day-badges {
+  display: flex;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.kpi-day-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.kpi-day-badge.d7 {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+}
+
+.kpi-day-badge.d30 {
+  background: color-mix(in srgb, var(--ok) 16%, transparent);
+  color: var(--ok);
+}
+
+button.home-kpi-pill.clickable {
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: border-color 0.14s, background 0.14s;
+}
+button.home-kpi-pill.clickable:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .home-hero-actions {

@@ -22,11 +22,15 @@ const EMOJI_CHOICES = ["📦", "👟", "👜", "💍", "🎮", "📱", "🧸", "
 
 export default function Home() {
   const { state, dispatch } = useStore();
-  const navigate = useNavigate();
   const [addOpen, setAddOpen] = useState(false);
+  const [vaultOpen, setVaultOpen] = useState(false);
+  const [draftVault, setDraftVault] = useState("");
 
   const allTime = useMemo(() => periodRange("all"), []);
   const global = useMemo(() => computeStats(state, allTime), [state, allTime]);
+  const last7 = useMemo(() => computeStats(state, lastNDaysRange(7)), [state]);
+  const last30 = useMemo(() => computeStats(state, lastNDaysRange(30)), [state]);
+  const vaultAmount = state.settings.vaultAmount || 0;
   const customSectors = state.settings.customSectors ?? [];
 
   const allSectorIds = useMemo(
@@ -47,9 +51,8 @@ export default function Home() {
 
   return (
     <div className="home-v2">
-      {/* ── BANNIÈRE HERO : CHIFFRES CLÉS & +NOUVEAU & ONGLETS DE L'ACCUEIL ── */}
+      {/* ── BANNIÈRE HERO : CHIFFRES CLÉS ── */}
       <section className="home-hero-cockpit">
-        {/* En-tête Chiffres Clés (CA, Marge, Trésorerie / Stock) */}
         <div className="home-hero-top">
           <div className="home-stats-bar">
             <div className="home-kpi-pill">
@@ -57,6 +60,10 @@ export default function Home() {
               <div>
                 <span className="lbl">Chiffre d'Affaires</span>
                 <b className="val">{eur(global.ca)}</b>
+                <div className="kpi-day-badges">
+                  <span className="kpi-day-badge d7">7j · {eur(last7.ca)}</span>
+                  <span className="kpi-day-badge d30">30j · {eur(last30.ca)}</span>
+                </div>
               </div>
             </div>
 
@@ -65,13 +72,26 @@ export default function Home() {
               <div>
                 <span className="lbl">Marge Nette</span>
                 <b className="val">{eur(global.margeNette)}</b>
+                <div className="kpi-day-badges">
+                  <span className="kpi-day-badge d7">7j · {eur(last7.margeNette)}</span>
+                  <span className="kpi-day-badge d30">30j · {eur(last30.margeNette)}</span>
+                </div>
               </div>
             </div>
 
-            <div className="home-kpi-pill info">
+            <button type="button" className="home-kpi-pill info clickable" onClick={() => { setDraftVault(vaultAmount ? String(vaultAmount) : ""); setVaultOpen(true); }}>
               <span className="ic-wrap"><Wallet size={16} /></span>
               <div>
-                <span className="lbl">Trésorerie & Stock</span>
+                <span className="lbl">Trésorerie</span>
+                <b className="val">{eur(vaultAmount)}</b>
+                <span className="sub">Cliquer pour modifier ✎</span>
+              </div>
+            </button>
+
+            <div className="home-kpi-pill">
+              <span className="ic-wrap"><Boxes size={16} /></span>
+              <div>
+                <span className="lbl">Stock</span>
                 <b className="val">{eur(global.stockEstimate)}</b>
               </div>
             </div>
@@ -84,25 +104,42 @@ export default function Home() {
               </div>
             </div>
           </div>
-
-          <div className="home-hero-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {/* Bouton + Nouveau qui lie à la Centrale d'achat avec choix de la catégorie */}
-            <MenuButton
-              label="+ Nouveau"
-              options={[
-                { value: "fashion", label: "👕 Nouveau dans Vêtements", note: "Ouvrir la centrale Vêtements" },
-                { value: "tcg", label: "🏷️ Nouveau dans Tag / Cartes", note: "Ouvrir la centrale TCG" },
-                ...customSectors.map((cs) => ({
-                  value: cs.id,
-                  label: `${cs.icon} Nouveau dans ${cs.label}`,
-                  note: `Ouvrir la centrale ${cs.label}`,
-                })),
-              ]}
-              onSelect={(v) => navigate(`/achats?secteur=${v}`)}
-            />
-          </div>
         </div>
       </section>
+
+      {vaultOpen && (
+        <Modal
+          title="🔒 Trésorerie"
+          onClose={() => setVaultOpen(false)}
+          footer={
+            <>
+              <button className="btn" onClick={() => setVaultOpen(false)}>Annuler</button>
+              <button
+                className="btn primary"
+                onClick={() => {
+                  dispatch({ type: "settings", patch: { vaultAmount: num(draftVault) } });
+                  setVaultOpen(false);
+                }}
+              >
+                Enregistrer
+              </button>
+            </>
+          }
+        >
+          <label style={{ fontSize: 12, color: "var(--ink-3)", fontWeight: 600, display: "block", marginBottom: 6 }}>
+            Montant de trésorerie disponible
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            autoFocus
+            value={draftVault}
+            onChange={(e) => setDraftVault(e.target.value)}
+            placeholder="0,00"
+            style={{ width: "100%" }}
+          />
+        </Modal>
+      )}
 
       {/* ── ACCÈS AUX PAGES UNIVERS JUSTE EN DESSOUS ── */}
       <section className="home-section" style={{ marginTop: 24 }}>
