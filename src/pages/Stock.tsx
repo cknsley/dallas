@@ -173,7 +173,7 @@ export default function Stock() {
 
   const [editing, setEditing] = useState<{ item: Item | null } | null>(null);
   const [selling, setSelling] = useState<Item | null>(null);
-  const [confirming, setConfirming] = useState<Item | null>(null);
+  const [confirming, setConfirming] = useState<Item[] | null>(null);
   const [revealingItem, setRevealingItem] = useState<Item | null>(null);
 
   const held = useMemo(
@@ -227,6 +227,29 @@ export default function Stock() {
     });
   }, [held, categoryTab, brand, type, size, q, sortKey, sortDir, isTcg]);
 
+  /** Clé de regroupement : même SKU, ou à défaut même fiche produit (nom/marque/type/taille/coût/prix). */
+  const groupKeyOf = (i: Item): string =>
+    i.sku?.trim()
+      ? `sku:${i.sku.trim().toLowerCase()}`
+      : [i.name, i.brand, i.type, i.size, i.tcgGrade, i.tcgSet, i.condition, i.cost, i.price, i.source, i.lotTag]
+          .map((v) => String(v ?? "").toLowerCase())
+          .join("|");
+
+  const groupedList = useMemo(() => {
+    const map = new Map<string, { key: string; rep: Item; items: Item[]; qty: number }>();
+    for (const i of list) {
+      const key = groupKeyOf(i);
+      const existing = map.get(key);
+      if (existing) {
+        existing.items.push(i);
+        existing.qty += qtyOf(i);
+      } else {
+        map.set(key, { key, rep: i, items: [i], qty: qtyOf(i) });
+      }
+    }
+    return [...map.values()];
+  }, [list]);
+
   const toggleSort = (k: SortKey) => {
     if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else {
@@ -245,7 +268,7 @@ export default function Stock() {
   // Le capital immobilisé ne compte que les pièces encore en stock pour l'onglet actif.
   const heldCost = list.reduce((a, i) => a + costOf(i), 0);
 
-  const actions = (i: Item) => {
+  const actions = (i: Item, group?: Item[]) => {
     const isGrading = i.tcgCategory === "grading" || (i.tcgGrade && i.tcgGrade.toLowerCase().includes("gradation"));
     return (
       <div className={`rowact${view === "grid" ? " always" : ""}`}>
@@ -270,7 +293,7 @@ export default function Stock() {
         <button className="iconbtn" title="Éditer" onClick={() => setEditing({ item: i })}>
           <Pencil size={14} />
         </button>
-        <button className="iconbtn del" title="Supprimer" onClick={() => setConfirming(i)}>
+        <button className="iconbtn del" title="Supprimer" onClick={() => setConfirming(group && group.length > 1 ? group : [i])}>
           <Trash2 size={14} />
         </button>
       </div>
@@ -392,8 +415,8 @@ export default function Stock() {
                 </tr>
               </thead>
               <tbody>
-                {list.map((i) => (
-                  <tr key={i.id}>
+                {groupedList.map(({ key, rep: i, items, qty }) => (
+                  <tr key={key}>
                     <td className="shrink"><Photo id={i.photoId} /></td>
                     <td className="stock-name-cell">
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -405,7 +428,7 @@ export default function Stock() {
                         SKU · {i.sku || "—"}
                       </div>
                     </td>
-                    <td className="r num shrink">{qtyOf(i)}</td>
+                    <td className="r num shrink">{qty}</td>
                     <td>{itemAttr(i, "brand") || "—"}</td>
                     <td>{itemAttr(i, "type") || "—"}</td>
                     <td>{itemAttr(i, "size") || "—"}</td>
@@ -421,7 +444,7 @@ export default function Stock() {
                       {i.estimatedPrice ? eur2(i.estimatedPrice) : "—"}
                     </td>
                     <td className="num nowrap" style={{ fontSize: 12 }}>{dshortNoYear(i.buyDate)}</td>
-                    <td className="r shrink">{actions(i)}</td>
+                    <td className="r shrink">{actions(i, items)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -430,8 +453,8 @@ export default function Stock() {
         </div>
       ) : (
         <div className="gallery">
-          {list.map((i) => (
-            <article className="gcard" key={i.id}>
+          {groupedList.map(({ key, rep: i, items, qty }) => (
+            <article className="gcard" key={key}>
               <div className="ph">
                 <PhotoCover id={i.photoId} />
               </div>
@@ -443,12 +466,12 @@ export default function Stock() {
                       {i.name || "Sans nom"}
                     </button>
                   </div>
-                  <div style={{ flexShrink: 0, marginTop: -2 }}>{actions(i)}</div>
+                  <div style={{ flexShrink: 0, marginTop: -2 }}>{actions(i, items)}</div>
                 </div>
                 <div className="meta" style={{ marginTop: 4 }}>
                   {itemAttr(i, "type") || "—"}{itemAttr(i, "size") ? ` · ${itemAttr(i, "size")}` : ""}
                   {itemAttr(i, "condition") ? ` · ${itemAttr(i, "condition")}` : ""}
-                  {qtyOf(i) > 1 && <span className="qty-badge">×{qtyOf(i)}</span>}
+                  {qty > 1 && <span className="qty-badge">×{qty}</span>}
                 </div>
                 {i.sku && <div className="meta hint" style={{ fontSize: 11 }}>SKU: {i.sku}</div>}
                 <div className="meta hint">
@@ -488,22 +511,25 @@ export default function Stock() {
       )}
       {confirming && (
         <Confirm
-          title="Supprimer cet article ?"
+          title={confirming.length > 1 ? `Supprimer ces ${confirming.length} fiches ?` : "Supprimer cet article ?"}
           body={
             <>
-              « {confirming.name || "Sans nom"} » sera définitivement retirée du stock, photo comprise.
-              {linkedDoc(confirming) && (
+              {confirming.length > 1 ? (
+                <>« {confirming[0].name || "Sans nom"} » ({confirming.reduce((a, i) => a + qtyOf(i), 0)} unités regroupées) sera définitivement retirée du stock, photo comprise.</>
+              ) : (
+                <>« {confirming[0].name || "Sans nom"} » sera définitivement retirée du stock, photo comprise.</>
+              )}
+              {confirming.some((i) => linkedDoc(i)) && (
                 <div className="note warn" style={{ marginTop: 12 }}>
                   <span className="glyph">⚠</span>
                   <div>
-                    Elle figure sur le document <b>{linkedDoc(confirming)?.number}</b>, qui restera émis avec
-                    son montant d'origine.
+                    Elle figure sur un document déjà émis, qui restera émis avec son montant d'origine.
                   </div>
                 </div>
               )}
             </>
           }
-          onConfirm={() => { deleteItem(confirming); toast("Article supprimé"); }}
+          onConfirm={() => { confirming.forEach((i) => deleteItem(i)); toast(confirming.length > 1 ? "Fiches supprimées" : "Article supprimé"); }}
           onClose={() => setConfirming(null)}
         />
       )}
