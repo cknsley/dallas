@@ -330,13 +330,12 @@ export default function ItemModal({
           {!isFirstStep && (
             <button className="btn" onClick={() => setStep(ITEM_STEPS[stepIndex - 1].key)}>Précédent</button>
           )}
-          {isLastStep ? (
-            <button className="btn primary" onClick={() => void submit()}>
-              {isNew ? "Ajouter l’article" : "Enregistrer"}
-            </button>
-          ) : (
-            <button className="btn primary" onClick={() => setStep(ITEM_STEPS[stepIndex + 1].key)}>Suivant</button>
+          {!isLastStep && (
+            <button className="btn" onClick={() => setStep(ITEM_STEPS[stepIndex + 1].key)}>Suivant</button>
           )}
+          <button className="btn primary" onClick={() => void submit()}>
+            {isNew ? "Ajouter l’article" : "Enregistrer"}
+          </button>
         </>
       }
     >
