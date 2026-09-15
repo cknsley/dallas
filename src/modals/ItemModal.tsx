@@ -704,10 +704,18 @@ export default function ItemModal({
       <div className="fgrid">
         <Field label={eurLabel(LABEL.cost)}>
           <input type="number" step="0.01" value={draft.cost} placeholder="0,00" onChange={(e) => set("cost", e.target.value)} />
-          {qty > 1 && num(draft.cost) > 0 && (
-            <span className="hint" style={{ fontSize: 11, marginTop: 2, display: "block" }}>
-              Total Lot (x{qty}) : {eur2(totalCost)}
-            </span>
+          {qty > 1 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+              <span className="hint" style={{ fontSize: 11, whiteSpace: "nowrap" }}>Total lot (x{qty})</span>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="0,00"
+                style={{ height: 28, fontSize: 12 }}
+                value={num(draft.cost) > 0 ? String(Math.round(num(draft.cost) * qty * 100) / 100) : ""}
+                onChange={(e) => set("cost", e.target.value ? String(num(e.target.value) / qty) : "")}
+              />
+            </div>
           )}
         </Field>
         <Field label={eurLabel(draft.lotTag ? "Part livraison du lot" : "Livraison")}>
@@ -732,7 +740,24 @@ export default function ItemModal({
               set("estimatedPrice", e.target.value);
             }}
           />
-          {qty > 1 && price > 0 && (
+          {qty > 1 && !isSold && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+              <span className="hint pos" style={{ fontSize: 11, whiteSpace: "nowrap" }}>Total revente (x{qty})</span>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="0,00"
+                style={{ height: 28, fontSize: 12 }}
+                value={price > 0 ? String(Math.round(price * qty * 100) / 100) : ""}
+                onChange={(e) => {
+                  const unit = e.target.value ? String(num(e.target.value) / qty) : "";
+                  set("price", unit);
+                  set("estimatedPrice", unit);
+                }}
+              />
+            </div>
+          )}
+          {qty > 1 && isSold && price > 0 && (
             <span className="hint pos" style={{ fontSize: 11, marginTop: 2, display: "block" }}>
               Total Revente (x{qty}) : {eur2(price * qty)}
             </span>

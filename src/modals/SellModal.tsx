@@ -3,7 +3,7 @@ import { Field, Modal } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { PLATFORMS } from "../lib/constants";
-import { costOf } from "../lib/calc";
+import { costOf, qtyOf } from "../lib/calc";
 import { eur2, num, today } from "../lib/format";
 import { LABEL, eurLabel } from "../lib/lexicon";
 import type { Item } from "../types";
@@ -68,12 +68,14 @@ export default function SellModal({
   };
   const currentRate = feeRate(d.platform);
 
-  // La commission est toujours calculée depuis le taux défini dans les paramètres.
+  const qty = qtyOf(item);
+
+  // La commission est toujours calculée depuis le taux défini dans les paramètres, sur le montant total encaissé.
   useEffect(() => {
     if (currentRate === null) return;
-    const computed = currentRate > 0 ? ((num(d.price) * currentRate) / 100).toFixed(2) : "";
+    const computed = currentRate > 0 ? ((num(d.price) * qty * currentRate) / 100).toFixed(2) : "";
     setD((x) => (x.saleFees === computed ? x : { ...x, saleFees: computed }));
-  }, [d.platform, d.price, currentRate]);
+  }, [d.platform, d.price, currentRate, qty]);
 
   /* ---- calculatrice de marge, port compris ---- */
   const buyCost = costOf(item);
@@ -82,7 +84,7 @@ export default function SellModal({
   const packagingCost = num(d.packagingCost);
   const shippingCost = num(d.port);
   const extraFees = num(d.extraFees);
-  const cashIn = price;
+  const cashIn = price * qty;
   const outflow = buyCost + saleFees + packagingCost + shippingCost + extraFees;
   const margin = cashIn - outflow;
 
@@ -147,8 +149,21 @@ export default function SellModal({
       <div className="sale-layout">
         <div className="sale-form">
           <div className="fgrid">
-            <Field label={eurLabel(LABEL.price)}>
+            <Field label={eurLabel(qty > 1 ? `${LABEL.price} (unitaire)` : LABEL.price)}>
               <input type="number" step="0.01" value={d.price} placeholder="0,00" autoFocus onChange={(e) => set("price", e.target.value)} />
+              {qty > 1 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                  <span className="hint" style={{ fontSize: 11, whiteSpace: "nowrap" }}>Total vente (x{qty})</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    style={{ height: 28, fontSize: 12 }}
+                    value={price > 0 ? String(Math.round(price * qty * 100) / 100) : ""}
+                    onChange={(e) => set("price", e.target.value ? String(num(e.target.value) / qty) : "")}
+                  />
+                </div>
+              )}
             </Field>
             <Field label="Date de vente">
               <input type="date" value={d.saleDate} onChange={(e) => set("saleDate", e.target.value)} />
@@ -192,7 +207,7 @@ export default function SellModal({
         {/* ---- calculatrice ---- */}
         <aside className="sale-calc">
           <div className="sale-calc-h">Marge estimée</div>
-          <Row label="Prix encaissé" value={eur2(price)} />
+          <Row label="Prix encaissé" value={eur2(cashIn)} />
           <Row label="Coût article" value={buyCost ? `−${eur2(buyCost)}` : eur2(0)} />
           <Row label="Commission plateforme" value={saleFees ? `−${eur2(saleFees)}` : eur2(0)} />
           <Row label="Port" value={shippingCost ? `−${eur2(shippingCost)}` : eur2(0)} />
