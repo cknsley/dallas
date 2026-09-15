@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
-import { Empty, Kpi, Modal, Photo, RangePicker } from "../components/ui";
+import { Empty, Kpi, Modal, Photo, QtySelect, RangePicker, SizeSelect } from "../components/ui";
 import InlineField from "../components/InlineField";
 import { useStore } from "../store/StoreContext";
 import { computeStats, costOf, isTcgItem, qtyOf } from "../lib/calc";
@@ -130,7 +130,14 @@ function ReceiveParcelModal({ items, onClose }: { items: Item[]; onClose: () => 
               <label><span>Article</span><input value={d.name} onChange={(e) => patch(d.id, "name", e.target.value)} /></label>
               <label><span>{labels.brand}</span><input value={d.brand} onChange={(e) => patch(d.id, "brand", e.target.value)} /></label>
               <label><span>{labels.type}</span><input value={d.type} onChange={(e) => patch(d.id, "type", e.target.value)} /></label>
-              <label><span>{labels.size}</span><input value={d.size} onChange={(e) => patch(d.id, "size", e.target.value)} /></label>
+              <label>
+                <span>{labels.size}</span>
+                {isTcg ? (
+                  <input value={d.size} onChange={(e) => patch(d.id, "size", e.target.value)} />
+                ) : (
+                  <SizeSelect value={d.size} onChange={(v) => patch(d.id, "size", v)} />
+                )}
+              </label>
               {!isTcg && (
                 <label>
                   <span>Sexe</span>
@@ -143,7 +150,7 @@ function ReceiveParcelModal({ items, onClose }: { items: Item[]; onClose: () => 
                   </select>
                 </label>
               )}
-              <label><span>Quantité</span><input type="number" min="1" step="1" value={d.quantity} onChange={(e) => patch(d.id, "quantity", e.target.value)} /></label>
+              <label><span>Quantité</span><QtySelect value={d.quantity} onChange={(v) => patch(d.id, "quantity", v)} /></label>
               <label><span>Coût</span><input type="number" step="0.01" value={d.cost} onChange={(e) => patch(d.id, "cost", e.target.value)} /></label>
               <label><span>Frais</span><input type="number" step="0.01" value={d.fees} onChange={(e) => patch(d.id, "fees", e.target.value)} /></label>
               <label><span>Prix estimé</span><input type="number" step="0.01" value={d.price} onChange={(e) => patch(d.id, "price", e.target.value)} /></label>

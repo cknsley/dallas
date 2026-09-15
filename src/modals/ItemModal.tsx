@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Field, Modal, Photo } from "../components/ui";
+import { Field, Modal, Photo, QtySelect, SizeSelect } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { compressImage, deletePhoto, savePhoto } from "../store/photos";
@@ -481,37 +481,18 @@ export default function ItemModal({
         </Field>
 
         <Field label={isBoxFormat ? (draft.tcgCategory === "case" ? "Nombre de cases" : "Nombre de displays") : "Quantité"}>
-          <input
-            type="number"
-            step="1"
-            min="1"
-            value={draft.quantity}
-            onChange={(e) => set("quantity", e.target.value)}
-          />
+          <QtySelect value={draft.quantity} onChange={(v) => set("quantity", v)} />
         </Field>
 
         {isBoxFormat && (
           <Field label="Quantité à l'intérieur">
-            <input
-              type="number"
-              step="1"
-              min="1"
-              placeholder="Ex. 24 boosters"
-              value={draft.tcgUnitsInside ?? ""}
-              onChange={(e) => set("tcgUnitsInside", e.target.value ? Number(e.target.value) : undefined)}
-            />
+            <QtySelect value={draft.tcgUnitsInside ?? ""} onChange={(v) => set("tcgUnitsInside", v ? Number(v) : undefined)} />
           </Field>
         )}
 
         {!tcg && (
           <Field label="Taille(s)">
-            <input
-              type="text"
-              list="dl-size"
-              value={draft.size}
-              placeholder="Ex. 42 (ou '38, 39, 40')"
-              onChange={(e) => set("size", e.target.value)}
-            />
+            <SizeSelect value={draft.size} onChange={(v) => set("size", v)} extra={suggestions.size} />
             {isNew && draft.size.includes(",") && (
               <span className="hint pos" style={{ fontSize: 11, marginTop: 2, display: "block" }}>
                 ✨ {parseSizes(draft.size).length} fiches distinctes seront créées automatiquement !
@@ -612,7 +593,6 @@ export default function ItemModal({
 
       <datalist id="dl-brand">{suggestions.brand.map((v) => <option key={v} value={v} />)}</datalist>
       <datalist id="dl-type">{suggestions.type.map((v) => <option key={v} value={v} />)}</datalist>
-      <datalist id="dl-size">{suggestions.size.map((v) => <option key={v} value={v} />)}</datalist>
       <datalist id="dl-source">{suggestions.source.map((v) => <option key={v} value={v} />)}</datalist>
 
       {step === "prix" && (

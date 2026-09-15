@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Field, Modal, Segmented } from "../components/ui";
+import { Field, Modal, QtySelect, Segmented, SizeSelect } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { useStore } from "../store/StoreContext";
 import { ARTICLE_TYPES, CARRIERS } from "../lib/constants";
@@ -645,10 +645,17 @@ export default function OrderModal({
               )}
             </div>
             <div className="calc-line-grid">
-              <label><span>Quantité</span><input type="number" step="1" min="1" value={l.quantity} onChange={(e) => patch(l.key, { quantity: e.target.value })} /></label>
+              <label><span>Quantité</span><QtySelect value={l.quantity} onChange={(v) => patch(l.key, { quantity: v })} /></label>
               <label><span>{isTcgOrder ? "Licence" : "Marque"}</span><input type="text" list="dl-order-brand" value={l.brand} onChange={(e) => patch(l.key, { brand: e.target.value })} /></label>
               <label><span>Type</span><input type="text" list="dl-order-type" value={l.type} onChange={(e) => patch(l.key, { type: e.target.value })} /></label>
-              <label><span>{isTcgOrder ? "Grade" : "Taille"}</span><input type="text" list="dl-order-size" value={l.size} onChange={(e) => patch(l.key, { size: e.target.value })} /></label>
+              <label>
+                <span>{isTcgOrder ? "Grade" : "Taille"}</span>
+                {isTcgOrder ? (
+                  <input type="text" list="dl-order-size" value={l.size} onChange={(e) => patch(l.key, { size: e.target.value })} />
+                ) : (
+                  <SizeSelect value={l.size} onChange={(v) => patch(l.key, { size: v })} extra={suggestions.size} />
+                )}
+              </label>
               <label><span>{LABEL.cost}</span><input type="number" step="0.01" value={l.cost} placeholder="0,00" onChange={(e) => patch(l.key, { cost: e.target.value })} /></label>
               <label><span>{destination === "direct" ? "Prix de vente (€)" : LABEL.estimate}</span><input type="number" step="0.01" value={l.estimate} placeholder={HINT.estimate} onChange={(e) => patch(l.key, { estimate: e.target.value })} /></label>
             </div>

@@ -98,6 +98,35 @@ export function Field({ label, children, span }: { label: string; children: Reac
   );
 }
 
+/* ---------- Quantité & Taille en dropdown ---------- */
+export const QTY_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 24, 25, 30, 40, 50, 60, 75, 100];
+
+export function QtySelect({ value, onChange }: { value: string | number; onChange: (v: string) => void }) {
+  const n = Math.round(Number(value)) || 0;
+  const options = n > 0 && !QTY_OPTIONS.includes(n) ? [...QTY_OPTIONS, n].sort((a, b) => a - b) : QTY_OPTIONS;
+  return (
+    <select value={n > 0 ? String(n) : ""} onChange={(e) => onChange(e.target.value)}>
+      {n <= 0 && <option value="">—</option>}
+      {options.map((o) => <option key={o} value={o}>{o}</option>)}
+    </select>
+  );
+}
+
+export const SIZE_BASELINE = [
+  "XS", "S", "M", "L", "XL", "XXL",
+  "35", "36", "37", "38", "39", "40", "41", "41.5", "42", "43", "44", "45", "46",
+];
+
+export function SizeSelect({ value, onChange, extra = [] }: { value: string; onChange: (v: string) => void; extra?: string[] }) {
+  const options = [...new Set([value, ...extra, ...SIZE_BASELINE].filter(Boolean))];
+  return (
+    <select value={value || ""} onChange={(e) => onChange(e.target.value)}>
+      <option value="">—</option>
+      {options.map((o) => <option key={o} value={o}>{o}</option>)}
+    </select>
+  );
+}
+
 /* ---------- KPI ---------- */
 export function Kpi({
   label, value, meta, tone, to, hint, onClick, featured,

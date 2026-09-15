@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Field, Modal } from "../components/ui";
+import { Field, Modal, QtySelect } from "../components/ui";
 import { useToast } from "../components/Toast";
 import { extractPdfText, parseInvoiceText, type ParsedInvoiceLine } from "../lib/invoiceImport";
 import { eur2, num } from "../lib/format";
@@ -118,7 +118,7 @@ export default function ImportInvoiceModal({
                   <button className="iconbtn del" title="Retirer" onClick={() => removeLine(l.key)}>✕</button>
                 </div>
                 <div className="calc-line-grid">
-                  <label><span>Quantité</span><input type="number" min="1" step="1" value={l.quantity} onChange={(e) => patch(l.key, { quantity: Math.max(1, Math.round(num(e.target.value)) || 1) })} /></label>
+                  <label><span>Quantité</span><QtySelect value={l.quantity} onChange={(v) => patch(l.key, { quantity: Math.max(1, Math.round(num(v)) || 1) })} /></label>
                   <label><span>Prix unitaire</span><input type="number" step="0.01" value={l.unitPrice} onChange={(e) => patch(l.key, { unitPrice: num(e.target.value) })} /></label>
                 </div>
               </div>

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
-import { Kpi, Modal, RangePicker } from "../components/ui";
+import { Kpi, Modal, QtySelect, RangePicker, SizeSelect } from "../components/ui";
 import MenuButton from "../components/MenuButton";
 import { useStore } from "../store/StoreContext";
 import { computeStats, costOf, filterTodosByDomain, qtyOf } from "../lib/calc";
@@ -307,11 +307,18 @@ export default function CentraleAchat() {
             <div className="fgrid">
               <label className="field"><span>{labels.brand} *</span><input type="text" placeholder={isTcg ? labels.brandPlaceholder : "ex. Nike, Adidas, Jordan…"} value={expressBrand} onChange={(e) => setExpressBrand(e.target.value)} autoFocus /></label>
               <label className="field"><span>{labels.name}</span><input type="text" placeholder={labels.namePlaceholder} value={expressName} onChange={(e) => setExpressName(e.target.value)} /></label>
-              <label className="field"><span>{isTcg ? labels.size : "Taille / pointure"}</span><input type="text" placeholder={isTcg ? labels.sizePlaceholder : "ex. 42 / M / US 8.5"} value={expressSize} onChange={(e) => setExpressSize(e.target.value)} /></label>
+              <label className="field">
+                <span>{isTcg ? labels.size : "Taille / pointure"}</span>
+                {isTcg ? (
+                  <input type="text" placeholder={labels.sizePlaceholder} value={expressSize} onChange={(e) => setExpressSize(e.target.value)} />
+                ) : (
+                  <SizeSelect value={expressSize} onChange={setExpressSize} />
+                )}
+              </label>
               <label className="field"><span>{isTcg ? labels.type : "Catégorie"}</span><input type="text" placeholder={labels.typePlaceholder} value={expressType} onChange={(e) => setExpressType(e.target.value)} /></label>
               <label className="field"><span>Coût d'achat unitaire (€)</span><input type="number" step="0.01" placeholder="0.00" value={expressCost} onChange={(e) => setExpressCost(e.target.value)} /></label>
               <label className="field"><span>Frais d'approche / port (€)</span><input type="number" step="0.01" placeholder="0.00" value={expressFees} onChange={(e) => setExpressFees(e.target.value)} /></label>
-              <label className="field"><span>Quantité</span><input type="number" min="1" value={expressQty} onChange={(e) => setExpressQty(parseInt(e.target.value) || 1)} /></label>
+              <label className="field"><span>Quantité</span><QtySelect value={expressQty} onChange={(v) => setExpressQty(parseInt(v) || 1)} /></label>
               <label className="field"><span>Source / fournisseur</span><input type="text" placeholder="ex. StockX, Vinted, grossiste…" value={expressSource} onChange={(e) => setExpressSource(e.target.value)} /></label>
               <label className="field">
                 <span>Fait partie d'un lot ?</span>
