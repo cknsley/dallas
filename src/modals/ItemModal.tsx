@@ -97,6 +97,7 @@ export default function ItemModal({
 
   const tcg = !!draft.isTcg || (!!item && isTcgItem(item));
   const labels = fieldLabels(tcg ? "tcg" : "fashion");
+  const isBoxFormat = tcg && (draft.tcgCategory === "sealed" || draft.tcgCategory === "case");
 
   const autoGenerateSku = () => {
     const prefix = (draft.brand || "RS").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
@@ -503,6 +504,12 @@ export default function ItemModal({
                     <option key={c.key} value={c.key}>{c.icon} {c.label}</option>
                   ))}
                 </select>
+                {isBoxFormat && (
+                  <div className="seg sm" style={{ marginTop: 6 }}>
+                    <button type="button" className={draft.tcgSealed !== false ? "on" : ""} onClick={() => set("tcgSealed", true)}>Scellé</button>
+                    <button type="button" className={draft.tcgSealed === false ? "on" : ""} onClick={() => set("tcgSealed", false)}>Ouvert</button>
+                  </div>
+                )}
               </Field>
             ) : (
               <Field label="Type / Modèle">
@@ -523,7 +530,7 @@ export default function ItemModal({
           </div>
         </Field>
 
-        <Field label="Quantité">
+        <Field label={isBoxFormat ? (draft.tcgCategory === "case" ? "Nombre de cases" : "Nombre de displays") : "Quantité"}>
           <input
             type="number"
             step="1"
@@ -532,6 +539,19 @@ export default function ItemModal({
             onChange={(e) => set("quantity", e.target.value)}
           />
         </Field>
+
+        {isBoxFormat && (
+          <Field label="Quantité à l'intérieur">
+            <input
+              type="number"
+              step="1"
+              min="1"
+              placeholder="Ex. 24 boosters"
+              value={draft.tcgUnitsInside ?? ""}
+              onChange={(e) => set("tcgUnitsInside", e.target.value ? Number(e.target.value) : undefined)}
+            />
+          </Field>
+        )}
 
         <Field label={tcg ? labels.size : "Taille(s)"}>
           <input

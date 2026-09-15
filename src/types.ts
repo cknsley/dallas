@@ -80,6 +80,10 @@ export interface Item {
   tcgSet?: string;        // 151, Évolution Céleste, OP-05
   tcgCategory?: "raw" | "graded" | "sealed" | "grading" | "blister" | "case"; // Carte seule, Gradée, Booster/ETB, En gradation, Blister, Case scellée
   gradingCompany?: string; // PSA, BGS, PCA, CGC, SGS
+  /** Nombre d'unités (boosters/packs) contenues dans chaque case/display. */
+  tcgUnitsInside?: number;
+  /** Scellé ou ouvert — pertinent pour Displays et Cases. */
+  tcgSealed?: boolean;
   /* SAV & Litiges */
   litigeState?: "en_cours" | "attente" | "resolu";
   litigeCategory?: string;
