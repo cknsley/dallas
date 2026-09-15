@@ -161,7 +161,9 @@ export default function Stock() {
     visibleTabs.some((t) => t.key === catRaw) || (isBuiltinFashionOrAll && catRaw === "emballages") ? catRaw : "total";
   const setCategoryTab = (val: string) => setCatRaw(val);
   const columns = isTcg
-    ? COLUMNS.map((c) => (c.key in TCG_COLUMN_LABELS ? { ...c, label: TCG_COLUMN_LABELS[c.key as AttrKey] } : c))
+    ? COLUMNS.filter((c) => c.key !== "condition" && c.key !== "supplierLot").map((c) =>
+        c.key in TCG_COLUMN_LABELS ? { ...c, label: TCG_COLUMN_LABELS[c.key as AttrKey] } : c,
+      )
     : COLUMNS;
   const [q, setQ] = useQueryState("q");
   const [brand, setBrand] = useQueryState("brand");
@@ -401,7 +403,7 @@ export default function Stock() {
       ) : view === "table" ? (
         <div className="card">
           <div className="twrap">
-            <table className="table-compact stock-table">
+            <table className={`table-compact stock-table${isTcg ? " tcg" : ""}`}>
               <thead>
                 <tr>
                   {columns.map((c) => {
@@ -450,30 +452,36 @@ export default function Stock() {
                     <td>{itemAttr(i, "brand") || "—"}</td>
                     <td>{itemAttr(i, "type") || "—"}</td>
                     <td>{itemAttr(i, "size") || "—"}</td>
-                    <td className="shrink">
-                      {itemAttr(i, "condition") ? (
-                        <span
-                          className="stock-condition"
-                          style={{
-                            background: `${tagColor(itemAttr(i, "condition"))}26`,
-                            color: tagColor(itemAttr(i, "condition")),
-                            padding: "3px 8px",
-                            borderRadius: 999,
-                          }}
-                        >
-                          {itemAttr(i, "condition")}
-                        </span>
-                      ) : "—"}
-                    </td>
-                    <td className="stock-supplier-cell">
-                      <div className="ellipsis" title={supplierNameOf(i)}>{supplierNameOf(i)}</div>
-                      {i.lotTag && <div className="hint ellipsis" title={i.lotTag}>Lot · {i.lotTag}</div>}
-                    </td>
+                    {!isTcg && (
+                      <td className="shrink">
+                        {itemAttr(i, "condition") ? (
+                          <span
+                            className="stock-condition"
+                            style={{
+                              background: `${tagColor(itemAttr(i, "condition"))}26`,
+                              color: tagColor(itemAttr(i, "condition")),
+                              padding: "3px 8px",
+                              borderRadius: 999,
+                            }}
+                          >
+                            {itemAttr(i, "condition")}
+                          </span>
+                        ) : "—"}
+                      </td>
+                    )}
+                    {!isTcg && (
+                      <td className="stock-supplier-cell">
+                        <div className="ellipsis" title={supplierNameOf(i)}>{supplierNameOf(i)}</div>
+                        {i.lotTag && <div className="hint ellipsis" title={i.lotTag}>Lot · {i.lotTag}</div>}
+                      </td>
+                    )}
                     <td className="r num">{eur2(costOf(i))}</td>
                     <td className="r num">{purchaseFeesOf(i) ? eur2(purchaseFeesOf(i)) : "—"}</td>
                     <td className="r num">{i.price ? eur2(i.price) : "—"}</td>
                     <td className={`r num shrink stock-estimate-cell${i.estimatedPrice ? "" : " empty"}`}>
-                      {i.estimatedPrice ? eur2(i.estimatedPrice) : "—"}
+                      {i.estimatedPrice ? (
+                        <span style={{ color: "#4ade80", fontWeight: 700 }}>{eur2(i.estimatedPrice)}</span>
+                      ) : "—"}
                     </td>
                     <td className="num nowrap" style={{ fontSize: 12 }}>{dshortNoYear(i.buyDate)}</td>
                     <td className="r shrink">{actions(i, items)}</td>
