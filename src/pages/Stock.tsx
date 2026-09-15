@@ -250,6 +250,13 @@ export default function Stock() {
     return [...map.values()];
   }, [list]);
 
+  const TAG_COLORS = ["#8b5cf6", "#06b6d4", "#f59e0b", "#ef4444", "#22c55e", "#ec4899", "#3b82f6", "#eab308"];
+  const tagColor = (label: string): string => {
+    let h = 0;
+    for (let i = 0; i < label.length; i++) h = (h * 31 + label.charCodeAt(i)) >>> 0;
+    return TAG_COLORS[h % TAG_COLORS.length];
+  };
+
   const toggleSort = (k: SortKey) => {
     if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else {
@@ -428,11 +435,36 @@ export default function Stock() {
                         SKU · {i.sku || "—"}
                       </div>
                     </td>
-                    <td className="r num shrink">{qty}</td>
+                    <td className="r num shrink">
+                      <span
+                        style={{
+                          display: "inline-flex", minWidth: 22, padding: "2px 7px", borderRadius: 8,
+                          fontWeight: 700, fontSize: 12, justifyContent: "center",
+                          background: qty > 1 ? "rgba(139,92,246,0.18)" : "transparent",
+                          color: qty > 1 ? "#c4b5fd" : "inherit",
+                        }}
+                      >
+                        {qty}
+                      </span>
+                    </td>
                     <td>{itemAttr(i, "brand") || "—"}</td>
                     <td>{itemAttr(i, "type") || "—"}</td>
                     <td>{itemAttr(i, "size") || "—"}</td>
-                    <td className="shrink"><span className="stock-condition">{itemAttr(i, "condition") || "—"}</span></td>
+                    <td className="shrink">
+                      {itemAttr(i, "condition") ? (
+                        <span
+                          className="stock-condition"
+                          style={{
+                            background: `${tagColor(itemAttr(i, "condition"))}26`,
+                            color: tagColor(itemAttr(i, "condition")),
+                            padding: "3px 8px",
+                            borderRadius: 999,
+                          }}
+                        >
+                          {itemAttr(i, "condition")}
+                        </span>
+                      ) : "—"}
+                    </td>
                     <td className="stock-supplier-cell">
                       <div className="ellipsis" title={supplierNameOf(i)}>{supplierNameOf(i)}</div>
                       {i.lotTag && <div className="hint ellipsis" title={i.lotTag}>Lot · {i.lotTag}</div>}
