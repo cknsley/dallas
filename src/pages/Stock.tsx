@@ -12,7 +12,7 @@ import { useSecteur } from "../lib/useSecteur";
 import { dshortNoYear, eur, eur2 } from "../lib/format";
 import { TCG_CATEGORIES, fieldLabels, getTcgCategory, itemAttr, type AttrKey, type TcgCategory } from "../lib/sectorFields";
 import { downloadText, itemsToCSV, stockFilename } from "../lib/csv";
-import { Download, Plus, Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Download, Plus, Pencil, Trash2 } from "lucide-react";
 import ItemModal from "../modals/ItemModal";
 import SellModal from "../modals/SellModal";
 import GradeRevealModal from "../modals/GradeRevealModal";
@@ -96,6 +96,12 @@ const TCG_STOCK_TABS: { key: TcgCategory | "total"; label: string; icon: string 
   ...TCG_CATEGORIES,
 ];
 
+/** Regroupe les formats TCG en deux familles, comme les sous-menus de la navigation. */
+const TCG_TAB_GROUPS: { key: string; label: string; icon: string; children: TcgCategory[] }[] = [
+  { key: "cartes", label: "Cartes", icon: "🃏", children: ["raw", "graded", "grading"] },
+  { key: "scelle", label: "Scellé", icon: "📦", children: ["blister", "sealed", "case"] },
+];
+
 type SortKey = "name" | "brand" | "type" | "size" | "condition" | "supplierLot" | "source" | "cost" | "fees" | "price" | "estimate" | "buyDate" | "quantity";
 
 const COLUMNS: { key: SortKey | "photo" | "sell" | "actions"; label: string; sortable: boolean; right?: boolean }[] = [
@@ -144,6 +150,7 @@ export default function Stock() {
   const navigate = useNavigate();
 
   const [view, setView] = usePref<"table" | "grid">("stockView", "table");
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(["cartes", "scelle"]));
   const [catRaw, setCatRaw] = useQueryState("cat", "total");
   const secteur = useSecteur();
   // Dans l'espace TCG comme dans un univers personnalisé, tout appartient déjà à ce
@@ -365,6 +372,66 @@ export default function Stock() {
           </div>
           <button className="btn ghost sm" onClick={() => setCategoryTab("total")}>Retour au stock</button>
         </div>
+      ) : isTcg ? (
+      <div className="stock-tabs-bar" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, alignItems: "flex-start" }}>
+        {(() => {
+          const totalTab = TCG_STOCK_TABS[0];
+          const totalActive = categoryTab === totalTab.key;
+          return (
+            <button
+              type="button"
+              className={`btn stock-tab${totalActive ? " primary" : " ghost"}`}
+              onClick={() => setCategoryTab(totalTab.key)}
+            >
+              <span>{totalTab.icon} {totalTab.label}</span>
+              <span className={`badge stock-tab-badge${totalActive ? " active" : ""}`}>{tabCounts[totalTab.key] ?? 0}</span>
+            </button>
+          );
+        })()}
+        {TCG_TAB_GROUPS.map((group) => {
+          const expanded = expandedGroups.has(group.key);
+          const groupCount = group.children.reduce((a, k) => a + (tabCounts[k] ?? 0), 0);
+          const groupActive = group.children.includes(categoryTab as TcgCategory);
+          return (
+            <div key={group.key} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <button
+                type="button"
+                className={`btn stock-tab${groupActive ? " primary" : " ghost"}`}
+                onClick={() =>
+                  setExpandedGroups((s) => {
+                    const next = new Set(s);
+                    next.has(group.key) ? next.delete(group.key) : next.add(group.key);
+                    return next;
+                  })
+                }
+              >
+                <span>{group.icon} {group.label}</span>
+                <span className={`badge stock-tab-badge${groupActive ? " active" : ""}`}>{groupCount}</span>
+                {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+              {expanded && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", paddingLeft: 14 }}>
+                  {group.children.map((key) => {
+                    const tab = TCG_STOCK_TABS.find((t) => t.key === key)!;
+                    const active = categoryTab === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        className={`btn stock-tab sm${active ? " primary" : " ghost"}`}
+                        onClick={() => setCategoryTab(key)}
+                      >
+                        <span>{tab.icon} {tab.label}</span>
+                        <span className={`badge stock-tab-badge${active ? " active" : ""}`}>{tabCounts[key] ?? 0}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
       ) : visibleTabs.length > 0 && (
       <div className="stock-tabs-bar" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
         {visibleTabs.map((tab) => {
