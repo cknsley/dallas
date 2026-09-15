@@ -139,7 +139,7 @@ const sortValue = (i: Item, k: SortKey): string | number => {
 };
 
 export default function Stock() {
-  const { state, deleteItem } = useStore();
+  const { state, dispatch, deleteItem } = useStore();
   const toast = useToast();
   const navigate = useNavigate();
 
@@ -243,6 +243,24 @@ export default function Stock() {
           .map((v) => String(v ?? "").toLowerCase())
           .join("|");
 
+  /**
+   * Avant d'éditer une ligne groupée, fusionne les fiches identiques en une seule
+   * (quantité cumulée) : sinon modifier la quantité affichée ne touche qu'une des
+   * fiches sous-jacentes et le total groupé semble « s'additionner » au lieu de se
+   * réinitialiser.
+   */
+  const editGroup = (group: { rep: Item; items: Item[]; qty: number }) => {
+    if (group.items.length <= 1) {
+      setEditing({ item: group.rep });
+      return;
+    }
+    const sorted = [...group.items].sort((a, b) => a.createdAt - b.createdAt);
+    const primary = sorted[0];
+    sorted.slice(1).forEach((it) => dispatch({ type: "removeItem", id: it.id }));
+    dispatch({ type: "patchItem", id: primary.id, patch: { quantity: group.qty } });
+    setEditing({ item: { ...primary, quantity: group.qty } });
+  };
+
   const groupedList = useMemo(() => {
     const map = new Map<string, { key: string; rep: Item; items: Item[]; qty: number }>();
     for (const i of list) {
@@ -305,7 +323,11 @@ export default function Stock() {
             ✨ Révéler note
           </button>
         )}
-        <button className="iconbtn" title="Éditer" onClick={() => setEditing({ item: i })}>
+        <button
+          className="iconbtn"
+          title="Éditer"
+          onClick={() => (group && group.length > 1 ? editGroup({ rep: i, items: group, qty: group.reduce((a, x) => a + qtyOf(x), 0) }) : setEditing({ item: i }))}
+        >
           <Pencil size={14} />
         </button>
         <button className="iconbtn del" title="Supprimer" onClick={() => setConfirming(group && group.length > 1 ? group : [i])}>
@@ -442,7 +464,7 @@ export default function Stock() {
                     <td className="shrink"><Photo id={i.photoId} /></td>
                     <td className="stock-name-cell">
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <button className="linkish ellipsis" title={i.name} onClick={() => setEditing({ item: i })}>
+                        <button className="linkish ellipsis" title={i.name} onClick={() => editGroup({ rep: i, items, qty })}>
                           {i.name || "Sans nom"}
                         </button>
                       </div>
@@ -515,7 +537,7 @@ export default function Stock() {
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="brand-line">{itemAttr(i, "brand") || "—"}</div>
-                    <button className="linkish" onClick={() => setEditing({ item: i })}>
+                    <button className="linkish" onClick={() => editGroup({ rep: i, items, qty })}>
                       {i.name || "Sans nom"}
                     </button>
                   </div>
