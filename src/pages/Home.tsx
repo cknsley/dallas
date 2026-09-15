@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, ArrowUp, ArrowDown, Plus, X, Trash2, DollarSign, TrendingUp, Wallet, Boxes, Sparkles, CheckSquare } from "lucide-react";
 import { Confirm, Modal } from "../components/ui";
 import { useStore } from "../store/StoreContext";
-import { computeStats, filterSourcingByDomain, periodRange, sectorMeta, todoDomain } from "../lib/calc";
+import { computeStats, filterSourcingByDomain, periodRange, sectorMeta } from "../lib/calc";
 import { eur, num } from "../lib/format";
 import { uid } from "../lib/id";
 import type { CustomSector } from "../types";
@@ -235,93 +235,6 @@ export default function Home() {
             <span className="home-sector-add-lbl">Ajouter un univers</span>
             <span className="home-sector-add-sub">Créer une nouvelle page secteur sur-mesure</span>
           </button>
-        </div>
-      </section>
-
-      {/* ── SOURCING CENTRALISÉ — TOUS UNIVERS ── */}
-      <section className="home-section" style={{ marginTop: 24 }}>
-        <div className="home-section-title">
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", flexWrap: "wrap", gap: 10 }}>
-            <div>
-              <h2>🛒 Sourcing Centralisé</h2>
-              <span className="hint">Toutes vos opportunités et recherches d'achat réunies par univers (Vêtements, TCG...)</span>
-            </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <Link to="/sourcing" className="btn sm primary" style={{ textDecoration: "none" }}>
-                Ouvrir Sourcing ({activeSourcing.length}) <ArrowRight size={14} style={{ marginLeft: 4 }} />
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        <div className="card" style={{ padding: "18px 20px" }}>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
-            <div className="pill info" style={{ padding: "6px 12px", fontSize: 12 }}>
-              🔎 <b>{activeSourcing.filter((t) => !t.dueDate).length}</b> &nbsp; À rechercher
-            </div>
-            <div className="pill warn" style={{ padding: "6px 12px", fontSize: 12 }}>
-              💬 <b>{activeSourcing.filter((t) => !!t.dueDate).length}</b> &nbsp; En négociation
-            </div>
-            <div className="pill good" style={{ padding: "6px 12px", fontSize: 12 }}>
-              ✓ <b>{allSourcing.filter((t) => t.ordered || t.col === "termine").length}</b> &nbsp; Trouvés / Commandés
-            </div>
-          </div>
-
-          {activeSourcing.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "20px 0", color: "var(--ink-3)" }}>
-              <p style={{ margin: "0 0 12px 0", fontSize: 14 }}>Aucun produit en sourcing actif pour le moment.</p>
-              <Link to="/sourcing" className="btn sm primary">
-                🛒 + Ajouter un produit à sourcer
-              </Link>
-            </div>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
-              {activeSourcing.slice(0, 4).map((t) => {
-                const sDom = todoDomain(t);
-                const sMeta = sectorMeta(sDom, customSectors);
-                const isNego = !!t.dueDate;
-                return (
-                  <div
-                    key={t.id}
-                    className="card"
-                    style={{
-                      padding: "14px 16px",
-                      background: "var(--surface-2)",
-                      border: "1px solid var(--line)",
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
-                      gap: 8,
-                    }}
-                  >
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 6 }}>
-                        <span className="pill info" style={{ fontSize: 11, fontWeight: 600 }}>
-                          {sMeta.icon} {sMeta.label}
-                        </span>
-                        <span className={`pill ${isNego ? "warn" : "ghost"}`} style={{ fontSize: 10 }}>
-                          {isNego ? "💬 En négo" : "🔎 À chercher"}
-                        </span>
-                      </div>
-                      <b style={{ fontSize: 14, display: "block", color: "var(--ink)" }}>{t.text}</b>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4, fontSize: 11 }}>
-                        {t.sourcingBrand && <span className="pill ghost">{t.sourcingBrand}</span>}
-                        {t.sourcingPrice && t.sourcingPrice > 0 ? (
-                          <span className="pill good">Budget: {eur(t.sourcingPrice)}</span>
-                        ) : null}
-                        {t.supplierName && <span className="pill ghost">🏢 {t.supplierName}</span>}
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
-                      <Link to={`/sourcing?secteur=${sDom}`} className="btn sm ghost" style={{ fontSize: 11 }}>
-                        Voir dans {sMeta.label} →
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
       </section>
 
