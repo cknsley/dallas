@@ -169,7 +169,8 @@ export default function Stock() {
   const [brand, setBrand] = useQueryState("brand");
   const [type, setType] = useQueryState("type");
   const [size, setSize] = useQueryState("size");
-  const clearFilters = useClearQuery(["q", "brand", "type", "size"]);
+  const [sealed, setSealed] = useQueryState("sealed");
+  const clearFilters = useClearQuery(["q", "brand", "type", "size", "sealed"]);
   const [sortKey, setSortKey] = useState<SortKey>("buyDate");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
@@ -214,6 +215,11 @@ export default function Stock() {
       if (brand && itemAttr(i, "brand") !== brand) return false;
       if (type && itemAttr(i, "type") !== type) return false;
       if (size && itemAttr(i, "size") !== size) return false;
+      if (sealed && isTcg) {
+        const isSealed = i.tcgSealed !== false;
+        if (sealed === "scelle" && !isSealed) return false;
+        if (sealed === "ouvert" && isSealed) return false;
+      }
       if (needle) {
         const hay = [i.name, i.brand, i.type, i.size, i.source, i.notes, i.sku, i.condition, i.tcgGame, i.tcgSet, i.tcgGrade].join(" ").toLowerCase();
         if (!hay.includes(needle)) return false;
@@ -227,7 +233,7 @@ export default function Stock() {
       if (x === y) return b.createdAt - a.createdAt;
       return (x > y ? 1 : -1) * dir;
     });
-  }, [held, categoryTab, brand, type, size, q, sortKey, sortDir, isTcg]);
+  }, [held, categoryTab, brand, type, size, sealed, q, sortKey, sortDir, isTcg]);
 
   /** Clé de regroupement : même SKU, ou à défaut même fiche produit (nom/marque/type/taille/coût/prix). */
   const groupKeyOf = (i: Item): string =>
@@ -267,7 +273,7 @@ export default function Stock() {
     }
   };
 
-  const hasFilters = !!brand || !!type || !!size || !!q;
+  const hasFilters = !!brand || !!type || !!size || !!sealed || !!q;
   const linkedDoc = (i: Item) => state.docs.find((d) => d.itemIds.includes(i.id));
   const supplierNameOf = (i: Item) =>
     state.suppliers.find((supplier) => supplier.id === i.supplierId || supplier.id === i.source || supplier.name === i.source)?.name
@@ -373,6 +379,13 @@ export default function Stock() {
           <option value="">{labels.sizeAll}</option>
           {uniq("size").map((b) => <option key={b}>{b}</option>)}
         </select>
+        {isTcg && (
+          <select value={sealed} onChange={(e) => setSealed(e.target.value)} style={{ width: "auto", minWidth: 110 }}>
+            <option value="">Scellé ou non</option>
+            <option value="scelle">Scellé</option>
+            <option value="ouvert">Ouvert</option>
+          </select>
+        )}
         <div className="grow">
           <input
             type="search"

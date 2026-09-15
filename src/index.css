@@ -1273,8 +1273,8 @@ a.balance-row:hover, button.balance-row:hover { background: var(--accent-soft); 
 .stock-table.tcg th:nth-child(2), .stock-table.tcg td:nth-child(2) { width: 220px; }
 .stock-table.tcg th:nth-child(3), .stock-table.tcg td:nth-child(3) { width: 60px; }
 .stock-table.tcg th:nth-child(4), .stock-table.tcg td:nth-child(4) { width: 130px; }
-.stock-table.tcg th:nth-child(5), .stock-table.tcg td:nth-child(5) { width: 110px; }
-.stock-table.tcg th:nth-child(6), .stock-table.tcg td:nth-child(6) { width: 110px; }
+.stock-table.tcg th:nth-child(5), .stock-table.tcg td:nth-child(5) { width: 130px; }
+.stock-table.tcg th:nth-child(6), .stock-table.tcg td:nth-child(6) { width: 90px; }
 .stock-table.tcg th:nth-child(7), .stock-table.tcg td:nth-child(7) { width: 90px; }
 .stock-table.tcg th:nth-child(8), .stock-table.tcg td:nth-child(8) { width: 70px; }
 .stock-table.tcg th:nth-child(9), .stock-table.tcg td:nth-child(9) { width: 90px; }
