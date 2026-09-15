@@ -4,7 +4,7 @@ import { HeaderActions } from "../components/Layout";
 import { Kpi, RangePicker } from "../components/ui";
 import MenuButton from "../components/MenuButton";
 import { useStore } from "../store/StoreContext";
-import { costOf, filterTodosByDomain, qtyOf } from "../lib/calc";
+import { computeStats, costOf, filterTodosByDomain, qtyOf } from "../lib/calc";
 import { useDateRange } from "../lib/useDateRange";
 import { useSecteur } from "../lib/useSecteur";
 import { dshort, eur, num, today } from "../lib/format";
@@ -39,7 +39,7 @@ export default function CentraleAchat() {
   const secteur = useSecteur();
   const isTcg = secteur.domain === "tcg";
   const labels = fieldLabels(secteur.domain);
-  const { from: dateFrom, to: dateTo, setRange } = useDateRange("centrale");
+  const { range, from: dateFrom, to: dateTo, setRange } = useDateRange("centrale");
   const [tab, setTab] = useState<Tab>("colis");
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [importingInvoice, setImportingInvoice] = useState(false);
@@ -61,6 +61,8 @@ export default function CentraleAchat() {
 
   const stockItems = useMemo(() => secteur.items.filter((i) => i.status === "stock"), [secteur.items]);
   const stockValue = useMemo(() => stockItems.reduce((a, i) => a + costOf(i), 0), [stockItems]);
+  const ca = useMemo(() => computeStats(state, range, secteur.domain).ca, [state, range, secteur.domain]);
+  const vaultAmount = state.settings.vaultAmount || 0;
 
   /** Todo actifs, triés par échéance la plus proche (sans date en dernier). */
   const activeTodos = useMemo(
@@ -144,17 +146,10 @@ export default function CentraleAchat() {
       </HeaderActions>
 
       <div className="kpi-grid" style={{ marginBottom: 18 }}>
-        <Kpi
-          label="Tâches actives"
-          value={String(activeTodos.length)}
-          meta={activeTodos.length ? "À traiter dans le Todo" : "Rien en attente"}
-          tone={activeTodos.length ? "info" : "ok"}
-          to={links.todo({ secteur: secteur.domain !== "all" ? secteur.domain : undefined })}
-          hint="Voir"
-        />
+        <Kpi label="CA" value={eur(ca)} meta={range.label} tone="ok" to={links.ventes()} hint="Voir" />
+        <Kpi label="Stock" value={eur(stockValue)} meta={`${stockItems.reduce((a, i) => a + qtyOf(i), 0)} article(s) disponibles`} tone="ok" to={links.stock({ status: "stock" })} hint="Voir" />
+        <Kpi label="Trésorerie" value={eur(vaultAmount)} meta="Coffre-fort" tone="info" to={links.reglages()} hint="Voir" />
         <Kpi label="Ventes à traiter" value={String(ventesATraiter.length)} meta={ventesATraiter.length ? "Règlement ou envoi en attente" : "Tout est réglé"} tone={ventesATraiter.length ? "warn" : "ok"} to={links.ventes()} hint="Voir" />
-        <Kpi label="Colis en livraison" value={String(enLivraison.length)} meta={enLivraison.length ? "Pas encore reçus par l'acheteur" : "Aucune livraison en cours"} tone={enLivraison.length ? "info" : "ok"} to={links.livraison()} hint="Voir" />
-        <Kpi label="Stock actuel" value={eur(stockValue)} meta={`${stockItems.reduce((a, i) => a + qtyOf(i), 0)} article(s) disponibles`} tone="ok" to={links.stock({ status: "stock" })} hint="Voir" />
       </div>
 
       {tab === "colis" && (
