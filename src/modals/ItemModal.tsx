@@ -7,7 +7,7 @@ import { ARTICLE_TYPES, PLATFORMS } from "../lib/constants";
 import { eur2, num, pct, today } from "../lib/format";
 import { uid } from "../lib/id";
 import { LABEL, eurLabel } from "../lib/lexicon";
-import { isTcgItem, qtyOf } from "../lib/calc";
+import { isTcgItem } from "../lib/calc";
 import { useSecteur } from "../lib/useSecteur";
 import { TCG_CATEGORIES, TCG_GAMES, TCG_GRADES, fieldLabels, sectorStamp } from "../lib/sectorFields";
 import type { Item, PackagingKind } from "../types";
@@ -88,7 +88,6 @@ export default function ItemModal({
   const [pendingURL, setPendingURL] = useState<string | null>(null);
   const [cleared, setCleared] = useState(false);
   const [step, setStep] = useState<ItemStep>("base");
-  const [syncLotCosts, setSyncLotCosts] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const conditionOptions = [...VINTED_CONDITIONS, ...CONDITION_GRADES];
@@ -120,10 +119,6 @@ export default function ItemModal({
     };
   }, [state.items, tcg]);
 
-  const existingLots = useMemo(() => {
-    return [...new Set(state.items.map((i) => i.lotTag).filter(Boolean))].sort();
-  }, [state.items]);
-
   const isSold = draft.status === "vendu";
   const stepIndex = ITEM_STEPS.findIndex((s) => s.key === step);
   const isFirstStep = stepIndex === 0;
@@ -143,49 +138,6 @@ export default function ItemModal({
     if (tcg || !raw.trim()) return [raw.trim()];
     const items = raw.split(/[,/]+/).map((s) => s.trim()).filter(Boolean);
     return items.length > 0 ? items : [raw.trim()];
-  };
-
-  const selectLot = (lotTag: string) => {
-    if (!lotTag) {
-      set("lotTag", "");
-      setSyncLotCosts(false);
-      return;
-    }
-
-    const linkedItems = state.items.filter((candidate) => candidate.lotTag === lotTag && candidate.id !== draft.id);
-    const currentAlreadyInLot = item?.lotTag === lotTag;
-    const addedUnits = qty * (isNew ? parseSizes(draft.size).length : 1);
-    const totalUnits = linkedItems.reduce((sum, candidate) => sum + qtyOf(candidate), 0) + addedUnits;
-    const shippingTotal = linkedItems.reduce(
-      (sum, candidate) => sum + num(candidate.purchaseShipping) * qtyOf(candidate),
-      currentAlreadyInLot ? num(draft.purchaseShipping) * qty : 0,
-    );
-    const customsTotal = linkedItems.reduce(
-      (sum, candidate) => sum + num(candidate.customsFees) * qtyOf(candidate),
-      currentAlreadyInLot ? num(draft.customsFees) * qty : 0,
-    );
-
-    setDraft((current) => ({
-      ...current,
-      lotTag,
-      purchaseShipping: shippingTotal > 0 ? (shippingTotal / totalUnits).toFixed(2) : "",
-      customsFees: customsTotal > 0 ? (customsTotal / totalUnits).toFixed(2) : "",
-    }));
-    setSyncLotCosts(true);
-  };
-
-  const syncLinkedLotCosts = (savedIds: string[], saved: Item) => {
-    if (!syncLotCosts || !saved.lotTag) return;
-    state.items
-      .filter((candidate) => candidate.lotTag === saved.lotTag && !savedIds.includes(candidate.id))
-      .forEach((candidate) => dispatch({
-        type: "patchItem",
-        id: candidate.id,
-        patch: {
-          purchaseShipping: saved.purchaseShipping || 0,
-          customsFees: saved.customsFees || 0,
-        },
-      }));
   };
 
   const generateVintedDescription = (): string => {
@@ -305,7 +257,6 @@ export default function ItemModal({
         dispatch({ type: "upsertItem", item: next });
         createdItems.push(next);
       }
-      syncLinkedLotCosts(createdItems.map((created) => created.id), createdItems[0]);
       toast(`${createdItems.length} fiches créées (Tailles : ${sizes.join(", ")})`);
       return createdItems[0];
     }
@@ -347,7 +298,6 @@ export default function ItemModal({
         : {}),
     };
     dispatch({ type: "upsertItem", item: next });
-    syncLinkedLotCosts([next.id], next);
     return next;
   };
 
@@ -553,20 +503,22 @@ export default function ItemModal({
           </Field>
         )}
 
-        <Field label={tcg ? labels.size : "Taille(s)"}>
-          <input
-            type="text"
-            list="dl-size"
-            value={draft.size}
-            placeholder={tcg ? "Ex. PSA 10 Gem Mint" : "Ex. 42 (ou '38, 39, 40')"}
-            onChange={(e) => set("size", e.target.value)}
-          />
-          {isNew && !tcg && draft.size.includes(",") && (
-            <span className="hint pos" style={{ fontSize: 11, marginTop: 2, display: "block" }}>
-              ✨ {parseSizes(draft.size).length} fiches distinctes seront créées automatiquement !
-            </span>
-          )}
-        </Field>
+        {!tcg && (
+          <Field label="Taille(s)">
+            <input
+              type="text"
+              list="dl-size"
+              value={draft.size}
+              placeholder="Ex. 42 (ou '38, 39, 40')"
+              onChange={(e) => set("size", e.target.value)}
+            />
+            {isNew && draft.size.includes(",") && (
+              <span className="hint pos" style={{ fontSize: 11, marginTop: 2, display: "block" }}>
+                ✨ {parseSizes(draft.size).length} fiches distinctes seront créées automatiquement !
+              </span>
+            )}
+          </Field>
+        )}
 
         {tcg ? (
           <Field label={labels.type}>
@@ -588,19 +540,6 @@ export default function ItemModal({
           <input type="text" list="dl-source" value={draft.source} placeholder="Ex. Vinted, friperie, grossiste" onChange={(e) => set("source", e.target.value)} />
         </Field>
 
-        <Field label="Fait partie d'un lot ?">
-          <select value={draft.lotTag || ""} onChange={(e) => selectLot(e.target.value)}>
-            <option value="">Non (Article solo)</option>
-            {existingLots.map((lot) => (
-              <option key={lot} value={lot}>{lot}</option>
-            ))}
-          </select>
-          {draft.lotTag && (
-            <span className="hint" style={{ display: "block", marginTop: 4, fontSize: 10 }}>
-              {state.items.filter((candidate) => candidate.lotTag === draft.lotTag && candidate.id !== draft.id).reduce((sum, candidate) => sum + qtyOf(candidate), 0) + qty} unités · frais répartis automatiquement
-            </span>
-          )}
-        </Field>
       </div>
 
       {/* Univers personnalisé : uniquement si l'utilisateur en a créé depuis l'accueil */}
@@ -621,35 +560,12 @@ export default function ItemModal({
         <>
       <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 14 }}>
         <Field label="État / Condition de l'article">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 8, marginTop: 4 }}>
-            {conditionOptions.map((cond) => {
-              const active = draft.condition === cond;
-              return (
-                <button
-                  key={cond}
-                  type="button"
-                  onClick={() => set("condition", cond)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: "10px 8px",
-                    borderRadius: 8,
-                    border: active ? "2px solid var(--accent)" : "1px solid var(--line-2)",
-                    background: active ? "var(--accent-sub)" : "var(--surface-sub)",
-                    color: active ? "var(--accent-glow)" : "var(--ink)",
-                    fontWeight: active ? 600 : 400,
-                    fontSize: 12,
-                    cursor: "pointer",
-                    textAlign: "center",
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  {cond}
-                </button>
-              );
-            })}
-          </div>
+          <select value={draft.condition || ""} onChange={(e) => set("condition", e.target.value)}>
+            <option value="">Non précisé</option>
+            {conditionOptions.map((cond) => (
+              <option key={cond} value={cond}>{cond}</option>
+            ))}
+          </select>
         </Field>
 
         {/* Boîte & Accessoires - Boutons carrés interactifs */}
@@ -702,31 +618,29 @@ export default function ItemModal({
       {step === "prix" && (
         <>
       <div className="fgrid">
-        <Field label={eurLabel(LABEL.cost)}>
+        <Field label={eurLabel("Prix unitaire")}>
           <input type="number" step="0.01" value={draft.cost} placeholder="0,00" onChange={(e) => set("cost", e.target.value)} />
-          {qty > 1 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
-              <span className="hint" style={{ fontSize: 11, whiteSpace: "nowrap" }}>Total lot (x{qty})</span>
-              <input
-                type="number"
-                step="0.01"
-                placeholder="0,00"
-                style={{ height: 28, fontSize: 12 }}
-                value={num(draft.cost) > 0 ? String(Math.round(num(draft.cost) * qty * 100) / 100) : ""}
-                onChange={(e) => set("cost", e.target.value ? String(num(e.target.value) / qty) : "")}
-              />
-            </div>
-          )}
         </Field>
-        <Field label={eurLabel(draft.lotTag ? "Part livraison du lot" : "Livraison")}>
-          <input type="number" min="0" step="0.01" value={draft.purchaseShipping} placeholder="0,00" onChange={(e) => { set("purchaseShipping", e.target.value); setSyncLotCosts(!!draft.lotTag); }} />
+        <Field label={eurLabel("Livraison")}>
+          <input type="number" min="0" step="0.01" value={draft.purchaseShipping} placeholder="0,00" onChange={(e) => set("purchaseShipping", e.target.value)} />
         </Field>
-        <Field label={eurLabel(draft.lotTag ? "Part douane du lot" : "Douane")}>
-          <input type="number" min="0" step="0.01" value={draft.customsFees} placeholder="0,00" onChange={(e) => { set("customsFees", e.target.value); setSyncLotCosts(!!draft.lotTag); }} />
+        <Field label={eurLabel("Douane")}>
+          <input type="number" min="0" step="0.01" value={draft.customsFees} placeholder="0,00" onChange={(e) => set("customsFees", e.target.value)} />
         </Field>
         <Field label={eurLabel("Autres frais")}>
           <input type="number" min="0" step="0.01" value={draft.fees} placeholder="Nettoyage, retouche…" onChange={(e) => set("fees", e.target.value)} />
         </Field>
+      </div>
+
+      <div className="note info">
+        <span className="glyph">≡</span>
+        <div>
+          Estimation prix d'achat total <b className="num">{eur2(totalCost)}</b>
+          {qty > 1 && <> ({qty} × {eur2(num(draft.cost))} + livraison + douane + frais)</>}
+        </div>
+      </div>
+
+      <div className="fgrid" style={{ marginTop: 14 }}>
         <Field label={eurLabel(isSold ? LABEL.price : "Prix estimé")}>
           <input
             type="number"
@@ -740,28 +654,6 @@ export default function ItemModal({
               set("estimatedPrice", e.target.value);
             }}
           />
-          {qty > 1 && !isSold && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
-              <span className="hint pos" style={{ fontSize: 11, whiteSpace: "nowrap" }}>Total revente (x{qty})</span>
-              <input
-                type="number"
-                step="0.01"
-                placeholder="0,00"
-                style={{ height: 28, fontSize: 12 }}
-                value={price > 0 ? String(Math.round(price * qty * 100) / 100) : ""}
-                onChange={(e) => {
-                  const unit = e.target.value ? String(num(e.target.value) / qty) : "";
-                  set("price", unit);
-                  set("estimatedPrice", unit);
-                }}
-              />
-            </div>
-          )}
-          {qty > 1 && isSold && price > 0 && (
-            <span className="hint pos" style={{ fontSize: 11, marginTop: 2, display: "block" }}>
-              Total Revente (x{qty}) : {eur2(price * qty)}
-            </span>
-          )}
         </Field>
       </div>
 
@@ -769,7 +661,7 @@ export default function ItemModal({
         <span className="glyph">≡</span>
         <div>
           {!price ? (
-            <>{LABEL.totalCost} <b className="num">{eur2(totalCost)}</b> — donnez une {LABEL.estimate.toLowerCase()} pour voir la marge.</>
+            <>Donnez une {LABEL.estimate.toLowerCase()} pour voir la marge.</>
           ) : isSold ? (
             <>
               Marge nette <b className="num">{eur2(marge)}</b> · ROI <b className="num">{pct(outflow ? (marge / outflow) * 100 : 0)}</b>
