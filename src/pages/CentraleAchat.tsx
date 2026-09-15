@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { HeaderActions } from "../components/Layout";
-import { Kpi, RangePicker } from "../components/ui";
+import { Kpi, Modal, RangePicker } from "../components/ui";
 import MenuButton from "../components/MenuButton";
 import { useStore } from "../store/StoreContext";
 import { computeStats, costOf, filterTodosByDomain, qtyOf } from "../lib/calc";
@@ -46,6 +46,8 @@ export default function CentraleAchat() {
   const [creatingOrder, setCreatingOrder] = useState<{ mode: "lot" | "supplier"; defaultSource?: string; initialLines?: OrderPresetLine[] } | null>(null);
   const [addingExpense, setAddingExpense] = useState(false);
   const [newItem, setNewItem] = useState(false);
+  const [vaultOpen, setVaultOpen] = useState(false);
+  const [draftVault, setDraftVault] = useState("");
 
   const [expressBrand, setExpressBrand] = useState("");
   const [expressName, setExpressName] = useState("");
@@ -148,7 +150,14 @@ export default function CentraleAchat() {
       <div className="kpi-grid" style={{ marginBottom: 18 }}>
         <Kpi label="CA" value={eur(ca)} meta={range.label} tone="ok" to={links.ventes()} hint="Voir" />
         <Kpi label="Stock" value={eur(stockValue)} meta={`${stockItems.reduce((a, i) => a + qtyOf(i), 0)} article(s) disponibles`} tone="ok" to={links.stock({ status: "stock" })} hint="Voir" />
-        <Kpi label="Trésorerie" value={eur(vaultAmount)} meta="Coffre-fort" tone="info" to={links.reglages()} hint="Voir" />
+        <Kpi
+          label="Trésorerie"
+          value={eur(vaultAmount)}
+          meta="Coffre-fort"
+          tone="info"
+          hint="Modifier"
+          onClick={() => { setDraftVault(vaultAmount ? String(vaultAmount) : ""); setVaultOpen(true); }}
+        />
         <Kpi label="Ventes à traiter" value={String(ventesATraiter.length)} meta={ventesATraiter.length ? "Règlement ou envoi en attente" : "Tout est réglé"} tone={ventesATraiter.length ? "warn" : "ok"} to={links.ventes()} hint="Voir" />
       </div>
 
@@ -337,6 +346,40 @@ export default function CentraleAchat() {
       )}
       {addingExpense && <ExpenseModal expense={null} onClose={() => setAddingExpense(false)} />}
       {newItem && <ItemModal item={null} onClose={() => setNewItem(false)} />}
+
+      {vaultOpen && (
+        <Modal
+          title="🔒 Trésorerie"
+          onClose={() => setVaultOpen(false)}
+          footer={
+            <>
+              <button className="btn" onClick={() => setVaultOpen(false)}>Annuler</button>
+              <button
+                className="btn primary"
+                onClick={() => {
+                  dispatch({ type: "settings", patch: { vaultAmount: num(draftVault) } });
+                  setVaultOpen(false);
+                }}
+              >
+                Enregistrer
+              </button>
+            </>
+          }
+        >
+          <label style={{ fontSize: 12, color: "var(--ink-3)", fontWeight: 600, display: "block", marginBottom: 6 }}>
+            Montant de trésorerie disponible
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            autoFocus
+            value={draftVault}
+            onChange={(e) => setDraftVault(e.target.value)}
+            placeholder="0,00"
+            style={{ width: "100%" }}
+          />
+        </Modal>
+      )}
       {importingInvoice && (
         <ImportInvoiceModal
           onClose={() => setImportingInvoice(false)}
